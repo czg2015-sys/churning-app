@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
 import { QuestionnaireForm } from "@/components/questionnaire-form";
-import { createClient } from "@/lib/supabase/server";
-import type { Opportunity } from "@/lib/types";
+import { getLiveOpportunities } from "@/lib/opportunities";
 
 export const metadata: Metadata = { title: "Guest Planner" };
 
 export default async function GuestPage() {
-  const supabase = await createClient();
-  const { data } = await supabase.from("opportunities").select("*").eq("offer_status", "live");
+  const { opportunities, dataAvailable } = await getLiveOpportunities();
 
   return (
     <main className="page-shell guest-page">
@@ -22,7 +20,8 @@ export default async function GuestPage() {
             <span className="active" /><span /><span /><span />
           </div>
         </div>
-        <QuestionnaireForm initial={null} guestMode opportunities={(data || []) as Opportunity[]} />
+        {!dataAvailable && <div className="disclaimer"><strong>Guest Mode is still available.</strong> Live offers are temporarily unavailable, so you can build a practice allocation but recommendation cards may be empty.</div>}
+        <QuestionnaireForm initial={null} guestMode opportunities={opportunities} />
       </div>
     </main>
   );
