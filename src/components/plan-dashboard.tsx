@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowUpRight, CreditCard, Landmark, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, CreditCard, Landmark, ShieldCheck, Sparkles } from "lucide-react";
 import type { FinancialProfile, Opportunity } from "@/lib/types";
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -23,7 +23,7 @@ function PlanChoice({ title, subtitle, icon, options, selected, onChange }: {
 }) {
   return (
     <article className="plan-card">
-      <div className="plan-card-head"><span className="plan-card-icon">{icon}</span><div><h3>{title}</h3><p>{subtitle}</p></div></div>
+      <div className="plan-card-head"><span className="plan-card-icon">{icon}</span><div><h3>{title}</h3><p>{subtitle}</p></div><span className="rank-badge">Top match</span></div>
       <div className="plan-card-body">
         <select className="plan-select" aria-label={"Choose " + title} value={selected?.id || ""} onChange={(event) => onChange(event.target.value)}>
           {options.map((option, index) => <option key={option.id} value={option.id}>#{index + 1} · {option.institution} · {number(option.bonus_amount) ? money.format(number(option.bonus_amount)) : number(option.apy).toFixed(2) + "% APY"}</option>)}
@@ -47,7 +47,7 @@ function PlanChoice({ title, subtitle, icon, options, selected, onChange }: {
   );
 }
 
-export function PlanDashboard({ profile, opportunities }: { profile: FinancialProfile; opportunities: Opportunity[] }) {
+export function PlanDashboard({ profile, opportunities, guestMode = false }: { profile: FinancialProfile; opportunities: Opportunity[]; guestMode?: boolean }) {
   const preference = profile.ranking_preference || "balanced";
   const directDeposit = useMemo(() => rank(opportunities.filter((item) => item.category === "checking_bonus"), preference), [opportunities, preference]);
   const savings = useMemo(() => rank(opportunities.filter((item) => item.category === "hysa" || item.category === "savings_bonus"), preference), [opportunities, preference]);
@@ -72,7 +72,7 @@ export function PlanDashboard({ profile, opportunities }: { profile: FinancialPr
     <>
       <section className="plan-summary">
         <div className="summary-main">
-          <span className="kicker">YOUR BEST CURRENT SPLIT</span>
+          <div className="summary-label-row"><span className="kicker">{guestMode ? "YOUR PRACTICE PLAN" : "YOUR BEST CURRENT SPLIT"}</span><span className="optimized-pill"><Sparkles size={13} /> Optimized</span></div>
           <h2>Keep your reserve liquid, earn on the rest, and route your paycheck toward one bonus at a time.</h2>
           <p>This plan favors {preference === "balanced" ? "a balance of profit and effort" : preference}. It never moves money for you, and every offer should be rechecked before you apply.</p>
           <div className="summary-stats">

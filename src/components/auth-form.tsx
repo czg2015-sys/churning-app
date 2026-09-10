@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export function AuthForm() {
@@ -67,6 +69,9 @@ export function AuthForm() {
           {mode === "signin" ? "Create an account" : "Sign in"}
         </button>
       </div>
+      <div className="auth-divider"><span>or</span></div>
+      <Link className="button guest-auth-button full" href="/guest"><Sparkles size={17} /> Continue as guest</Link>
+      <p className="auth-guest-note">No account needed. Guest plans disappear when you leave.</p>
     </div>
   );
 }
