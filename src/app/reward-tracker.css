@@ -56,5 +56,16 @@
 .add-plan-wrap { display:grid; gap:5px; }
 .add-plan-error { color:var(--danger); font-size:10px; }
 .opportunity-actions { display:flex; gap:8px; align-items:center; justify-content:flex-end; }
-@media (max-width: 900px) { .reward-tracker-head { grid-template-columns:1fr; } .reward-lifetime { width:100%; } .reward-quick-grid { grid-template-columns:repeat(2,1fr); } .reward-quick-grid > div:nth-child(3) { border-left:0; border-top:1px solid var(--line); } .reward-quick-grid > div:nth-child(4) { border-top:1px solid var(--line); } .reward-details { grid-template-columns:1fr; } }
-@media (max-width: 620px) { .reward-card-top,.reward-progress-row { align-items:flex-start; flex-direction:column; } .reward-value { text-align:left; } .reward-quick-grid { grid-template-columns:1fr; } .reward-quick-grid > div + div { border-left:0; border-top:1px solid var(--line); } .reward-next-action { grid-template-columns:1fr; gap:4px; } }
+.dashboard-section-label { display:flex; justify-content:space-between; gap:20px; align-items:end; margin:30px 0 12px; }
+.dashboard-section-label p { margin:0; max-width:560px; color:var(--muted); font-size:12px; text-align:right; }
+.bank-history-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; }
+.bank-history-option { position:relative; cursor:pointer; }
+.bank-history-option input { position:absolute; opacity:0; }
+.bank-history-option span { display:flex; align-items:center; min-height:46px; padding:0 12px; border:1px solid var(--line); border-radius:10px; background:rgba(7,9,13,.32); color:var(--muted-strong); font-size:12px; font-weight:680; transition:160ms ease; }
+.bank-history-option span:hover { border-color:var(--line-strong); background:rgba(255,255,255,.035); }
+.bank-history-option input:checked + span { color:var(--ink); border-color:rgba(199,255,91,.45); background:linear-gradient(145deg,rgba(199,255,91,.12),rgba(129,116,255,.06)); box-shadow:inset 0 0 0 1px rgba(199,255,91,.06); }
+.bank-history-option input:focus-visible + span { outline:2px solid var(--green); outline-offset:3px; }
+.opportunity-row-expanded { grid-template-columns:1.4fr .65fr .8fr .7fr 1.1fr; }
+@media (max-width: 1020px) { .opportunity-row-expanded { grid-template-columns:1.4fr .7fr .8fr; } .opportunity-row-expanded > :nth-child(4), .opportunity-row-expanded > :nth-child(5) { display:none; } }
+@media (max-width: 900px) { .reward-tracker-head { grid-template-columns:1fr; } .reward-lifetime { width:100%; } .reward-quick-grid { grid-template-columns:repeat(2,1fr); } .reward-quick-grid > div:nth-child(3) { border-left:0; border-top:1px solid var(--line); } .reward-quick-grid > div:nth-child(4) { border-top:1px solid var(--line); } .reward-details { grid-template-columns:1fr; } .bank-history-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width: 620px) { .reward-card-top,.reward-progress-row { align-items:flex-start; flex-direction:column; } .reward-value { text-align:left; } .reward-quick-grid { grid-template-columns:1fr; } .reward-quick-grid > div + div { border-left:0; border-top:1px solid var(--line); } .reward-next-action { grid-template-columns:1fr; gap:4px; } .dashboard-section-label { align-items:flex-start; flex-direction:column; } .dashboard-section-label p { text-align:left; } .bank-history-grid { grid-template-columns:1fr; } }
