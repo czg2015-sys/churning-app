@@ -1,0 +1,60 @@
+.reward-tracker-shell { margin: 0 0 18px; }
+.reward-tracker-head { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 20px; align-items: end; padding: 24px; border: 1px solid var(--line); border-radius: 18px 18px 0 0; background: linear-gradient(145deg, rgba(20,27,38,.98), rgba(10,14,21,.98)); }
+.reward-tracker-head h2 { margin: 8px 0 6px; font-size: clamp(26px,3vw,38px); letter-spacing: -.045em; }
+.reward-tracker-head p { max-width: 720px; margin: 0; color: var(--muted); }
+.reward-lifetime { min-width: 210px; padding: 16px 18px; border: 1px solid rgba(199,255,91,.17); border-radius: 13px; background: var(--green-soft); }
+.reward-lifetime small,.reward-lifetime span { display:block; color:var(--muted); font-size:11px; }
+.reward-lifetime strong { display:block; margin:4px 0; color:var(--green); font-size:30px; letter-spacing:-.04em; }
+.reward-tabs { display:flex; gap:8px; padding:12px 16px; border-inline:1px solid var(--line); background:rgba(12,16,23,.86); }
+.reward-tabs button { display:inline-flex; gap:8px; align-items:center; padding:9px 12px; border:1px solid var(--line); border-radius:9px; background:transparent; color:var(--muted-strong); cursor:pointer; font-size:13px; font-weight:760; }
+.reward-tabs button.active { color:var(--green-ink); background:var(--green); border-color:var(--green); }
+.reward-tabs button span { min-width:20px; padding:1px 6px; border-radius:999px; background:rgba(255,255,255,.08); font-size:10px; text-align:center; }
+.reward-grid { display:grid; gap:12px; padding:14px; border:1px solid var(--line); border-radius:0 0 18px 18px; background:rgba(9,12,18,.72); }
+.reward-card { overflow:hidden; border:1px solid var(--line); border-radius:15px; background:linear-gradient(155deg, rgba(22,29,40,.97), rgba(12,16,23,.97)); box-shadow:0 20px 55px rgba(0,0,0,.16); }
+.reward-card-top { display:flex; justify-content:space-between; gap:18px; padding:20px 20px 14px; }
+.reward-bank { color:var(--green); font-family:var(--font-geist-mono),monospace; font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
+.reward-card h3 { margin:5px 0 0; font-size:21px; letter-spacing:-.025em; }
+.reward-value { text-align:right; }
+.reward-value small { display:block; color:var(--muted); font-size:10px; }
+.reward-value strong { display:block; color:var(--green); font-size:24px; }
+.reward-progress-row { display:flex; justify-content:space-between; gap:16px; align-items:end; padding:0 20px 9px; }
+.reward-progress-copy { display:grid; gap:2px; }
+.reward-progress-copy strong { font-size:13px; }
+.reward-progress-copy span { color:var(--muted); font-size:12px; }
+.reward-status { padding:5px 8px; border-radius:999px; background:var(--purple-soft); color:#bdb7ff; font-size:9px; font-weight:850; letter-spacing:.06em; text-transform:uppercase; }
+.reward-progress-track { height:9px; margin:0 20px 18px; overflow:hidden; border-radius:999px; background:#252d39; }
+.reward-progress-track span { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,var(--green-strong),var(--green)); box-shadow:0 0 18px rgba(199,255,91,.22); }
+.reward-quick-grid { display:grid; grid-template-columns:repeat(4,1fr); border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+.reward-quick-grid > div { display:flex; gap:9px; align-items:center; min-width:0; padding:14px 16px; }
+.reward-quick-grid > div + div { border-left:1px solid var(--line); }
+.reward-quick-grid svg { flex:0 0 auto; color:var(--green); }
+.reward-quick-grid span { display:grid; min-width:0; }
+.reward-quick-grid small { color:var(--muted); font-size:9px; }
+.reward-quick-grid b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; }
+.reward-next-action { display:grid; grid-template-columns:95px 1fr; gap:12px; padding:15px 20px; }
+.reward-next-action span { color:var(--muted); font-size:11px; }
+.reward-next-action strong { font-size:12px; }
+.reward-fee-warning { margin:0 20px 14px; padding:11px 12px; border:1px solid rgba(255,211,122,.13); border-radius:10px; background:var(--amber-soft); color:#dfc482; font-size:11px; line-height:1.5; }
+.reward-expand { width:100%; display:flex; align-items:center; justify-content:space-between; padding:13px 20px; border:0; border-top:1px solid var(--line); background:rgba(255,255,255,.018); color:var(--muted-strong); cursor:pointer; font-size:12px; font-weight:760; }
+.reward-expand svg { transition:transform 160ms ease; }
+.reward-expand svg.rotated { transform:rotate(180deg); }
+.reward-details { display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:16px 20px 20px; border-top:1px solid var(--line); background:rgba(7,9,13,.3); }
+.reward-section-title { display:flex; justify-content:space-between; margin-bottom:10px; color:var(--muted-strong); font-size:11px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+.reward-step-list { display:grid; align-content:start; }
+.reward-step { display:block; padding:10px 0; border-top:1px solid var(--line); cursor:pointer; }
+.reward-step input { position:absolute; opacity:0; }
+.reward-step > span { display:flex; align-items:center; gap:9px; font-size:12px; }
+.reward-step svg { color:var(--green); }
+.step-circle { width:17px; height:17px; border:1px solid var(--line-strong); border-radius:50%; }
+.reward-close-plan { padding:14px; border:1px solid var(--line); border-radius:11px; background:rgba(255,255,255,.022); }
+.reward-close-plan p { margin:9px 0 0; color:var(--muted); font-size:11px; line-height:1.55; }
+.reward-close-plan strong { color:var(--ink); }
+.reward-empty { display:grid; place-items:center; text-align:center; padding:44px 20px; }
+.reward-empty svg { color:var(--green); }
+.reward-empty h3 { margin:10px 0 4px; }
+.reward-empty p { max-width:520px; margin:0; color:var(--muted); font-size:13px; }
+.add-plan-wrap { display:grid; gap:5px; }
+.add-plan-error { color:var(--danger); font-size:10px; }
+.opportunity-actions { display:flex; gap:8px; align-items:center; justify-content:flex-end; }
+@media (max-width: 900px) { .reward-tracker-head { grid-template-columns:1fr; } .reward-lifetime { width:100%; } .reward-quick-grid { grid-template-columns:repeat(2,1fr); } .reward-quick-grid > div:nth-child(3) { border-left:0; border-top:1px solid var(--line); } .reward-quick-grid > div:nth-child(4) { border-top:1px solid var(--line); } .reward-details { grid-template-columns:1fr; } }
+@media (max-width: 620px) { .reward-card-top,.reward-progress-row { align-items:flex-start; flex-direction:column; } .reward-value { text-align:left; } .reward-quick-grid { grid-template-columns:1fr; } .reward-quick-grid > div + div { border-left:0; border-top:1px solid var(--line); } .reward-next-action { grid-template-columns:1fr; gap:4px; } }
