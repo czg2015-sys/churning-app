@@ -13,7 +13,7 @@ export async function getLiveOpportunities() {
 
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase.from("opportunities").select("*").eq("offer_status", "live");
+    const { data, error } = await supabase.from("opportunities").select("*, opportunity_reviews(*)").eq("offer_status", "live");
     if (error) throw error;
     return { opportunities: (data || []) as Opportunity[], dataAvailable: true };
   } catch (error) {

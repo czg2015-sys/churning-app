@@ -1,14 +1,15 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  BadgeCheck,
   BadgeDollarSign,
+  CalendarClock,
   CircleCheck,
-  CreditCard,
   Landmark,
   LockKeyhole,
-  MoveUpRight,
   ShieldCheck,
   Sparkles,
+  WalletCards,
 } from "lucide-react";
 
 export default function Home() {
@@ -16,59 +17,54 @@ export default function Home() {
     <main className="home-page">
       <section className="home-hero shell">
         <div className="hero-copy">
-          <div className="eyebrow"><span /> CASH OPTIMIZER · YOU STAY IN CONTROL</div>
-          <h1>Make your cash work <em>harder.</em></h1>
-          <p className="hero-lede">Build a clear strategy across bank bonuses, high-yield savings, and everyday spending—without handing over your money.</p>
+          <div className="eyebrow"><span /> CASH STRATEGY OS · YOU STAY IN CONTROL</div>
+          <h1>Turn idle cash into a <em>tracked strategy.</em></h1>
+          <p className="hero-lede">Churning ranks cash opportunities against your real baseline, then tracks every requirement, payout window, fee, and safe-close review from one command center.</p>
           <div className="hero-actions">
-            <Link className="button primary hero-primary" href="/guest"><Sparkles size={18} /> Try Guest Mode <ArrowRight size={18} /></Link>
+            <Link className="button primary hero-primary" href="/guest"><Sparkles size={18} /> Build a practice plan <ArrowRight size={18} /></Link>
             <Link className="button ghost" href="/auth">Create free account</Link>
           </div>
-          <p className="guest-inline-note"><LockKeyhole size={15} /> Guest plans are private, temporary, and never saved.</p>
+          <p className="guest-inline-note"><LockKeyhole size={15} /> Guest Mode writes nothing to your account or database.</p>
           <div className="trust-row">
-            <span><ShieldCheck size={17} /> No bank connection</span>
+            <span><ShieldCheck size={17} /> Safety floor before ranking</span>
             <span><CircleCheck size={17} /> No automatic transfers</span>
-            <span><CircleCheck size={17} /> Clear requirements</span>
+            <span><CircleCheck size={17} /> Manual reward confirmation</span>
           </div>
         </div>
 
-        <div className="command-preview" aria-label="Example optimized cash plan">
+        <div className="command-preview" aria-label="Example Churning reward tracker">
           <div className="command-glow" />
-          <div className="command-window">
-            <div className="command-header">
-              <div><span className="window-dot" /><span className="overline">PLAN OVERVIEW</span></div>
-              <span className="live-pill"><i /> Example</span>
+          <div className="command-window advanced-preview">
+            <div className="command-header"><div><span className="window-dot" /><span className="overline">REWARD MISSION CONTROL</span></div><span className="live-pill"><i /> Example</span></div>
+            <div className="preview-mission-head"><div><small>CHASE</small><strong>Checking reward</strong></div><b>$400</b></div>
+            <div className="preview-dual-progress">
+              <div><span><b>TIME WINDOW</b><small>45 of 90 days</small></span><strong>50%</strong><i><em style={{ width: "50%" }} /></i></div>
+              <div><span><b>REQUIREMENTS</b><small>2 of 4 confirmed</small></span><strong>50%</strong><i className="green"><em style={{ width: "50%" }} /></i></div>
             </div>
-            <div className="balance-block">
-              <span>Cash assigned</span>
-              <strong>$25,000</strong>
-              <small><MoveUpRight size={14} /> 100% allocated</small>
+            <div className="preview-rows mission-rows">
+              <div><span className="preview-icon yield"><CircleCheck size={18} /></span><p><b>Account opened</b><small>Confirmed Sep 3</small></p><strong>Done</strong></div>
+              <div><span className="preview-icon bonus"><Landmark size={18} /></span><p><b>Direct deposit</b><small>$600 of $1,000 recorded</small></p><strong>60%</strong></div>
+              <div><span className="preview-icon reserve"><CalendarClock size={18} /></span><p><b>Safe-close review</b><small>Calculated from stored terms</small></p><strong>Dec 17</strong></div>
             </div>
-            <div className="allocation-bar" aria-hidden="true"><span /><span /><span /></div>
-            <div className="allocation-key"><span>Reserve 30%</span><span>HYSA 50%</span><span>Bonus 20%</span></div>
-            <div className="preview-rows">
-              <div><span className="preview-icon reserve"><ShieldCheck size={18} /></span><p><b>Emergency reserve</b><small>Always available</small></p><strong>$7,500</strong></div>
-              <div><span className="preview-icon yield"><Landmark size={18} /></span><p><b>High-yield base</b><small>Liquid earnings</small></p><strong>$12,500</strong></div>
-              <div><span className="preview-icon bonus"><BadgeDollarSign size={18} /></span><p><b>Bonus bucket</b><small>One offer at a time</small></p><strong>$5,000</strong></div>
-            </div>
-            <div className="preview-return"><span>Example extra value</span><b>+$612</b><small>estimated annually</small></div>
+            <div className="preview-return"><span>Reward is not counted as earned until you confirm payout</span><b><BadgeCheck size={17} /> Manual</b></div>
           </div>
-          <div className="signal-card signal-one"><span><Landmark size={16} /></span><div><small>HYSA MATCH</small><b>Strong liquidity</b></div></div>
-          <div className="signal-card signal-two"><span><CreditCard size={16} /></span><div><small>SPENDING</small><b>Normal purchases only</b></div></div>
+          <div className="signal-card signal-one"><span><ShieldCheck size={16} /></span><div><small>SAFETY GATE</small><b>80/100 floor</b></div></div>
+          <div className="signal-card signal-two"><span><BadgeDollarSign size={16} /></span><div><small>BASELINE</small><b>Compare vs your HYSA</b></div></div>
         </div>
       </section>
 
-      <section className="product-strip shell" aria-label="What Churning compares">
-        <article><span>01</span><div><h2>Direct deposit</h2><p>Rank bonuses by payoff, effort, and timing.</p></div><Landmark size={21} /></article>
-        <article><span>02</span><div><h2>High-yield savings</h2><p>Keep your liquid cash earning competitively.</p></div><ShieldCheck size={21} /></article>
-        <article><span>03</span><div><h2>Everyday spending</h2><p>Find value without changing how you spend.</p></div><CreditCard size={21} /></article>
+      <section className="product-strip shell" aria-label="Churning core workflow">
+        <article><span>01</span><div><h2>Rank the next move</h2><p>Cash fit, paycheck capacity, liquidity, effort, confidence, and bank history.</p></div><Sparkles size={21} /></article>
+        <article><span>02</span><div><h2>Track the real requirements</h2><p>Separate the time window from what you actually completed.</p></div><CalendarClock size={21} /></article>
+        <article><span>03</span><div><h2>Know when to review the exit</h2><p>Fees, payout timing, safe-close review, and completed earnings history.</p></div><WalletCards size={21} /></article>
       </section>
 
       <section className="process shell" id="how-it-works">
-        <div className="section-heading"><span>HOW IT WORKS</span><h2>From scattered offers to one clear move.</h2></div>
+        <div className="section-heading"><span>THE CHURNING LOOP</span><h2>Recommendation → reward → history → next move.</h2></div>
         <div className="process-grid">
-          <article><b>01</b><h3>Add the basics</h3><p>Enter the cash, reserve, paycheck, and spending numbers that shape your options.</p></article>
-          <article><b>02</b><h3>See your best split</h3><p>Compare a liquid reserve, savings base, and bonus bucket in one view.</p></article>
-          <article><b>03</b><h3>Stay in control</h3><p>Review every requirement yourself before opening or moving anything.</p></article>
+          <article><b>01</b><h3>Build your baseline</h3><p>Enter the cash, reserve, current APY, paycheck, spending, tax estimate, and banks you already use.</p></article>
+          <article><b>02</b><h3>Add one realistic move</h3><p>Choose from safety-cleared recommendations and enter the actual opening date, committed cash, and deposit plan.</p></article>
+          <article><b>03</b><h3>Track until it is real</h3><p>Only confirmed payouts become lifetime earnings. Then review whether the account should stay open.</p></article>
         </div>
       </section>
     </main>

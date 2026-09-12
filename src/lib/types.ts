@@ -1,3 +1,20 @@
+export type OpportunityReview = {
+  id?: string;
+  review_stage: string;
+  overall_status: string;
+  risk_level: string;
+  hard_pull_status: string;
+  chexsystems_status: string;
+  ews_status: string;
+  tax_status: string;
+  insurance_status: string;
+  close_rule_status: string;
+  safe_close_summary?: string | null;
+  source_kind?: string | null;
+  reviewed_at: string;
+  notes?: string | null;
+};
+
 export type Opportunity = {
   id: string;
   institution: string;
@@ -12,10 +29,17 @@ export type Opportunity = {
   required_balance: number | string | null;
   direct_deposit_required: number | string | null;
   direct_deposit_window_days?: number | null;
+  dd_min_each?: number | string | null;
+  dd_deposit_count?: number | null;
+  purchase_count?: number | null;
+  purchase_min_amount?: number | string | null;
+  reward_rate?: number | string | null;
+  reward_cap_annual?: number | string | null;
   qualification_days: number | null;
   payout_days: number | null;
   min_account_age_days?: number | null;
   monthly_fee: number | string | null;
+  estimated_unavoidable_fees?: number | string | null;
   early_close_fee?: number | string | null;
   effort: number | null;
   evidence_confidence: number | null;
@@ -23,7 +47,9 @@ export type Opportunity = {
   terms_summary: string | null;
   eligibility_notes?: string | null;
   fee_waiver_summary?: string | null;
+  state_scope?: string | null;
   last_verified_at: string | null;
+  opportunity_reviews?: OpportunityReview[];
 };
 
 export type MissionStep = {
@@ -75,4 +101,13 @@ export type FinancialProfile = {
   current_spend_reward_rate: number | string;
   ranking_preference: string;
   annual_extra_goal: number | string;
+  recent_bank_openings?: number | string;
+};
+
+export type PlanStartDetails = {
+  openedAlready: boolean;
+  openedAt: string | null;
+  amountCommitted: number;
+  plannedDirectDeposit: number;
+  trackingDays?: number | null;
 };

@@ -1,118 +1,378 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ChevronDown, CircleDollarSign, Clock3, ShieldCheck, TimerReset } from "lucide-react";
-import type { Mission } from "@/lib/types";
+import {
+  BadgeCheck,
+  CalendarDays,
+  CheckCircle2,
+  ChevronDown,
+  CircleDollarSign,
+  Clock3,
+  Landmark,
+  ShieldCheck,
+  TimerReset,
+  TriangleAlert,
+} from "lucide-react";
+import type { Mission, MissionStep } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
-
-const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-
-function daysBetween(start?: string | null, end?: string | null) {
-  if (!start || !end) return null;
-  const a = new Date(start + "T00:00:00");
-  const b = new Date(end + "T00:00:00");
-  return Math.max(0, Math.ceil((b.getTime() - a.getTime()) / 86400000));
-}
+import { latestReview, money, numberValue, reviewStatusLabel, timelineFromOpenedDate } from "@/lib/plan-math";
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function progressFor(mission: Mission) {
+function dateValue(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(`${value.slice(0, 10)}T12:00:00`);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function daysBetween(start?: string | null, end?: string | null) {
+  const a = dateValue(start);
+  const b = dateValue(end);
+  if (!a || !b) return null;
+  return Math.ceil((b.getTime() - a.getTime()) / 86_400_000);
+}
+
+function timeProgress(mission: Mission) {
   if (mission.status === "completed" || mission.status === "closed") return { percent: 100, total: 0, elapsed: 0, remaining: 0 };
-  const start = mission.opened_at;
+  if (!mission.opened_at) return { percent: 0, total: 0, elapsed: 0, remaining: null as number | null };
   const end = mission.qualification_deadline || mission.payout_due_date || mission.safe_close_review_date;
-  const total = daysBetween(start, end);
-  const elapsed = daysBetween(start, todayIso());
-  if (!total || elapsed === null) return { percent: 12, total: total || 0, elapsed: elapsed || 0, remaining: total || null };
-  const bounded = Math.min(total, Math.max(0, elapsed));
-  return { percent: Math.min(100, Math.round((bounded / total) * 100)), total, elapsed: bounded, remaining: Math.max(0, total - bounded) };
+  const total = daysBetween(mission.opened_at, end);
+  const elapsedRaw = daysBetween(mission.opened_at, todayIso());
+  if (!total || elapsedRaw === null) return { percent: 0, total: total || 0, elapsed: Math.max(0, elapsedRaw || 0), remaining: total || null };
+  const elapsed = Math.min(total, Math.max(0, elapsedRaw));
+  return { percent: Math.min(100, Math.round((elapsed / total) * 100)), total, elapsed, remaining: Math.max(0, total - elapsed) };
 }
 
 function readableDate(value?: string | null) {
-  if (!value) return "Not set";
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value + "T00:00:00"));
+  if (!value) return "Not started";
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${value.slice(0, 10)}T12:00:00`));
 }
 
 function safetyLabel(mission: Mission) {
-  const confidence = Number(mission.opportunity?.evidence_confidence || 0);
+  const confidence = numberValue(mission.opportunity?.evidence_confidence);
   const gate = mission.opportunity?.safety_gate;
-  if (gate === "pass" && confidence >= 80) return "High";
-  if (confidence >= 70) return "Moderate";
-  return "Review";
+  if ((gate || "").toLowerCase() === "pass" && confidence >= 80) return { label: "High", tone: "safe" };
+  if (confidence >= 70) return { label: "Review", tone: "review" };
+  return { label: "Re-check", tone: "warning" };
 }
 
-function MissionCard({ mission }: { mission: Mission }) {
+function safeCloseState(mission: Mission) {
+  if (!mission.safe_close_review_date) return { ready: false, text: "No close-review date stored" };
+  const remaining = daysBetween(todayIso(), mission.safe_close_review_date);
+  if (remaining === null) return { ready: false, text: "Review date unavailable" };
+  if (remaining <= 0) return { ready: true, text: "Close review is due now" };
+  return { ready: false, text: `${remaining} days until close review` };
+}
+
+
+function earnedValue(mission: Mission) {
+  const rewardStep = (mission.mission_steps || []).find((step) => step.step_type === "reward_received");
+  const actual = numberValue(rewardStep?.current_amount);
+  return mission.status === "completed" ? actual : numberValue(mission.expected_bonus) + numberValue(mission.expected_interest);
+}
+
+function inferredTrackingDays(mission: Mission) {
+  const opportunity = mission.opportunity;
+  if (!opportunity || opportunity.category !== "hysa") return null;
+  const storedDays = numberValue(opportunity.qualification_days || opportunity.direct_deposit_window_days);
+  if (storedDays > 0) return storedDays;
+  const committed = numberValue(mission.amount_committed);
+  const apy = numberValue(opportunity.apy) / 100;
+  const expectedInterest = numberValue(mission.expected_interest);
+  if (committed <= 0 || apy <= 0 || expectedInterest <= 0) return null;
+  return Math.max(30, Math.round((expectedInterest / (committed * apy)) * 365));
+}
+
+function requirementPercent(steps: MissionStep[]) {
+  if (!steps.length) return 0;
+  return Math.round((steps.filter((step) => step.is_complete).length / steps.length) * 100);
+}
+
+function StepEditor({ step, onToggle, onAmount }: {
+  step: MissionStep;
+  onToggle: (step: MissionStep, complete: boolean) => void;
+  onAmount: (step: MissionStep, amount: number) => void;
+}) {
+  const target = numberValue(step.target_amount);
+  const current = numberValue(step.current_amount);
+  const [amount, setAmount] = useState(current);
+  const rewardNeedsAmount = step.step_type === "reward_received" && target > 0 && current <= 0;
+
+  useEffect(() => setAmount(current), [current]);
+
+  return (
+    <div className="reward-step">
+      <label className="reward-step-check">
+        <input type="checkbox" checked={step.is_complete} disabled={rewardNeedsAmount} onChange={(event: React.ChangeEvent<HTMLInputElement>) => onToggle(step, event.target.checked)} />
+        <span>{step.is_complete ? <CheckCircle2 size={18} /> : <span className="step-circle" />}</span>
+        <span className="reward-step-copy"><b>{step.label}</b>{target > 0 && <small>{step.step_type === "reward_received" ? (current > 0 ? `${money.format(current)} actual payout recorded` : `Record the actual payout before confirming`) : `${money.format(current)} recorded of ${money.format(target)} target`}</small>}</span>
+      </label>
+      {target > 0 && !step.is_complete && (
+        <div className="step-amount-editor">
+          <span>$</span>
+          <input type="number" min="0" step="1" value={amount} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setAmount(Number(event.target.value || 0))} />
+          <button type="button" onClick={() => onAmount(step, amount)}>Update</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MissionCard({
+  mission,
+  guestMode,
+  onGuestUpdate,
+}: {
+  mission: Mission;
+  guestMode: boolean;
+  onGuestUpdate?: (mission: Mission) => void;
+}) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const [steps, setSteps] = useState(mission.mission_steps || []);
-  const progress = progressFor(mission);
+  const [starting, setStarting] = useState(false);
+  const [startDate, setStartDate] = useState(todayIso());
+  const timeline = timeProgress(mission);
+  const requirements = requirementPercent(steps);
   const opportunity = mission.opportunity;
+  const review = opportunity ? latestReview(opportunity) : null;
   const completedSteps = steps.filter((step) => step.is_complete).length;
-  const reward = Number(mission.expected_bonus || 0) + Number(mission.expected_interest || 0);
-  const monthlyFee = Number(opportunity?.monthly_fee || 0);
-  const safeClose = mission.safe_close_review_date;
+  const reward = earnedValue({ ...mission, mission_steps: steps });
+  const monthlyFee = numberValue(opportunity?.monthly_fee);
+  const safety = safetyLabel(mission);
+  const closeState = safeCloseState(mission);
 
-  async function toggleStep(stepId: string, complete: boolean) {
+  useEffect(() => setSteps(mission.mission_steps || []), [mission.mission_steps]);
+
+  function emitGuest(nextMission: Mission) {
+    onGuestUpdate?.(nextMission);
+  }
+
+  async function updateStep(step: MissionStep, patch: Partial<MissionStep>) {
+    const nextSteps = steps.map((item) => item.id === step.id ? { ...item, ...patch } : item);
+    setSteps(nextSteps);
+
+    if (guestMode) {
+      const allComplete = nextSteps.length > 0 && nextSteps.every((item) => item.is_complete);
+      emitGuest({ ...mission, status: allComplete ? "completed" : mission.status === "completed" ? "active" : mission.status, mission_steps: nextSteps });
+      return;
+    }
+
     const supabase = createClient();
-    const nextSteps = steps.map((step) => step.id === stepId ? { ...step, is_complete: complete, completed_at: complete ? new Date().toISOString() : null } : step);
-    const { error } = await supabase.from("mission_steps").update({ is_complete: complete, completed_at: complete ? new Date().toISOString() : null, updated_at: new Date().toISOString() }).eq("id", stepId);
+    const { error } = await supabase.from("mission_steps").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", step.id);
     if (error) return;
 
-    setSteps(nextSteps);
-    const allComplete = nextSteps.length > 0 && nextSteps.every((step) => step.is_complete);
+    const allComplete = nextSteps.length > 0 && nextSteps.every((item) => item.is_complete);
     if (allComplete && mission.status !== "completed") {
       const completedDate = todayIso();
-      await supabase.from("missions").update({ status: "completed", next_action: safeClose ? `Reward complete. Review whether to keep or close the account on ${readableDate(safeClose)}.` : "Reward complete. Review whether this account is still worth keeping.", updated_at: new Date().toISOString() }).eq("id", mission.id);
-      const { data: existingHistory } = await supabase.from("account_history").select("id").eq("user_id", mission.user_id).eq("institution", mission.institution).eq("product_name", mission.title).eq("bonus_received_at", completedDate).maybeSingle();
-      if (!existingHistory) {
-        await supabase.from("account_history").insert({ user_id: mission.user_id, institution: mission.institution, product_name: mission.title, opened_at: mission.opened_at, bonus_received_at: completedDate, bonus_amount: reward, outcome: "completed", eligible_again_at: null, notes: "Completed through Churning reward tracker" });
+      await supabase.from("missions").update({
+        status: "completed",
+        next_action: mission.safe_close_review_date
+          ? `Reward received. Review whether to keep or close the account on ${readableDate(mission.safe_close_review_date)}.`
+          : "Reward received. Review whether this account is still worth keeping.",
+        updated_at: new Date().toISOString(),
+      }).eq("id", mission.id);
+
+      const historyNote = `Completed through Churning reward tracker · mission:${mission.id}`;
+      const actualEarned = nextSteps.find((item) => item.step_type === "reward_received")?.current_amount;
+      const earnedAmount = numberValue(actualEarned);
+      const { data: existingHistory } = await supabase.from("account_history")
+        .select("id")
+        .eq("user_id", mission.user_id)
+        .eq("notes", historyNote)
+        .maybeSingle();
+
+      const historyPayload = {
+        institution: mission.institution,
+        product_name: mission.title,
+        opened_at: mission.opened_at,
+        bonus_received_at: completedDate,
+        bonus_amount: earnedAmount,
+        outcome: "completed",
+        eligible_again_at: null,
+        notes: historyNote,
+        updated_at: new Date().toISOString(),
+      };
+      if (existingHistory?.id) {
+        await supabase.from("account_history").update(historyPayload).eq("id", existingHistory.id);
+      } else {
+        await supabase.from("account_history").insert({ user_id: mission.user_id, ...historyPayload });
       }
       router.refresh();
     } else if (!allComplete && mission.status === "completed") {
+      const historyNote = `Completed through Churning reward tracker · mission:${mission.id}`;
       await supabase.from("missions").update({ status: "active", updated_at: new Date().toISOString() }).eq("id", mission.id);
+      await supabase.from("account_history").delete().eq("user_id", mission.user_id).eq("notes", historyNote);
       router.refresh();
     }
   }
 
+  async function toggleStep(step: MissionStep, complete: boolean) {
+    await updateStep(step, { is_complete: complete, completed_at: complete ? new Date().toISOString() : null });
+  }
+
+  async function updateAmount(step: MissionStep, amount: number) {
+    const target = numberValue(step.target_amount);
+    const requiresMultipleDeposits = step.step_type === "direct_deposit" && Number(opportunity?.dd_deposit_count || 0) > 1;
+    const complete = target > 0 && amount >= target && step.step_type === "direct_deposit" && !requiresMultipleDeposits;
+    await updateStep(step, {
+      current_amount: Math.max(0, amount),
+      is_complete: complete ? true : step.is_complete,
+      completed_at: complete ? new Date().toISOString() : step.completed_at,
+    });
+  }
+
+  async function startTracker() {
+    if (!opportunity || !startDate) return;
+    const nextTimeline = timelineFromOpenedDate(opportunity, startDate, inferredTrackingDays(mission));
+    const openedStep = steps.find((step) => step.step_type === "opened");
+    const nextSteps = steps.map((step) => step.step_type === "opened" ? { ...step, is_complete: true, completed_at: new Date().toISOString() } : step);
+    const nextMission: Mission = {
+      ...mission,
+      opened_at: startDate,
+      qualification_deadline: nextTimeline.qualificationDeadline,
+      payout_due_date: nextTimeline.payoutDueDate,
+      minimum_account_age_date: nextTimeline.minimumAccountAgeDate,
+      safe_close_review_date: nextTimeline.safeCloseReviewDate,
+      status: "active",
+      next_action: numberValue(opportunity.direct_deposit_required) > 0
+        ? `Complete ${money.format(numberValue(opportunity.direct_deposit_required))} in qualifying direct deposits.`
+        : "Complete the qualification requirements and keep the tracker updated.",
+      mission_steps: nextSteps,
+    };
+
+    if (guestMode) {
+      setSteps(nextSteps);
+      emitGuest(nextMission);
+      setStarting(false);
+      return;
+    }
+
+    const supabase = createClient();
+    await supabase.from("missions").update({
+      opened_at: startDate,
+      qualification_deadline: nextTimeline.qualificationDeadline,
+      payout_due_date: nextTimeline.payoutDueDate,
+      minimum_account_age_date: nextTimeline.minimumAccountAgeDate,
+      safe_close_review_date: nextTimeline.safeCloseReviewDate,
+      status: "active",
+      next_action: nextMission.next_action,
+      updated_at: new Date().toISOString(),
+    }).eq("id", mission.id);
+    if (openedStep) await supabase.from("mission_steps").update({ is_complete: true, completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", openedStep.id);
+    setStarting(false);
+    router.refresh();
+  }
+
   return (
-    <article className="reward-card">
+    <article className={`reward-card ${mission.status === "planned" ? "planned" : ""}`}>
       <div className="reward-card-top">
-        <div><span className="reward-bank">{mission.institution}</span><h3>{mission.title}</h3></div>
-        <div className="reward-value"><small>{mission.status === "completed" ? "Reward earned" : "Expected reward"}</small><strong>{money.format(reward)}</strong></div>
+        <div className="reward-title-group"><span className="reward-bank">{mission.institution}</span><h3>{mission.title}</h3><span className={`reward-safety ${safety.tone}`}><ShieldCheck size={13} /> {safety.label} safety</span></div>
+        <div className="reward-value"><small>{mission.status === "completed" ? "Reward earned" : "Expected reward"}</small><strong>{money.format(reward)}</strong>{numberValue(mission.amount_committed) > 0 && <span>{money.format(numberValue(mission.amount_committed))} committed</span>}</div>
       </div>
-      <div className="reward-progress-row">
-        <div className="reward-progress-copy"><strong>{progress.percent}% complete</strong><span>{mission.status === "completed" ? "Reward completed" : progress.total ? `${progress.elapsed} of ${progress.total} days · ${progress.remaining} days left` : "Tracking requirements"}</span></div>
-        <span className="reward-status">{mission.status.replaceAll("_", " ")}</span>
-      </div>
-      <div className="reward-progress-track" aria-label={`${progress.percent}% complete`}><span style={{ width: `${progress.percent}%` }} /></div>
+
+      {mission.status === "planned" && !mission.opened_at ? (
+        <div className="reward-start-panel">
+          <div><span className="reward-start-icon"><Landmark size={19} /></span><div><b>Added to your queue — clock not started</b><p>We will not guess an opening date. Confirm it only after the account is actually open.</p></div></div>
+          {starting ? <div className="reward-start-form"><input type="date" value={startDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setStartDate(event.target.value)} /><button type="button" className="button primary compact" onClick={startTracker}>Start tracker</button><button type="button" className="button ghost compact" onClick={() => setStarting(false)}>Cancel</button></div> : <button type="button" className="button primary compact" onClick={() => setStarting(true)}>I opened this account</button>}
+        </div>
+      ) : (
+        <div className="reward-progress-zone">
+          <div className="reward-progress-block">
+            <div className="reward-progress-row"><div><small>TIME WINDOW</small><strong>{timeline.percent}% elapsed</strong></div><span>{timeline.total ? `${timeline.elapsed} of ${timeline.total} days · ${timeline.remaining} left` : "No timed window stored"}</span></div>
+            <div className="reward-progress-track time"><span style={{ width: `${timeline.percent}%` }} /></div>
+          </div>
+          <div className="reward-progress-block">
+            <div className="reward-progress-row"><div><small>REQUIREMENTS</small><strong>{requirements}% complete</strong></div><span>{completedSteps} of {steps.length} confirmed</span></div>
+            <div className="reward-progress-track requirements"><span style={{ width: `${requirements}%` }} /></div>
+          </div>
+        </div>
+      )}
+
       <div className="reward-quick-grid">
-        <div><Clock3 size={16} /><span><small>Qualify by</small><b>{readableDate(mission.qualification_deadline)}</b></span></div>
-        <div><CircleDollarSign size={16} /><span><small>Reward timing</small><b>{readableDate(mission.payout_due_date)}</b></span></div>
-        <div><TimerReset size={16} /><span><small>Safe close review</small><b>{readableDate(safeClose)}</b></span></div>
-        <div><ShieldCheck size={16} /><span><small>Safety</small><b>{safetyLabel(mission)}</b></span></div>
+        <div><Clock3 size={16} /><span><small>{opportunity?.category === "hysa" ? "Tracking period ends" : "Qualify by"}</small><b>{readableDate(mission.qualification_deadline)}</b></span></div>
+        <div><CircleDollarSign size={16} /><span><small>{opportunity?.category === "hysa" ? "Interest review" : "Expected payout"}</small><b>{readableDate(mission.payout_due_date)}</b></span></div>
+        <div><TimerReset size={16} /><span><small>{opportunity?.category === "hysa" ? "Strategy review" : "Safe-close review"}</small><b>{readableDate(mission.safe_close_review_date)}</b></span></div>
+        <div className={closeState.ready ? "ready" : ""}><BadgeCheck size={16} /><span><small>{opportunity?.category === "hysa" ? "Review status" : "Exit status"}</small><b>{closeState.text}</b></span></div>
       </div>
-      <div className="reward-next-action"><span>Next action</span><strong>{mission.next_action || "Review the offer requirements."}</strong></div>
-      {monthlyFee > 0 && <div className="reward-fee-warning"><strong>{money.format(monthlyFee)}/mo fee after opening.</strong> {opportunity?.fee_waiver_summary || "Review how to waive this fee before deciding whether to keep the account."}</div>}
-      <button type="button" className="reward-expand" onClick={() => setExpanded((value) => !value)}>{expanded ? "Hide details" : "Requirements & closing plan"}<ChevronDown size={17} className={expanded ? "rotated" : ""} /></button>
-      {expanded && <div className="reward-details">
-        <div className="reward-step-list"><div className="reward-section-title"><span>Requirements</span><b>{completedSteps}/{steps.length} complete</b></div>{steps.map((step) => <label key={step.id} className="reward-step"><input type="checkbox" checked={step.is_complete} onChange={(event) => toggleStep(step.id, event.target.checked)} /><span>{step.is_complete ? <CheckCircle2 size={17} /> : <span className="step-circle" />}{step.label}</span></label>)}</div>
-        <div className="reward-close-plan"><div className="reward-section-title"><span>After the reward</span></div><p>{monthlyFee > 0 ? `This account may cost ${money.format(monthlyFee)} per month unless the fee is waived. Review the fee-waiver rule before keeping it long term.` : "There is no stored monthly fee for this offer. You can consider keeping the account if it remains useful."}</p><p><strong>Do not close before:</strong> {readableDate(safeClose)}. This is a review date based on the stored qualification, payout, and minimum-account-age windows—not a guarantee that closing is allowed.</p>{opportunity?.eligibility_notes && <p><strong>Eligibility:</strong> {opportunity.eligibility_notes}</p>}{opportunity?.terms_summary && <p><strong>Stored terms:</strong> {opportunity.terms_summary}</p>}</div>
-      </div>}
+
+      <div className="reward-next-action"><span>NEXT ACTION</span><strong>{mission.next_action || "Review the official offer requirements."}</strong></div>
+
+      {monthlyFee > 0 && <div className="reward-fee-warning"><TriangleAlert size={15} /><span><strong>{money.format(monthlyFee)}/mo stored monthly fee.</strong> {opportunity?.fee_waiver_summary || "Review the current fee-waiver rule before deciding whether to keep the account."}</span></div>}
+
+      <button type="button" className="reward-expand" onClick={() => setExpanded((value) => !value)}>{expanded ? "Hide tracker details" : "Requirements, terms & closing plan"}<ChevronDown size={17} className={expanded ? "rotated" : ""} /></button>
+
+      {expanded && (
+        <div className="reward-details">
+          <div className="reward-step-list">
+            <div className="reward-section-title"><span>Requirement confirmation</span><b>{completedSteps}/{steps.length}</b></div>
+            <p className="reward-section-help">Elapsed time does not mark requirements complete. Confirm each item from your actual account activity. “Reward received” is always manual.</p>
+            {steps.map((step) => <StepEditor key={step.id} step={step} onToggle={toggleStep} onAmount={updateAmount} />)}
+          </div>
+          <div className="reward-close-plan">
+            <div className="reward-section-title"><span>Account exit plan</span></div>
+            <div className="close-plan-date"><CalendarDays size={18} /><div><small>EARLIEST REVIEW DATE</small><b>{readableDate(mission.safe_close_review_date)}</b></div></div>
+            <p>{monthlyFee > 0 ? `This account may cost ${money.format(monthlyFee)} per month unless the current waiver rule is satisfied.` : "No monthly fee is stored for this offer, but current terms should still be checked before keeping it long term."}</p>
+            <p><strong>{opportunity?.category === "hysa" ? "Treat this as a strategy review, not an automatic transfer date." : "Do not treat this as an automatic close date."}</strong> It is the earliest Churning review point calculated from the stored qualification, payout, tracking, and minimum-account-age windows. Official terms control.</p>
+            {review && <div className="reward-safety-audit"><span><small>Hard pull</small><b>{reviewStatusLabel(review.hard_pull_status)}</b></span><span><small>Chex</small><b>{reviewStatusLabel(review.chexsystems_status)}</b></span><span><small>EWS</small><b>{reviewStatusLabel(review.ews_status)}</b></span><span><small>Tax</small><b>{reviewStatusLabel(review.tax_status)}</b></span></div>}
+            {review?.safe_close_summary && <p><strong>Research close note:</strong> {review.safe_close_summary}</p>}
+            {opportunity?.eligibility_notes && <p><strong>Eligibility note:</strong> {opportunity.eligibility_notes}</p>}
+            {opportunity?.terms_summary && <p><strong>Stored terms:</strong> {opportunity.terms_summary}</p>}
+            {mission.quick_access_url && <a className="card-link" href={mission.quick_access_url} target="_blank" rel="noreferrer">Open official terms</a>}
+          </div>
+        </div>
+      )}
     </article>
   );
 }
 
-export function RewardTracker({ missions }: { missions: Mission[] }) {
+export function RewardTracker({
+  missions,
+  guestMode = false,
+  onGuestMissionsChange,
+}: {
+  missions: Mission[];
+  guestMode?: boolean;
+  onGuestMissionsChange?: (missions: Mission[]) => void;
+}) {
   const [tab, setTab] = useState<"active" | "completed">("active");
-  const active = useMemo(() => missions.filter((mission) => mission.status !== "completed" && mission.status !== "closed"), [missions]);
-  const completed = useMemo(() => missions.filter((mission) => mission.status === "completed" || mission.status === "closed"), [missions]);
-  const lifetime = completed.reduce((sum, mission) => sum + Number(mission.expected_bonus || 0) + Number(mission.expected_interest || 0), 0);
+  const [guestMissions, setGuestMissions] = useState(missions);
+
+  useEffect(() => {
+    if (guestMode) setGuestMissions(missions);
+  }, [guestMode, missions]);
+
+  const source = guestMode ? guestMissions : missions;
+  const active = useMemo(() => source.filter((mission) => mission.status !== "completed" && mission.status !== "closed"), [source]);
+  const completed = useMemo(() => source.filter((mission) => mission.status === "completed" || mission.status === "closed"), [source]);
+  const lifetime = completed.reduce((sum, mission) => sum + earnedValue(mission), 0);
+  const expected = active.reduce((sum, mission) => sum + numberValue(mission.expected_bonus) + numberValue(mission.expected_interest), 0);
+  const committed = active.reduce((sum, mission) => sum + numberValue(mission.amount_committed), 0);
   const shown = tab === "active" ? active : completed;
-  return <section className="reward-tracker-shell">
-    <div className="reward-tracker-head"><div><span className="kicker">REWARD TRACKER</span><h2>Track every dollar from open to safe close.</h2><p>This is your control center for qualification windows, payouts, requirements, fees, and account exit dates.</p></div><div className="reward-lifetime"><small>Completed earnings</small><strong>{money.format(lifetime)}</strong><span>{completed.length} completed · {active.length} active</span></div></div>
-    <div className="reward-tabs"><button className={tab === "active" ? "active" : ""} onClick={() => setTab("active")}>Active rewards <span>{active.length}</span></button><button className={tab === "completed" ? "active" : ""} onClick={() => setTab("completed")}>Completed <span>{completed.length}</span></button></div>
-    <div className="reward-grid">{shown.length ? shown.map((mission) => <MissionCard mission={mission} key={mission.id} />) : <div className="reward-empty"><CircleDollarSign size={26} /><h3>{tab === "active" ? "No active rewards yet" : "No completed rewards yet"}</h3><p>{tab === "active" ? "Add one of your recommended opportunities and it will appear here as a live tracker." : "Finished bonuses and interest will build your lifetime earnings history here."}</p></div>}</div>
-  </section>;
+
+  function updateGuestMission(nextMission: Mission) {
+    const next = guestMissions.map((mission) => mission.id === nextMission.id ? nextMission : mission);
+    setGuestMissions(next);
+    onGuestMissionsChange?.(next);
+  }
+
+  return (
+    <section className="reward-tracker-shell">
+      <div className="reward-tracker-head">
+        <div><span className="kicker">REWARD MISSION CONTROL</span><h2>Track the clock and the requirements separately.</h2><p>Time passing never means you qualified. Churning keeps the deadline, the actual checklist, payout timing, fees, and close-review date visible in one place.</p></div>
+        <div className="reward-head-stats">
+          <div><small>Active expected</small><strong>{money.format(expected)}</strong></div>
+          <div><small>Cash committed</small><strong>{money.format(committed)}</strong></div>
+          <div className="positive"><small>Lifetime earned</small><strong>{money.format(lifetime)}</strong></div>
+        </div>
+      </div>
+      <div className="reward-tabs"><button className={tab === "active" ? "active" : ""} onClick={() => setTab("active")}>Active rewards <span>{active.length}</span></button><button className={tab === "completed" ? "active" : ""} onClick={() => setTab("completed")}>Completed history <span>{completed.length}</span></button></div>
+      <div className="reward-grid">
+        {shown.length ? shown.map((mission) => <MissionCard mission={mission} guestMode={guestMode} onGuestUpdate={updateGuestMission} key={mission.id} />) : <div className="reward-empty"><CircleDollarSign size={28} /><h3>{tab === "active" ? "No active rewards yet" : "No completed rewards yet"}</h3><p>{tab === "active" ? "Add a recommended opportunity. It will enter your queue first, and its countdown begins only after you confirm the real opening date." : "Only rewards you manually confirm as received are counted in lifetime earnings."}</p></div>}
+      </div>
+    </section>
+  );
 }

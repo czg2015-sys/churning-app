@@ -12,9 +12,10 @@ export default async function QuestionnairePage() {
   const userId = data?.claims?.sub;
   if (!userId) redirect("/auth?next=/questionnaire");
 
-  const [{ data: profile }, { data: bankHistory }] = await Promise.all([
+  const [{ data: profile }, { data: bankHistory }, { data: userProfile }] = await Promise.all([
     supabase.from("financial_profiles").select("*").eq("user_id", userId).maybeSingle(),
     supabase.from("account_history").select("institution").eq("user_id", userId).eq("notes", "Reported during onboarding"),
+    supabase.from("profiles").select("state_code").eq("user_id", userId).maybeSingle(),
   ]);
 
   return (
@@ -23,7 +24,7 @@ export default async function QuestionnairePage() {
         <div className="page-heading">
           <div><span className="kicker">BUILD MY PLAN</span><h1>Start with your real numbers.</h1><p>Use estimates if you are unsure. Nothing here moves your money or opens an account.</p></div>
         </div>
-        <QuestionnaireForm initial={(profile as FinancialProfile | null) || null} initialBanks={(bankHistory || []).map((row) => row.institution)} />
+        <QuestionnaireForm initial={(profile as FinancialProfile | null) || null} initialBanks={((bankHistory || []) as Array<{ institution: string }>).map((row) => row.institution)} initialState={userProfile?.state_code || "CA"} />
       </div>
     </main>
   );
