@@ -21,7 +21,7 @@
 .reward-bank { color:var(--green); font-family:var(--font-geist-mono),monospace; font-size:9px; font-weight:820; letter-spacing:.12em; text-transform:uppercase; }
 .reward-card h3 { margin:4px 0 8px; font-size:21px; letter-spacing:-.025em; }
 .reward-safety { display:inline-flex; align-items:center; gap:5px; padding:4px 7px; border:1px solid var(--line); border-radius:999px; font-size:9px; font-weight:780; }
-.reward-safety.safe { color:#d9f9a7; border-color:rgba(199,255,91,.15); background:var(--green-soft); }
+.reward-safety.safe { color:#d9f9a7; border-color:rgba(59,178,115,.15); background:var(--green-soft); }
 .reward-safety.review { color:#c5c0ff; border-color:rgba(129,116,255,.18); background:var(--purple-soft); }
 .reward-safety.warning { color:#e5c17c; border-color:rgba(255,211,122,.14); background:var(--amber-soft); }
 .reward-value { text-align:right; flex:0 0 auto; }
@@ -37,8 +37,8 @@
 .reward-progress-track { height:7px; overflow:hidden; border-radius:999px; background:#252d39; }
 .reward-progress-track > span { display:block; height:100%; border-radius:inherit; }
 .reward-progress-track.time > span { background:linear-gradient(90deg,#6e63df,#9b91ff); box-shadow:0 0 16px rgba(129,116,255,.22); }
-.reward-progress-track.requirements > span { background:linear-gradient(90deg,var(--green-strong),var(--green)); box-shadow:0 0 16px rgba(199,255,91,.20); }
-.reward-start-panel { display:flex; justify-content:space-between; gap:18px; align-items:center; margin:2px 22px 18px; padding:14px 15px; border:1px solid rgba(129,116,255,.18); border-radius:12px; background:linear-gradient(90deg,rgba(129,116,255,.09),rgba(199,255,91,.035)); }
+.reward-progress-track.requirements > span { background:linear-gradient(90deg,var(--green-strong),var(--green)); box-shadow:0 0 16px rgba(59,178,115,.20); }
+.reward-start-panel { display:flex; justify-content:space-between; gap:18px; align-items:center; margin:2px 22px 18px; padding:14px 15px; border:1px solid rgba(129,116,255,.18); border-radius:12px; background:linear-gradient(90deg,rgba(129,116,255,.09),rgba(59,178,115,.035)); }
 .reward-start-panel > div:first-child { display:flex; gap:11px; align-items:center; }
 .reward-start-icon { width:38px; height:38px; display:grid; place-items:center; border-radius:10px; color:#bdb7ff; background:var(--purple-soft); }
 .reward-start-panel b { display:block; font-size:12px; }
@@ -79,9 +79,9 @@
 .step-amount-editor > span { color:var(--muted); font-size:10px; }
 .step-amount-editor input { min-height:31px; padding:5px 6px; font-size:10px; }
 .step-amount-editor button { min-height:31px; border:1px solid var(--line); border-radius:7px; background:rgba(255,255,255,.04); color:var(--muted-strong); font-size:9px; font-weight:750; cursor:pointer; }
-.step-amount-editor button:hover { color:var(--green); border-color:rgba(199,255,91,.25); }
+.step-amount-editor button:hover { color:var(--green); border-color:rgba(59,178,115,.25); }
 .reward-close-plan { padding:15px; border:1px solid var(--line); border-radius:12px; background:rgba(255,255,255,.02); }
-.close-plan-date { display:flex; gap:10px; align-items:center; padding:11px; margin:9px 0 12px; border:1px solid rgba(199,255,91,.12); border-radius:10px; background:var(--green-soft); }
+.close-plan-date { display:flex; gap:10px; align-items:center; padding:11px; margin:9px 0 12px; border:1px solid rgba(59,178,115,.12); border-radius:10px; background:var(--green-soft); }
 .close-plan-date svg { color:var(--green); }
 .close-plan-date small { display:block; color:var(--muted); font-size:8px; }
 .close-plan-date b { display:block; margin-top:2px; font-size:12px; }
@@ -123,3 +123,7 @@
 .reward-safety-audit small { color:var(--muted); font-size:7px; text-transform:uppercase; letter-spacing:.05em; }
 .reward-safety-audit b { margin-top:2px; font-size:8px; color:var(--muted-strong); }
 @media (max-width:620px) { .reward-safety-audit { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+/* Money-green / slightly lighter surface pass */
+.reward-tracker-head { background:radial-gradient(circle at 100% 0,rgba(59,178,115,.12),transparent 28rem),linear-gradient(145deg,rgba(26,36,30,.98),rgba(15,22,17,.98)); }
+.reward-card { background:linear-gradient(155deg,rgba(27,37,31,.98),rgba(16,23,18,.98)); }

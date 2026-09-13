@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, BadgeCheck, CircleHelp, Info, LockKeyhole, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { FormattedNumberInput } from "@/components/formatted-number-input";
+import { FormattedPercentInput } from "@/components/formatted-percent-input";
 import type { FinancialProfile } from "@/lib/types";
 
 const defaults: FinancialProfile = {
@@ -32,7 +33,7 @@ const usStates = [
 ] as const;
 
 function numberValue(value: FormDataEntryValue | null) {
-  const parsed = Number(String(value ?? "0").replace(/,/g, ""));
+  const parsed = Number(String(value ?? "0").replace(/,/g, "").replace(/%/g, ""));
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
@@ -166,7 +167,7 @@ export function QuestionnaireForm({
 
       <div className="form-stack">
         <section className="planner-section">
-          <div className="form-section-heading"><span>01</span><div><h3>Where is your cash today?</h3><p>Enter the money you could potentially use. We calculate the total and protect your reserve automatically.</p></div></div>
+          <div className="form-section-heading"><span>01</span><div><h3>Where is your cash today?</h3><p>Enter the liquid cash you keep outside long-term investments. We calculate the total automatically and keep your reserve outside the opportunity budget.</p></div></div>
           <div className="form-grid">
             <div className="field"><label htmlFor="savings_cash">Cash currently in savings</label><FormattedNumberInput id="savings_cash" name="savings_cash" value={savingsCash} onValueChange={setSavingsCash} required /><small>Include savings and money-market cash you could move.</small></div>
             <div className="field"><label htmlFor="checking_cash">Cash currently in checking</label><FormattedNumberInput id="checking_cash" name="checking_cash" value={checkingCash} onValueChange={setCheckingCash} /><small>Do not include money you need before your next paycheck.</small></div>
@@ -175,16 +176,16 @@ export function QuestionnaireForm({
           </div>
 
           <div className={`cash-auto-summary ${reserveWarning ? "warning" : ""}`}>
-            <div><small>Total cash entered</small><strong>{dollars(totalCash)}</strong></div>
+            <div><small>Total liquid cash</small><strong>{dollars(totalCash)}</strong></div>
             <div><small>Protected reserve</small><strong>{dollars(Math.min(emergencyReserve, totalCash))}</strong></div>
-            <div><small>Available for your strategy</small><strong>{dollars(availableAfterReserve)}</strong></div>
+            <div><small>Cash available after reserve</small><strong>{dollars(availableAfterReserve)}</strong></div>
           </div>
 
           <div className="optional-toggle-block">
             <div><strong>Are you currently earning interest on your savings?</strong><small>This gives us your real baseline so we can compare whether an offer is actually better.</small></div>
             <div className="choice-pills"><button type="button" className={hasCurrentSavingsYield ? "active" : ""} onClick={() => setHasCurrentSavingsYield(true)}>Yes</button><button type="button" className={!hasCurrentSavingsYield ? "active" : ""} onClick={() => setHasCurrentSavingsYield(false)}>No / not sure</button></div>
           </div>
-          {hasCurrentSavingsYield && <div className="field inline-compact-field"><label htmlFor="current_hysa_apy">Current savings APY (%)</label><input id="current_hysa_apy" name="current_hysa_apy" type="number" min="0" max="20" step=".01" defaultValue={Number(profile.current_hysa_apy || 0)} placeholder="4.10" /><small>Use the APY shown by your bank, not the monthly interest amount.</small></div>}
+          {hasCurrentSavingsYield && <div className="field inline-compact-field"><label htmlFor="current_hysa_apy">Current savings APY</label><FormattedPercentInput id="current_hysa_apy" name="current_hysa_apy" max={20} defaultValue={Number(profile.current_hysa_apy || 0)} placeholder="4.10" /><small>Use the APY shown by your bank, not the monthly interest amount.</small></div>}
         </section>
 
         <section className="planner-section">
@@ -200,7 +201,7 @@ export function QuestionnaireForm({
           </div>
           {cardSpendKnown && <div className="form-grid compact-top-gap">
             <div className="field"><label htmlFor="monthly_card_spend">Normal monthly card spending</label><FormattedNumberInput id="monthly_card_spend" name="monthly_card_spend" defaultValue={Number(profile.monthly_card_spend)} placeholder="800" /></div>
-            <div className="field"><label htmlFor="current_spend_reward_rate">Current card/debit rewards rate (%)</label><input id="current_spend_reward_rate" name="current_spend_reward_rate" type="number" min="0" max="20" step=".1" defaultValue={Number(profile.current_spend_reward_rate)} placeholder="1.5" /></div>
+            <div className="field"><label htmlFor="current_spend_reward_rate">Current debit or card cash-back rate</label><FormattedPercentInput id="current_spend_reward_rate" name="current_spend_reward_rate" max={20} defaultValue={Number(profile.current_spend_reward_rate)} placeholder="1.5" /><small>Enter the percentage you normally earn on everyday purchases.</small></div>
           </div>}
         </section>
 
@@ -224,7 +225,7 @@ export function QuestionnaireForm({
         <section className="planner-section">
           <div className="form-section-heading"><span>04</span><div><h3>Optional tax estimate</h3><p>We use this only to estimate what a bonus or interest may be worth after taxes. If you do not know it, skip it and we will show pre-tax comparisons.</p></div></div>
           <div className="switch-row"><input id="tax-known" type="checkbox" checked={taxKnown} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setTaxKnown(event.target.checked)} /><label htmlFor="tax-known">I know my approximate combined tax rate</label></div>
-          {taxKnown && <div className="field" style={{ marginTop: 14, maxWidth: 300 }}><label htmlFor="estimated_tax_rate">Approximate combined rate (%)</label><input id="estimated_tax_rate" name="estimated_tax_rate" type="number" min="0" max="60" step="1" defaultValue={Number(profile.estimated_tax_rate || 0)} placeholder="22" /></div>}
+          {taxKnown && <div className="field" style={{ marginTop: 14, maxWidth: 300 }}><label htmlFor="estimated_tax_rate">Approximate combined tax rate</label><FormattedPercentInput id="estimated_tax_rate" name="estimated_tax_rate" max={60} defaultValue={Number(profile.estimated_tax_rate || 0)} placeholder="22" /></div>}
           <div className="explain-inline"><CircleHelp size={16} /><span>Example: a 22% estimate means we would show a $400 taxable bonus as roughly $312 after estimated taxes. Your actual tax treatment can differ.</span></div>
         </section>
 

@@ -4,6 +4,7 @@ import { QuestionnaireForm } from "@/components/questionnaire-form";
 import { createClient } from "@/lib/supabase/server";
 import type { FinancialProfile } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Build My Plan" };
 
 export default async function QuestionnairePage() {

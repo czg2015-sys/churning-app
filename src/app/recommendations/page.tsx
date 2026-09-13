@@ -7,6 +7,7 @@ import { getLiveOpportunities } from "@/lib/opportunities";
 import { createClient } from "@/lib/supabase/server";
 import type { FinancialProfile } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Your Recommendations" };
 
 export default async function RecommendationsPage() {
@@ -43,7 +44,7 @@ export default async function RecommendationsPage() {
         </header>
         <div id="matches">
           {!opportunityFeed.dataAvailable ? (
-            <section className="recommendation-data-error"><ShieldCheck size={24} /><div><h2>Verified offer data is syncing.</h2><p>Your saved profile is safe. Refresh shortly to retry the live opportunity feed rather than showing stale or invented recommendations.</p></div></section>
+            <section className="recommendation-data-error"><ShieldCheck size={24} /><div><h2>We couldn’t load the verified offer feed right now.</h2><p>Your saved profile is safe. Refresh to retry the live feed; Churning will not substitute stale or invented recommendations.</p></div></section>
           ) : (
             <RecommendedOpportunities
               profile={profile as FinancialProfile}

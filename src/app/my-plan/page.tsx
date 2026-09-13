@@ -10,6 +10,7 @@ import { SignOutButton } from "@/components/sign-out-button";
 import { createClient } from "@/lib/supabase/server";
 import type { FinancialProfile, Mission, Opportunity } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "My Plan" };
 
 export default async function MyPlanPage() {

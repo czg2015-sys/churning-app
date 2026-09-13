@@ -12,18 +12,18 @@ const filters = [
   { id: "checking_bonus", label: "Direct deposit" },
   { id: "hysa", label: "High-yield savings" },
   { id: "savings_bonus", label: "Savings bonuses" },
-  { id: "debit_spend", label: "Spending" },
+  { id: "debit_spend", label: "Debit & spending" },
 ];
 
 function isCleared(item: Opportunity) {
   const days = verificationAgeDays(item.last_verified_at);
-  return (item.safety_gate || "").toLowerCase() === "pass" && numberValue(item.evidence_confidence) >= 80 && days !== null && days <= 14;
+  return (item.safety_gate || "").toLowerCase() === "pass" && numberValue(item.evidence_confidence) >= 80 && days !== null && days <= 7;
 }
 
 function freshness(item: Opportunity) {
   const days = verificationAgeDays(item.last_verified_at);
   if (days === null) return { text: "No verified date", stale: true };
-  if (days <= 14) return { text: days === 0 ? "Today" : `${days}d ago`, stale: false };
+  if (days <= 7) return { text: days === 0 ? "Today" : `${days}d ago`, stale: false };
   return { text: `${days}d old`, stale: true };
 }
 
@@ -41,7 +41,7 @@ export function OpportunitiesList({ opportunities }: { opportunities: Opportunit
   const holdCount = opportunities.length - clearedCount;
   const staleCount = opportunities.filter((item) => {
     const days = verificationAgeDays(item.last_verified_at);
-    return days === null || days > 14;
+    return days === null || days > 7;
   }).length;
 
   return (
@@ -50,7 +50,7 @@ export function OpportunitiesList({ opportunities }: { opportunities: Opportunit
         <div><small>LIVE RECORDS</small><strong>{opportunities.length}</strong><span>currently stored as live</span></div>
         <div className="positive"><small>SAFETY CLEARED</small><strong>{clearedCount}</strong><span>eligible to enter My Plan</span></div>
         <div className={holdCount ? "warning" : ""}><small>RESEARCH HOLD</small><strong>{holdCount}</strong><span>visible, but not actionable yet</span></div>
-        <div className={staleCount ? "warning" : ""}><small>NEEDS RE-VERIFY</small><strong>{staleCount}</strong><span>older than 14 days or missing date</span></div>
+        <div className={staleCount ? "warning" : ""}><small>NEEDS RE-VERIFY</small><strong>{staleCount}</strong><span>older than 7 days or missing date</span></div>
       </div>
 
       <div className="opportunity-toolbar" role="group" aria-label="Filter opportunities">

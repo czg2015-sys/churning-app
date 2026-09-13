@@ -1,14 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { getSupabasePublicConfig } from "@/lib/supabase/env";
 
-const protectedPaths = ["/my-plan", "/questionnaire"];
+const protectedPaths = ["/my-plan", "/questionnaire", "/recommendations"];
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
   const needsAuth = protectedPaths.some((path) => request.nextUrl.pathname.startsWith(path));
   if (!needsAuth) return response;
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const { url: supabaseUrl, key: supabaseKey } = getSupabasePublicConfig();
   if (!supabaseUrl || !supabaseKey) {
     console.error("[auth-proxy] Supabase environment variables are unavailable");
     const url = request.nextUrl.clone();

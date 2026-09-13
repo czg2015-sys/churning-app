@@ -1,4 +1,4 @@
 import type { NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/proxy";
 export async function proxy(request: NextRequest) { return updateSession(request); }
-export const config = { matcher: ["/my-plan/:path*", "/questionnaire/:path*"] };
+export const config = { matcher: ["/my-plan/:path*", "/questionnaire/:path*", "/recommendations/:path*"] };

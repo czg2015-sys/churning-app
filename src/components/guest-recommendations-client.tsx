@@ -51,7 +51,7 @@ export function GuestRecommendationsClient({ opportunities, dataAvailable }: { o
         <p>These matches use the same ranking logic as an account plan. Create an account only if you want to save opportunities and keep tracking them later.</p>
       </header>
       {!dataAvailable ? (
-        <section className="recommendation-data-error"><ShieldCheck size={24} /><div><h2>Verified offer data is syncing.</h2><p>Your answers are still available in this browser session. Refresh shortly to retry the live opportunity feed rather than showing you stale or invented matches.</p></div></section>
+        <section className="recommendation-data-error"><ShieldCheck size={24} /><div><h2>We couldn’t load the verified offer feed right now.</h2><p>Your answers are still available in this browser session. Refresh to retry the live feed; Churning will not fill the page with stale or invented matches.</p></div></section>
       ) : (
         <GuestWorkspace profile={payload.profile} opportunities={opportunities} usedBanks={payload.banks || []} stateCode={payload.stateCode || "CA"} resultsPage />
       )}

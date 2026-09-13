@@ -1,10 +1,10 @@
 .recommendations-shell { margin: 18px 0 22px; border: 1px solid var(--line); border-radius: 22px; overflow: hidden; background: rgba(8, 12, 18, .78); box-shadow: 0 26px 80px rgba(0,0,0,.18); }
-.recommendations-prominent { border-color: rgba(199,255,91,.16); box-shadow: 0 30px 100px rgba(0,0,0,.25), 0 0 0 1px rgba(199,255,91,.025) inset; }
-.recommendations-head { display:flex; align-items:flex-end; justify-content:space-between; gap:28px; padding:28px 30px 24px; background: radial-gradient(circle at 100% 0, rgba(199,255,91,.08), transparent 28rem), linear-gradient(145deg,rgba(20,27,38,.98),rgba(9,13,19,.98)); border-bottom:1px solid var(--line); }
+.recommendations-prominent { border-color: rgba(59,178,115,.16); box-shadow: 0 30px 100px rgba(0,0,0,.25), 0 0 0 1px rgba(59,178,115,.025) inset; }
+.recommendations-head { display:flex; align-items:flex-end; justify-content:space-between; gap:28px; padding:28px 30px 24px; background: radial-gradient(circle at 100% 0, rgba(59,178,115,.08), transparent 28rem), linear-gradient(145deg,rgba(20,27,38,.98),rgba(9,13,19,.98)); border-bottom:1px solid var(--line); }
 .recommendations-head h2 { margin:8px 0 7px; font-size:clamp(28px,3vw,40px); line-height:1.03; letter-spacing:-.045em; }
 .recommendations-head p { max-width:800px; margin:0; color:var(--muted); font-size:13px; line-height:1.6; }
 .recommendation-refresh { flex:0 0 auto; display:inline-flex; align-items:center; gap:8px; padding:8px 11px; color:var(--muted-strong); border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.025); font-size:11px; font-weight:760; }
-.recommendation-refresh > span { width:7px; height:7px; border-radius:50%; background:var(--green); box-shadow:0 0 14px rgba(199,255,91,.65); }
+.recommendation-refresh > span { width:7px; height:7px; border-radius:50%; background:var(--green); box-shadow:0 0 14px rgba(59,178,115,.65); }
 .recommendation-intro-strip { display:grid; grid-template-columns:repeat(3,1fr); border-bottom:1px solid var(--line); background:rgba(255,255,255,.018); }
 .recommendation-intro-strip > div { display:flex; gap:11px; align-items:center; padding:15px 20px; }
 .recommendation-intro-strip > div + div { border-left:1px solid var(--line); }
@@ -16,7 +16,7 @@
 .recommendation-card { display:grid; grid-template-columns:58px minmax(0,1fr) auto; gap:18px; align-items:center; padding:22px 24px; border-top:1px solid var(--line); transition:background 160ms ease, border-color 160ms ease; }
 .recommendation-card:first-child { border-top:0; }
 .recommendation-card:hover { background:rgba(255,255,255,.022); }
-.recommendation-rank { width:48px; height:48px; display:grid; place-items:center; align-content:center; border:1px solid rgba(199,255,91,.15); border-radius:14px; background:linear-gradient(145deg,rgba(199,255,91,.10),rgba(129,116,255,.06)); }
+.recommendation-rank { width:48px; height:48px; display:grid; place-items:center; align-content:center; border:1px solid rgba(59,178,115,.15); border-radius:14px; background:linear-gradient(145deg,rgba(59,178,115,.10),rgba(129,116,255,.06)); }
 .recommendation-rank span { color:var(--green); font-family:var(--font-geist-mono),monospace; font-size:15px; font-weight:850; line-height:1; }
 .recommendation-rank small { margin-top:3px; color:var(--muted); font-size:7px; letter-spacing:.12em; font-weight:850; }
 .recommendation-main { min-width:0; }
@@ -34,7 +34,7 @@
 .recommendation-metrics { display:flex; flex-wrap:wrap; gap:7px 13px; margin-top:12px; }
 .recommendation-metrics span { display:inline-flex; gap:5px; align-items:center; color:var(--muted-strong); font-size:10px; }
 .recommendation-metrics svg { color:#9ba6b6; }
-.recommendation-metrics .safe { color:#d7f5a6; }
+.recommendation-metrics .safe { color:#bfe6cf; }
 .recommendation-metrics .safe svg { color:var(--green); }
 .recommendation-metrics .stale { color:#e5c17c; }
 .recommendation-metrics .stale svg { color:var(--amber); }
@@ -88,7 +88,7 @@
 .top-match-label p { margin:0; color:var(--muted); font-size:11px; }
 .top-match-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; padding:10px 14px 18px; }
 .top-match-card { min-width:0; display:flex; flex-direction:column; padding:19px; border:1px solid var(--line); border-radius:16px; background:linear-gradient(155deg,rgba(21,28,39,.98),rgba(10,14,20,.98)); }
-.top-match-card.cleared { border-color:rgba(199,255,91,.18); }
+.top-match-card.cleared { border-color:rgba(59,178,115,.18); }
 .top-match-card.pending { border-color:rgba(255,211,122,.14); }
 .top-match-card-head { display:flex; justify-content:space-between; gap:10px; align-items:center; }
 .match-rank { color:var(--green); font-family:var(--font-geist-mono); font-size:11px; font-weight:850; }
@@ -154,3 +154,45 @@
   .research-example-line { flex-direction:column; }
   .research-example-line b { text-align:left; }
 }
+
+/* Ranked result lanes: keep the top three unique, then group the rest by strategy. */
+.match-category-pill {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 8px;
+  padding: 4px 7px;
+  border: 1px solid rgba(59,178,115,.17);
+  border-radius: 999px;
+  background: rgba(59,178,115,.07);
+  color: #bfe6cf;
+  font-size: 8px;
+  font-weight: 780;
+  letter-spacing: .045em;
+  text-transform: uppercase;
+}
+.match-lanes { display:grid; gap:14px; }
+.match-lane {
+  overflow:hidden;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:rgba(255,255,255,.018);
+}
+.match-lane-head {
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:18px;
+  padding:15px 16px;
+  border-bottom:1px solid var(--line);
+  background:rgba(59,178,115,.035);
+}
+.match-lane-head h4 { margin:0; font-size:14px; }
+.match-lane-head p { margin:3px 0 0; color:var(--muted); font-size:9px; line-height:1.45; }
+.match-lane-head > span { flex:0 0 auto; padding:4px 7px; border-radius:999px; background:var(--green-soft); color:var(--green); font-size:8px; font-weight:800; }
+.match-lane .more-match-list { border:0; border-radius:0; }
+.match-lane .more-match-list article:last-child { border-bottom:0; }
+@media (max-width:720px) { .match-lane-head { flex-direction:column; } }
+
+/* Money-green / slightly lighter surface pass */
+.recommendations-shell { background:rgba(16,23,18,.86); }
+.top-match-card { background:linear-gradient(155deg,rgba(27,37,31,.98),rgba(16,23,18,.98)); }

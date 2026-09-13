@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, BadgeDollarSign, CalendarClock, CircleAlert, Droplets, Gauge, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowUpRight, BadgeDollarSign, CalendarClock, CircleAlert, Gauge, ShieldCheck, Sparkles } from "lucide-react";
 import { AddToPlanButton } from "@/components/add-to-plan-button";
 import { latestReview, money, numberValue, rankMatches, reviewStatusLabel, verificationAgeDays } from "@/lib/plan-math";
 import type { FinancialProfile, Opportunity, PlanStartDetails } from "@/lib/types";
@@ -24,6 +24,15 @@ function requirementLabel(item: Opportunity) {
 function opportunityValue(item: Opportunity) {
   const reward = numberValue(item.bonus_amount);
   return reward ? money.format(reward) : `${numberValue(item.apy).toFixed(2)}% APY`;
+}
+
+function categoryLabel(item: Opportunity) {
+  if (item.category === "checking_bonus") return "Direct deposit bonus";
+  if (item.category === "debit_spend") return "Debit & spending bonus";
+  if (item.category === "hysa") return "High-yield savings";
+  if (item.category === "savings_bonus") return "Savings bonus";
+  if (item.category === "cd") return "CD / fixed term";
+  return "Cash opportunity";
 }
 
 function paceText(mode: number) {
@@ -56,6 +65,11 @@ export function RecommendedOpportunities({
   const matches = rankMatches(opportunities, profile, usedBanks, stateCode).slice(0, 10);
   const topMatches = matches.slice(0, 3);
   const moreMatches = matches.slice(3);
+  const moreLanes = [
+    { key: "direct-deposit", title: "Direct deposit bonuses", copy: "Checking offers that use qualifying payroll or other eligible direct deposits.", items: moreMatches.filter((result) => result.item.category === "checking_bonus") },
+    { key: "savings", title: "Savings & yield", copy: "High-yield savings and savings bonuses for cash you want to keep liquid or semi-liquid.", items: moreMatches.filter((result) => ["hysa", "savings_bonus", "cd", "treasury"].includes(result.item.category)) },
+    { key: "spending", title: "Debit & spending bonuses", copy: "Rewards tied to debit purchases or normal spending requirements—not borrowing or opening a credit card.", items: moreMatches.filter((result) => result.item.category === "debit_spend") },
+  ].filter((lane) => lane.items.length > 0);
   const pace = paceText(Number(profile.strategy_mode || 2));
 
   return (
@@ -99,6 +113,7 @@ export function RecommendedOpportunities({
                     <span className={result.safetyPassed ? "match-status cleared" : "match-status pending"}>{result.safetyPassed ? <ShieldCheck size={13} /> : <CircleAlert size={13} />}{safetyText}</span>
                   </div>
                   <span className="match-bank">{item.institution}</span>
+                  <span className="match-category-pill">{categoryLabel(item)}</span>
                   <h3>{item.product_name}</h3>
                   <div className="match-value-row"><div><small>{numberValue(item.bonus_amount) ? "Potential reward" : "Current APY"}</small><strong>{opportunityValue(item)}</strong></div><div><small>{profile.tax_rate_known ? "Est. advantage after tax" : "Est. advantage vs current baseline"}</small><strong className={advantage >= 0 ? "positive" : "negative"}>{advantage >= 0 ? "+" : ""}{money.format(advantage)}</strong></div></div>
                   <div className="match-core-metrics">
@@ -109,7 +124,7 @@ export function RecommendedOpportunities({
                   <p className="match-fit-copy"><b>Why it fits:</b> {reasons.length ? reasons.join(" · ") : "strong overall fit for your current preferences"}.{result.historyMatch ? ` You reported prior ${item.institution} history, so eligibility needs an extra re-check.` : ""}</p>
                   <div className="match-research-row"><span className={freshness.stale ? "stale" : ""}>{freshness.text}</span><span>Research confidence {Math.round(result.confidence)}%</span></div>
                   <div className="match-actions">
-                    <AddToPlanButton opportunity={item} guestMode={guestMode} onGuestAdd={onGuestAdd} alreadyAdded={addedOpportunityIds.includes(item.id)} allowPlanningOnHold />
+                    <AddToPlanButton opportunity={item} guestMode={guestMode} onGuestAdd={onGuestAdd} alreadyAdded={addedOpportunityIds.includes(item.id)} allowGuestSimulationOnHold={guestMode} />
                     <a href={item.official_url} target="_blank" rel="noreferrer">Official terms <ArrowUpRight size={13} /></a>
                   </div>
                 </article>
@@ -117,24 +132,32 @@ export function RecommendedOpportunities({
             })}
           </div>
 
-          {moreMatches.length > 0 && (
+          {moreLanes.length > 0 && (
             <div className="more-matches-section">
-              <div className="more-matches-head"><div><span>MORE OPTIONS</span><h3>Other opportunities that fit your profile.</h3></div><p>Useful if you want another savings home, a second direct-deposit lane, or a different effort/liquidity tradeoff.</p></div>
-              <div className="more-match-list">
-                {moreMatches.map((result, index) => {
-                  const item = result.item;
-                  const advantage = profile.tax_rate_known ? result.estimatedAfterTaxAdvantage : result.grossAdvantage;
-                  return (
-                    <article key={item.id}>
-                      <span className="more-rank">#{index + 4}</span>
-                      <div className="more-name"><small>{item.institution}</small><strong>{item.product_name}</strong></div>
-                      <div><small>Value</small><b>{opportunityValue(item)}</b></div>
-                      <div><small>Est. advantage</small><b className={advantage >= 0 ? "positive" : "negative"}>{advantage >= 0 ? "+" : ""}{money.format(advantage)}</b></div>
-                      <div><small>Research</small><b>{result.safetyPassed ? "Cleared" : result.researchReady ? "Final review" : "Refresh due"}</b></div>
-                      <AddToPlanButton opportunity={item} guestMode={guestMode} onGuestAdd={onGuestAdd} alreadyAdded={addedOpportunityIds.includes(item.id)} allowPlanningOnHold compact />
-                    </article>
-                  );
-                })}
+              <div className="more-matches-head"><div><span>TOP 10 · MORE BY TYPE</span><h3>Compare the rest without mixing every strategy together.</h3></div><p>Your top three stay above. These are the remaining ranked matches, grouped so you can compare a second DD lane, savings option, or debit/spending reward without duplicating cards.</p></div>
+              <div className="match-lanes">
+                {moreLanes.map((lane) => (
+                  <section className="match-lane" key={lane.key}>
+                    <div className="match-lane-head"><div><h4>{lane.title}</h4><p>{lane.copy}</p></div><span>{lane.items.length} option{lane.items.length === 1 ? "" : "s"}</span></div>
+                    <div className="more-match-list">
+                      {lane.items.map((result) => {
+                        const item = result.item;
+                        const overallIndex = matches.findIndex((match) => match.item.id === item.id) + 1;
+                        const advantage = profile.tax_rate_known ? result.estimatedAfterTaxAdvantage : result.grossAdvantage;
+                        return (
+                          <article key={item.id}>
+                            <span className="more-rank">#{overallIndex}</span>
+                            <div className="more-name"><small>{item.institution}</small><strong>{item.product_name}</strong></div>
+                            <div><small>Value</small><b>{opportunityValue(item)}</b></div>
+                            <div><small>Est. advantage</small><b className={advantage >= 0 ? "positive" : "negative"}>{advantage >= 0 ? "+" : ""}{money.format(advantage)}</b></div>
+                            <div><small>Research</small><b>{result.safetyPassed ? "Cleared" : result.researchReady ? "Final review" : "Refresh due"}</b></div>
+                            <AddToPlanButton opportunity={item} guestMode={guestMode} onGuestAdd={onGuestAdd} alreadyAdded={addedOpportunityIds.includes(item.id)} allowGuestSimulationOnHold={guestMode} compact />
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
               </div>
             </div>
           )}

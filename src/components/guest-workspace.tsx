@@ -170,8 +170,8 @@ export function GuestWorkspace({
   return (
     <div className="guest-workspace">
       <div className="guest-workspace-banner">
-        <div><DatabaseZap size={18} /><span><b>Guest preview</b><small>Use the full recommendation and tracking flow without creating an account.</small></span></div>
-        <div><ShieldCheck size={16} /><span>Not saved to a permanent profile · create an account when you want ongoing tracking</span></div>
+        <div><DatabaseZap size={18} /><span><b>Guest plan</b><small>Use the same recommendation and tracking flow without creating an account.</small></span></div>
+        <div><ShieldCheck size={16} /><span>Guest answers are not permanently saved · create an account when you want ongoing tracking</span></div>
       </div>
 
       {missions.length === 0 ? (
