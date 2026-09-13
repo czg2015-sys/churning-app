@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { Mission, MissionStep } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
+import { FormattedNumberInput } from "@/components/formatted-number-input";
 import { latestReview, money, numberValue, reviewStatusLabel, timelineFromOpenedDate } from "@/lib/plan-math";
 
 function todayIso() {
@@ -113,7 +114,7 @@ function StepEditor({ step, onToggle, onAmount }: {
       {target > 0 && !step.is_complete && (
         <div className="step-amount-editor">
           <span>$</span>
-          <input type="number" min="0" step="1" value={amount} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setAmount(Number(event.target.value || 0))} />
+          <FormattedNumberInput name={`step-${step.id}`} value={amount} onValueChange={setAmount} ariaLabel="Recorded amount" />
           <button type="button" onClick={() => onAmount(step, amount)}>Update</button>
         </div>
       )}

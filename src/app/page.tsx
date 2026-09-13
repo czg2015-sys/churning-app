@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -9,63 +10,89 @@ import {
   LockKeyhole,
   ShieldCheck,
   Sparkles,
+  TrendingUp,
   WalletCards,
 } from "lucide-react";
 
 export default function Home() {
   return (
     <main className="home-page">
-      <section className="home-hero shell">
+      <section className="home-hero shell refreshed-home-hero">
         <div className="hero-copy">
-          <div className="eyebrow"><span /> CASH STRATEGY OS · YOU STAY IN CONTROL</div>
-          <h1>Turn idle cash into a <em>tracked strategy.</em></h1>
-          <p className="hero-lede">Churning ranks cash opportunities against your real baseline, then tracks every requirement, payout window, fee, and safe-close review from one command center.</p>
+          <div className="eyebrow"><span /> SAVINGS STRATEGY ENGINE · YOU STAY IN CONTROL</div>
+          <h1>Are you fully taking advantage of <em>your savings?</em></h1>
+          <p className="hero-lede">Churning compares bank bonuses, high-yield savings, and cash rewards against what your money earns today—then helps you track every requirement, payout, fee, and next step.</p>
           <div className="hero-actions">
-            <Link className="button primary hero-primary" href="/guest"><Sparkles size={18} /> Build a practice plan <ArrowRight size={18} /></Link>
+            <Link className="button primary hero-primary" href="/guest"><Sparkles size={18} /> See what you could be earning <ArrowRight size={18} /></Link>
             <Link className="button ghost" href="/auth">Create free account</Link>
           </div>
-          <p className="guest-inline-note"><LockKeyhole size={15} /> Guest Mode writes nothing to your account or database.</p>
+          <p className="guest-inline-note"><LockKeyhole size={15} /> Try the full planning flow without creating an account.</p>
           <div className="trust-row">
-            <span><ShieldCheck size={17} /> Safety floor before ranking</span>
+            <span><ShieldCheck size={17} /> Research status published</span>
             <span><CircleCheck size={17} /> No automatic transfers</span>
-            <span><CircleCheck size={17} /> Manual reward confirmation</span>
+            <span><CircleCheck size={17} /> 7-day freshness standard</span>
           </div>
         </div>
 
-        <div className="command-preview" aria-label="Example Churning reward tracker">
-          <div className="command-glow" />
-          <div className="command-window advanced-preview">
-            <div className="command-header"><div><span className="window-dot" /><span className="overline">REWARD MISSION CONTROL</span></div><span className="live-pill"><i /> Example</span></div>
-            <div className="preview-mission-head"><div><small>CHASE</small><strong>Checking reward</strong></div><b>$400</b></div>
-            <div className="preview-dual-progress">
-              <div><span><b>TIME WINDOW</b><small>45 of 90 days</small></span><strong>50%</strong><i><em style={{ width: "50%" }} /></i></div>
-              <div><span><b>REQUIREMENTS</b><small>2 of 4 confirmed</small></span><strong>50%</strong><i className="green"><em style={{ width: "50%" }} /></i></div>
+        <div className="profile-demo-wrap" aria-label="Illustrative Churning member example">
+          <div className="profile-demo-card">
+            <div className="profile-demo-head">
+              <Image src="/jordan-carter.png" alt="Synthetic demo profile portrait" width={64} height={64} className="profile-demo-avatar" priority />
+              <div><span>ILLUSTRATIVE MEMBER</span><h2>Jordan Carter</h2><p>Balanced pace · $18,000 cash being tracked</p></div>
+              <span className="live-pill"><i /> Demo</span>
             </div>
-            <div className="preview-rows mission-rows">
-              <div><span className="preview-icon yield"><CircleCheck size={18} /></span><p><b>Account opened</b><small>Confirmed Sep 3</small></p><strong>Done</strong></div>
-              <div><span className="preview-icon bonus"><Landmark size={18} /></span><p><b>Direct deposit</b><small>$600 of $1,000 recorded</small></p><strong>60%</strong></div>
-              <div><span className="preview-icon reserve"><CalendarClock size={18} /></span><p><b>Safe-close review</b><small>Calculated from stored terms</small></p><strong>Dec 17</strong></div>
+            <div className="profile-demo-summary">
+              <div><small>Estimated gross cash value this year</small><strong>$827</strong><span>before taxes · illustrative</span></div>
+              <div><small>Active opportunities</small><strong>2</strong><span>plus high-yield savings</span></div>
             </div>
-            <div className="preview-return"><span>Reward is not counted as earned until you confirm payout</span><b><BadgeCheck size={17} /> Manual</b></div>
+            <div className="demo-mission-list">
+              <article>
+                <div className="demo-mission-title"><span><Landmark size={17} /></span><div><small>CHASE TOTAL CHECKING</small><b>$400 checking bonus</b></div><strong>$400</strong></div>
+                <div className="demo-progress-copy"><span>Time window</span><b>45 of 90 days</b></div><div className="demo-progress"><i style={{ width: "50%" }} /></div>
+                <div className="demo-progress-copy"><span>Qualifying direct deposit</span><b>$600 of $1,000</b></div><div className="demo-progress green"><i style={{ width: "60%" }} /></div>
+              </article>
+              <article>
+                <div className="demo-mission-title"><span><WalletCards size={17} /></span><div><small>CHASE SAVINGS</small><b>$200 savings promotion</b></div><strong>$200</strong></div>
+                <div className="demo-progress-copy"><span>90-day balance hold</span><b>48 of 90 days</b></div><div className="demo-progress"><i style={{ width: "53%" }} /></div>
+                <div className="demo-progress-copy"><span>Required new money</span><b>$10,000 of $10,000</b></div><div className="demo-progress green"><i style={{ width: "100%" }} /></div>
+              </article>
+              <article className="demo-savings-row">
+                <div className="demo-mission-title"><span><TrendingUp size={17} /></span><div><small>HIGH-YIELD SAVINGS</small><b>$8,000 at 4.10% APY</b></div><strong>+$328/yr</strong></div>
+              </article>
+            </div>
+            <div className="demo-math-note"><BadgeCheck size={15} /><span>The $827 illustration combines $328 in annual HYSA interest + $400 checking bonus + roughly $99 incremental value from the $200 savings bonus after giving up about $101 of 4.10% APY for 90 days. Public offer terms can change.</span></div>
           </div>
-          <div className="signal-card signal-one"><span><ShieldCheck size={16} /></span><div><small>SAFETY GATE</small><b>80/100 floor</b></div></div>
-          <div className="signal-card signal-two"><span><BadgeDollarSign size={16} /></span><div><small>BASELINE</small><b>Compare vs your HYSA</b></div></div>
+          <div className="signal-card signal-one"><span><ShieldCheck size={16} /></span><div><small>RESEARCH</small><b>Risk fields visible</b></div></div>
+          <div className="signal-card signal-two"><span><BadgeDollarSign size={16} /></span><div><small>BASELINE</small><b>Compare against what you earn now</b></div></div>
         </div>
       </section>
 
-      <section className="product-strip shell" aria-label="Churning core workflow">
-        <article><span>01</span><div><h2>Rank the next move</h2><p>Cash fit, paycheck capacity, liquidity, effort, confidence, and bank history.</p></div><Sparkles size={21} /></article>
-        <article><span>02</span><div><h2>Track the real requirements</h2><p>Separate the time window from what you actually completed.</p></div><CalendarClock size={21} /></article>
-        <article><span>03</span><div><h2>Know when to review the exit</h2><p>Fees, payout timing, safe-close review, and completed earnings history.</p></div><WalletCards size={21} /></article>
+      <section className="home-proof shell">
+        <div><strong>One profile</strong><span>Cash, reserve, paycheck, spending, pace, and bank history.</span></div>
+        <div><strong>Top matches first</strong><span>See your strongest three opportunities before the longer list.</span></div>
+        <div><strong>Track what actually matters</strong><span>Requirements, payout timing, fees, and safe-close review dates.</span></div>
       </section>
 
-      <section className="process shell" id="how-it-works">
-        <div className="section-heading"><span>THE CHURNING LOOP</span><h2>Recommendation → reward → history → next move.</h2></div>
-        <div className="process-grid">
-          <article><b>01</b><h3>Build your baseline</h3><p>Enter the cash, reserve, current APY, paycheck, spending, tax estimate, and banks you already use.</p></article>
-          <article><b>02</b><h3>Add one realistic move</h3><p>Choose from safety-cleared recommendations and enter the actual opening date, committed cash, and deposit plan.</p></article>
-          <article><b>03</b><h3>Track until it is real</h3><p>Only confirmed payouts become lifetime earnings. Then review whether the account should stay open.</p></article>
+      <section className="process shell new-how-it-works" id="how-it-works">
+        <div className="section-heading split-heading"><div><span>HOW CHURNING WORKS</span><h2>A clearer way to make your cash work harder.</h2></div><p>We built the flow around one question: <strong>is the next move actually better for you than doing nothing?</strong> Rate alone is not enough, and a big bonus is not enough.</p></div>
+        <div className="process-flow">
+          <article><div className="process-number">01</div><div className="process-icon"><WalletCards size={22} /></div><h3>Show us your starting point</h3><p>Tell us where your cash sits, what you want untouched, what your pay can support, and what you already earn on savings.</p><span>We calculate your usable cash automatically.</span></article>
+          <article><div className="process-number">02</div><div className="process-icon"><Sparkles size={22} /></div><h3>Get your strongest matches</h3><p>Your results open on a dedicated recommendations page with the top three first, followed by additional opportunities that fit your profile.</p><span>Value · effort · liquidity · eligibility · research</span></article>
+          <article><div className="process-number">03</div><div className="process-icon"><CalendarClock size={22} /></div><h3>Track the real requirements</h3><p>Once you add an opportunity, time progress and requirement progress stay separate so a passing deadline never looks like qualification.</p><span>DD · balances · transactions · payout</span></article>
+          <article><div className="process-number">04</div><div className="process-icon"><ShieldCheck size={22} /></div><h3>Know what happens after payout</h3><p>See monthly fees, waiver rules, closing restrictions, research notes, and a safe-close review date before you decide whether to keep the account.</p><span>Completed earnings build your history.</span></article>
         </div>
+      </section>
+
+      <section className="home-research shell">
+        <div className="research-home-copy"><span className="kicker">MORE THAN A RATE TABLE</span><h2>We publish the research behind the match.</h2><p>Every opportunity can carry known information about credit inquiry behavior, ChexSystems, Early Warning Services, tax treatment, deposit insurance, fees, eligibility, and closing rules. Research older than seven days is treated as stale by the ranking layer until it is refreshed.</p></div>
+        <div className="research-home-grid">
+          <div><strong>Hard inquiry</strong><span>Known credit-pull behavior</span></div><div><strong>ChexSystems / EWS</strong><span>Deposit-screening research</span></div><div><strong>Tax treatment</strong><span>Known reporting status</span></div><div><strong>Close rules</strong><span>Hold periods, fees, and clawbacks</span></div>
+        </div>
+      </section>
+
+      <section className="home-final-cta shell">
+        <div><span className="kicker">START WITH YOUR REAL BASELINE</span><h2>Find out whether your cash has a better next move.</h2><p>Guest Mode uses the same planning questions and ranking logic. No account required to see the experience.</p></div>
+        <Link className="button primary" href="/guest">Build a guest plan <ArrowRight size={18} /></Link>
       </section>
     </main>
   );

@@ -1,17 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, DatabaseZap, LockKeyhole, RotateCcw } from "lucide-react";
+import { ArrowLeft, ArrowRight, BadgeCheck, CircleHelp, Info, LockKeyhole, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { GuestWorkspace } from "@/components/guest-workspace";
-import type { FinancialProfile, Opportunity } from "@/lib/types";
+import { FormattedNumberInput } from "@/components/formatted-number-input";
+import type { FinancialProfile } from "@/lib/types";
 
 const defaults: FinancialProfile = {
   total_cash: 20000,
-  savings_cash: 20000,
-  checking_cash: 0,
+  savings_cash: 18000,
+  checking_cash: 2000,
   emergency_reserve: 5000,
   current_hysa_apy: 0,
   biweekly_pay: 0,
@@ -27,60 +27,74 @@ const defaults: FinancialProfile = {
 };
 
 const commonBanks = ["Chase", "Bank of America", "Wells Fargo", "Citi", "Capital One", "Discover", "SoFi", "BMO", "U.S. Bank", "PNC", "Ally", "American Express", "Charles Schwab", "Fidelity", "Navy Federal Credit Union", "Golden 1 Credit Union", "SchoolsFirst FCU", "Truist", "TD Bank", "Citizens", "Huntington", "KeyBank", "Regions", "Santander", "Synchrony", "Marcus by Goldman Sachs", "Barclays", "Local credit union", "Other bank"];
-const noOpportunities: Opportunity[] = [];
 const usStates = [
   ["AL","Alabama"],["AK","Alaska"],["AZ","Arizona"],["AR","Arkansas"],["CA","California"],["CO","Colorado"],["CT","Connecticut"],["DE","Delaware"],["FL","Florida"],["GA","Georgia"],["HI","Hawaii"],["ID","Idaho"],["IL","Illinois"],["IN","Indiana"],["IA","Iowa"],["KS","Kansas"],["KY","Kentucky"],["LA","Louisiana"],["ME","Maine"],["MD","Maryland"],["MA","Massachusetts"],["MI","Michigan"],["MN","Minnesota"],["MS","Mississippi"],["MO","Missouri"],["MT","Montana"],["NE","Nebraska"],["NV","Nevada"],["NH","New Hampshire"],["NJ","New Jersey"],["NM","New Mexico"],["NY","New York"],["NC","North Carolina"],["ND","North Dakota"],["OH","Ohio"],["OK","Oklahoma"],["OR","Oregon"],["PA","Pennsylvania"],["RI","Rhode Island"],["SC","South Carolina"],["SD","South Dakota"],["TN","Tennessee"],["TX","Texas"],["UT","Utah"],["VT","Vermont"],["VA","Virginia"],["WA","Washington"],["WV","West Virginia"],["WI","Wisconsin"],["WY","Wyoming"],["DC","District of Columbia"]
 ] as const;
 
 function numberValue(value: FormDataEntryValue | null) {
-  const parsed = Number(value);
+  const parsed = Number(String(value ?? "0").replace(/,/g, ""));
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function dollars(value: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
 }
 
 export function QuestionnaireForm({
   initial,
   guestMode = false,
-  opportunities = noOpportunities,
   initialBanks = [],
   initialState = "CA",
 }: {
   initial: FinancialProfile | null;
   guestMode?: boolean;
-  opportunities?: Opportunity[];
   initialBanks?: string[];
   initialState?: string;
 }) {
   const router = useRouter();
-  const [guestProfile, setGuestProfile] = useState<FinancialProfile | null>(null);
-  const [guestBanks, setGuestBanks] = useState<string[]>([]);
-  const [guestState, setGuestState] = useState(initialState);
+  const profile = initial || defaults;
+  const [savingsCash, setSavingsCash] = useState(Number(profile.savings_cash || 0));
+  const [checkingCash, setCheckingCash] = useState(Number(profile.checking_cash || 0));
+  const [emergencyReserve, setEmergencyReserve] = useState(Number(profile.emergency_reserve || 0));
+  const [hasCurrentSavingsYield, setHasCurrentSavingsYield] = useState(Number(profile.current_hysa_apy || 0) > 0);
+  const [cardSpendKnown, setCardSpendKnown] = useState(Number(profile.monthly_card_spend || 0) > 0);
+  const [taxKnown, setTaxKnown] = useState(profile.tax_rate_known);
   const [bankSearch, setBankSearch] = useState("");
   const [bankSelections, setBankSelections] = useState<string[]>(initialBanks);
-  const [showGuestPlan, setShowGuestPlan] = useState(false);
-  const profile = guestProfile || initial || defaults;
-  const [taxKnown, setTaxKnown] = useState(profile.tax_rate_known);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const totalCash = savingsCash + checkingCash;
+  const availableAfterReserve = Math.max(0, totalCash - emergencyReserve);
+  const reserveWarning = emergencyReserve > totalCash;
+  const filteredBanks = useMemo(() => commonBanks
+    .filter((bank) => !bankSelections.includes(bank) && bank.toLowerCase().includes(bankSearch.trim().toLowerCase()))
+    .slice(0, bankSearch ? 12 : 8), [bankSearch, bankSelections]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setError("");
+
+    if (reserveWarning) {
+      setError("Your emergency reserve cannot be larger than the cash you entered.");
+      setSaving(false);
+      return;
+    }
+
     const form = new FormData(event.currentTarget);
-    const totalCash = numberValue(form.get("total_cash"));
-    const checkingCash = numberValue(form.get("checking_cash"));
     const selectedBanks = form.getAll("bank_history").map(String);
     const stateCode = String(form.get("state_code") || initialState);
     const financialProfile: FinancialProfile = {
       total_cash: totalCash,
-      savings_cash: Math.max(0, totalCash - checkingCash),
+      savings_cash: savingsCash,
       checking_cash: checkingCash,
-      emergency_reserve: numberValue(form.get("emergency_reserve")),
-      current_hysa_apy: numberValue(form.get("current_hysa_apy")),
+      emergency_reserve: emergencyReserve,
+      current_hysa_apy: hasCurrentSavingsYield ? numberValue(form.get("current_hysa_apy")) : 0,
       biweekly_pay: numberValue(form.get("biweekly_pay")),
       biweekly_essential_spend: numberValue(form.get("biweekly_essential_spend")),
-      monthly_card_spend: numberValue(form.get("monthly_card_spend")),
-      current_spend_reward_rate: numberValue(form.get("current_spend_reward_rate")),
+      monthly_card_spend: cardSpendKnown ? numberValue(form.get("monthly_card_spend")) : 0,
+      current_spend_reward_rate: cardSpendKnown ? numberValue(form.get("current_spend_reward_rate")) : 0,
       annual_extra_goal: numberValue(form.get("annual_extra_goal")),
       recent_bank_openings: numberValue(form.get("recent_bank_openings")),
       estimated_tax_rate: taxKnown ? numberValue(form.get("estimated_tax_rate")) : null,
@@ -90,12 +104,13 @@ export function QuestionnaireForm({
     };
 
     if (guestMode) {
-      setGuestProfile(financialProfile);
-      setGuestBanks(selectedBanks);
-      setGuestState(stateCode);
-      setShowGuestPlan(true);
-      setSaving(false);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      sessionStorage.setItem("churning_guest_profile", JSON.stringify({
+        profile: financialProfile,
+        banks: selectedBanks,
+        stateCode,
+        createdAt: new Date().toISOString(),
+      }));
+      router.push("/guest/recommendations");
       return;
     }
 
@@ -103,7 +118,7 @@ export function QuestionnaireForm({
     const { data: claimsData, error: authError } = await supabase.auth.getClaims();
     const userId = claimsData?.claims?.sub;
     if (authError || !userId) {
-      router.push("/auth");
+      router.push("/auth?next=/questionnaire");
       return;
     }
 
@@ -135,86 +150,105 @@ export function QuestionnaireForm({
       setSaving(false);
       return;
     }
-    router.push("/my-plan");
-    router.refresh();
-  }
 
-  if (guestMode && showGuestPlan && guestProfile) {
-    return (
-      <div className="guest-results">
-        <div className="guest-mode-bar" role="note">
-          <div className="guest-mode-copy"><span className="guest-mode-icon"><DatabaseZap size={18} /></span><div><strong>Practice plan — not saved</strong><p>This plan only exists on this page. Refreshing or leaving clears your numbers and bank selections.</p></div></div>
-          <div className="guest-mode-actions"><button className="button ghost compact" type="button" onClick={() => setShowGuestPlan(false)}><RotateCcw size={16} /> Edit numbers</button><Link className="button primary compact" href="/auth">Create account</Link></div>
-        </div>
-        <GuestWorkspace profile={guestProfile} opportunities={opportunities} usedBanks={guestBanks} stateCode={guestState} />
-      </div>
-    );
+    router.push("/recommendations");
+    router.refresh();
   }
 
   return (
     <form className="form-card planner-form" onSubmit={submit}>
-      {guestMode && <div className="guest-warning" role="note"><span className="guest-warning-icon"><LockKeyhole size={18} /></span><div><strong>You’re planning as a guest</strong><p>Nothing you enter will be saved to an account or database. If you refresh or leave, the plan disappears.</p></div></div>}
+      <div className="questionnaire-guidance">
+        <div><BadgeCheck size={18} /><span><strong>More accurate answers = better matches.</strong><small>Estimates are okay. Skip optional questions when you truly do not know.</small></span></div>
+        <div><Info size={16} /><span>Churning provides educational comparisons and tracking tools, not financial, tax, or legal advice.</span></div>
+      </div>
+
+      {guestMode && <div className="guest-warning" role="note"><span className="guest-warning-icon"><LockKeyhole size={18} /></span><div><strong>Explore without creating an account</strong><p>Your answers are used only to build this guest plan in your current browser session. Create an account later if you want to save and track progress.</p></div></div>}
+
       <div className="form-stack">
         <section className="planner-section">
-          <div className="form-section-heading"><span>01</span><div><h3>Your available cash</h3><p>Only include money you would feel comfortable moving between insured accounts.</p></div></div>
+          <div className="form-section-heading"><span>01</span><div><h3>Where is your cash today?</h3><p>Enter the money you could potentially use. We calculate the total and protect your reserve automatically.</p></div></div>
           <div className="form-grid">
-            <div className="field"><label htmlFor="total_cash">Total available cash</label><input id="total_cash" name="total_cash" type="number" min="0" step="100" defaultValue={Number(profile.total_cash)} required /></div>
-            <div className="field"><label htmlFor="checking_cash">Keep in checking</label><input id="checking_cash" name="checking_cash" type="number" min="0" step="100" defaultValue={Number(profile.checking_cash)} /></div>
-            <div className="field"><label htmlFor="emergency_reserve">Emergency reserve</label><input id="emergency_reserve" name="emergency_reserve" type="number" min="0" step="100" defaultValue={Number(profile.emergency_reserve)} required /></div>
-            <div className="field"><label htmlFor="current_hysa_apy">Current savings APY (%)</label><input id="current_hysa_apy" name="current_hysa_apy" type="number" min="0" max="20" step=".01" defaultValue={Number(profile.current_hysa_apy)} /></div>
-            <div className="field"><label htmlFor="state_code">Home state</label><select id="state_code" name="state_code" defaultValue={guestMode ? guestState : initialState}>{usStates.map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select><small>Used to filter state-limited offers and flag location-specific terms.</small></div>
+            <div className="field"><label htmlFor="savings_cash">Cash currently in savings</label><FormattedNumberInput id="savings_cash" name="savings_cash" value={savingsCash} onValueChange={setSavingsCash} required /><small>Include savings and money-market cash you could move.</small></div>
+            <div className="field"><label htmlFor="checking_cash">Cash currently in checking</label><FormattedNumberInput id="checking_cash" name="checking_cash" value={checkingCash} onValueChange={setCheckingCash} /><small>Do not include money you need before your next paycheck.</small></div>
+            <div className="field"><label htmlFor="emergency_reserve">Cash you want left completely untouched</label><FormattedNumberInput id="emergency_reserve" name="emergency_reserve" value={emergencyReserve} onValueChange={setEmergencyReserve} required /><small>Your reserve stays outside the opportunity budget.</small></div>
+            <div className="field"><label htmlFor="state_code">Home state</label><select id="state_code" name="state_code" defaultValue={initialState}>{usStates.map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select><small>Used only to filter state-limited offers and terms.</small></div>
           </div>
+
+          <div className={`cash-auto-summary ${reserveWarning ? "warning" : ""}`}>
+            <div><small>Total cash entered</small><strong>{dollars(totalCash)}</strong></div>
+            <div><small>Protected reserve</small><strong>{dollars(Math.min(emergencyReserve, totalCash))}</strong></div>
+            <div><small>Available for your strategy</small><strong>{dollars(availableAfterReserve)}</strong></div>
+          </div>
+
+          <div className="optional-toggle-block">
+            <div><strong>Are you currently earning interest on your savings?</strong><small>This gives us your real baseline so we can compare whether an offer is actually better.</small></div>
+            <div className="choice-pills"><button type="button" className={hasCurrentSavingsYield ? "active" : ""} onClick={() => setHasCurrentSavingsYield(true)}>Yes</button><button type="button" className={!hasCurrentSavingsYield ? "active" : ""} onClick={() => setHasCurrentSavingsYield(false)}>No / not sure</button></div>
+          </div>
+          {hasCurrentSavingsYield && <div className="field inline-compact-field"><label htmlFor="current_hysa_apy">Current savings APY (%)</label><input id="current_hysa_apy" name="current_hysa_apy" type="number" min="0" max="20" step=".01" defaultValue={Number(profile.current_hysa_apy || 0)} placeholder="4.10" /><small>Use the APY shown by your bank, not the monthly interest amount.</small></div>}
         </section>
 
         <section className="planner-section">
-          <div className="form-section-heading"><span>02</span><div><h3>Your paycheck and spending</h3><p>This keeps the plan inside your normal cash flow.</p></div></div>
+          <div className="form-section-heading"><span>02</span><div><h3>Your paycheck and normal spending</h3><p>This helps us avoid recommending direct-deposit or spending requirements that do not fit your real cash flow.</p></div></div>
           <div className="form-grid">
-            <div className="field"><label htmlFor="biweekly_pay">Biweekly paycheck</label><input id="biweekly_pay" name="biweekly_pay" type="number" min="0" step="25" defaultValue={Number(profile.biweekly_pay)} /></div>
-            <div className="field"><label htmlFor="biweekly_essential_spend">Biweekly essentials</label><input id="biweekly_essential_spend" name="biweekly_essential_spend" type="number" min="0" step="25" defaultValue={Number(profile.biweekly_essential_spend)} /></div>
-            <div className="field"><label htmlFor="monthly_card_spend">Normal monthly card spending</label><input id="monthly_card_spend" name="monthly_card_spend" type="number" min="0" step="25" defaultValue={Number(profile.monthly_card_spend)} /></div>
-            <div className="field"><label htmlFor="current_spend_reward_rate">Current rewards rate (%)</label><input id="current_spend_reward_rate" name="current_spend_reward_rate" type="number" min="0" max="20" step=".1" defaultValue={Number(profile.current_spend_reward_rate)} /></div>
+            <div className="field"><label htmlFor="biweekly_pay">About how much is each biweekly take-home paycheck?</label><FormattedNumberInput id="biweekly_pay" name="biweekly_pay" defaultValue={Number(profile.biweekly_pay)} placeholder="1,500" /><small>Enter what usually lands in your account after payroll deductions.</small></div>
+            <div className="field"><label htmlFor="biweekly_essential_spend">About how much of each two-week paycheck goes to essentials?</label><FormattedNumberInput id="biweekly_essential_spend" name="biweekly_essential_spend" defaultValue={Number(profile.biweekly_essential_spend)} placeholder="900" /><small>Think rent, food, gas, bills, and other normal needs.</small></div>
           </div>
+
+          <div className="optional-toggle-block">
+            <div><strong>Do you want card spending included in your matches?</strong><small>Optional. This can help surface debit or spending rewards that fit purchases you already make.</small></div>
+            <div className="choice-pills"><button type="button" className={cardSpendKnown ? "active" : ""} onClick={() => setCardSpendKnown(true)}>Yes</button><button type="button" className={!cardSpendKnown ? "active" : ""} onClick={() => setCardSpendKnown(false)}>N/A</button></div>
+          </div>
+          {cardSpendKnown && <div className="form-grid compact-top-gap">
+            <div className="field"><label htmlFor="monthly_card_spend">Normal monthly card spending</label><FormattedNumberInput id="monthly_card_spend" name="monthly_card_spend" defaultValue={Number(profile.monthly_card_spend)} placeholder="800" /></div>
+            <div className="field"><label htmlFor="current_spend_reward_rate">Current card/debit rewards rate (%)</label><input id="current_spend_reward_rate" name="current_spend_reward_rate" type="number" min="0" max="20" step=".1" defaultValue={Number(profile.current_spend_reward_rate)} placeholder="1.5" /></div>
+          </div>}
         </section>
 
         <section className="planner-section">
-          <div className="form-section-heading"><span>03</span><div><h3>Choose your pace</h3><p>Start simple or compare more offers.</p></div></div>
-          <div className="strategy-options">
-            {[{ id: 1, name: "Passive", copy: "Few moves, easy upkeep" }, { id: 2, name: "Balanced", copy: "Best return for reasonable effort" }, { id: 3, name: "Aggressive", copy: "More offers and more tracking" }].map((item) => (
-              <div className="strategy-option" key={item.id}><input id={"strategy-" + item.id} name="strategy_mode" type="radio" value={item.id} defaultChecked={profile.strategy_mode === item.id} /><label htmlFor={"strategy-" + item.id}><b>{item.name}</b><small>{item.copy}</small></label></div>
+          <div className="form-section-heading"><span>03</span><div><h3>How hands-on do you want to be?</h3><p>Your pace controls how many opportunities we surface at once. You can change it anytime.</p></div></div>
+          <div className="strategy-options detailed">
+            {[
+              { id: 1, name: "Simple", badge: "LOW UPKEEP", copy: "Usually one active move at a time. Prioritizes liquidity, easy requirements, and fewer accounts to manage." },
+              { id: 2, name: "Balanced", badge: "RECOMMENDED", copy: "A practical mix of return and effort. Usually one primary opportunity plus a strong savings home for idle cash." },
+              { id: 3, name: "Active", badge: "MORE TRACKING", copy: "Surfaces more simultaneous opportunities, including multiple direct-deposit lanes when your income can realistically support them." },
+            ].map((item) => (
+              <div className="strategy-option" key={item.id}><input id={`strategy-${item.id}`} name="strategy_mode" type="radio" value={item.id} defaultChecked={profile.strategy_mode === item.id} /><label htmlFor={`strategy-${item.id}`}><span className="strategy-badge">{item.badge}</span><b>{item.name}</b><small>{item.copy}</small></label></div>
             ))}
           </div>
           <div className="form-grid" style={{ marginTop: 17 }}>
-            <div className="field"><label htmlFor="ranking_preference">What matters most?</label><select id="ranking_preference" name="ranking_preference" defaultValue={profile.ranking_preference}><option value="balanced">Balance profit and ease</option><option value="profit">Highest profit</option><option value="ease">Easiest opportunities</option><option value="liquidity">Keep money most available</option></select></div>
-            <div className="field"><label htmlFor="annual_extra_goal">Annual extra earnings goal</label><input id="annual_extra_goal" name="annual_extra_goal" type="number" min="0" step="100" defaultValue={Number(profile.annual_extra_goal)} /></div>
+            <div className="field"><label htmlFor="ranking_preference">What should we prioritize first?</label><select id="ranking_preference" name="ranking_preference" defaultValue={profile.ranking_preference}><option value="balanced">Best overall fit</option><option value="profit">Highest estimated value</option><option value="ease">Simplest requirements</option><option value="liquidity">Keep cash most accessible</option></select><small>Balanced considers value, effort, liquidity, and fit together.</small></div>
+            <div className="field"><label htmlFor="annual_extra_goal">Extra annual cash earnings goal</label><FormattedNumberInput id="annual_extra_goal" name="annual_extra_goal" defaultValue={Number(profile.annual_extra_goal)} placeholder="1,000" /><small>Optional target for bonuses + incremental interest.</small></div>
           </div>
         </section>
 
         <section className="planner-section">
-          <div className="form-section-heading"><span>04</span><div><h3>Estimated tax rate</h3><p>Bonuses and interest can be taxable. Leave this off if you do not know.</p></div></div>
-          <div className="switch-row"><input id="tax-known" type="checkbox" checked={taxKnown} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setTaxKnown(event.target.checked)} /><label htmlFor="tax-known">I know my estimated combined tax rate</label></div>
-          {taxKnown && <div className="field" style={{ marginTop: 14, maxWidth: 260 }}><label htmlFor="estimated_tax_rate">Estimated rate (%)</label><input id="estimated_tax_rate" name="estimated_tax_rate" type="number" min="0" max="60" step="1" defaultValue={Number(profile.estimated_tax_rate || 0)} /></div>}
+          <div className="form-section-heading"><span>04</span><div><h3>Optional tax estimate</h3><p>We use this only to estimate what a bonus or interest may be worth after taxes. If you do not know it, skip it and we will show pre-tax comparisons.</p></div></div>
+          <div className="switch-row"><input id="tax-known" type="checkbox" checked={taxKnown} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setTaxKnown(event.target.checked)} /><label htmlFor="tax-known">I know my approximate combined tax rate</label></div>
+          {taxKnown && <div className="field" style={{ marginTop: 14, maxWidth: 300 }}><label htmlFor="estimated_tax_rate">Approximate combined rate (%)</label><input id="estimated_tax_rate" name="estimated_tax_rate" type="number" min="0" max="60" step="1" defaultValue={Number(profile.estimated_tax_rate || 0)} placeholder="22" /></div>}
+          <div className="explain-inline"><CircleHelp size={16} /><span>Example: a 22% estimate means we would show a $400 taxable bonus as roughly $312 after estimated taxes. Your actual tax treatment can differ.</span></div>
         </section>
 
         <section className="planner-section">
-          <div className="form-section-heading"><span>05</span><div><h3>Your banking history</h3><p>This helps us flag first-time-customer restrictions and show a better account-velocity signal. It never guarantees approval or denial.</p></div></div>
+          <div className="form-section-heading"><span>05</span><div><h3>Your banking history</h3><p>This helps flag new-customer restrictions and account-opening intensity. It does not guarantee approval or denial.</p></div></div>
           <div className="form-grid banking-history-grid">
-            <div className="field"><label htmlFor="recent_bank_openings">Deposit accounts opened in the last 12 months</label><input id="recent_bank_openings" name="recent_bank_openings" type="number" min="0" max="30" step="1" defaultValue={Number(profile.recent_bank_openings || 0)} /><small>Include checking and savings accounts, even if they were opened outside Churning.</small></div>
-            <div className="banking-signal-note"><strong>Why we ask</strong><p>Banks use their own approval and screening rules. This number is only a planning signal so Churning can warn you when account-opening activity is getting heavier.</p></div>
+            <div className="field"><label htmlFor="recent_bank_openings">Checking or savings accounts opened in the last 12 months</label><FormattedNumberInput id="recent_bank_openings" name="recent_bank_openings" defaultValue={Number(profile.recent_bank_openings || 0)} /><small>Include accounts opened outside Churning too.</small></div>
+            <div className="banking-signal-note"><strong>Why we ask</strong><p>Banks use different screening and eligibility rules. Churning treats this as a planning signal and publishes known ChexSystems/EWS/inquiry research when available.</p></div>
           </div>
           <div className="bank-selector">
             {bankSelections.map((bank) => <input key={bank} type="hidden" name="bank_history" value={bank} />)}
             <div className="bank-search-field"><input type="search" value={bankSearch} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setBankSearch(event.target.value)} placeholder="Search Chase, SoFi, Golden 1..." aria-label="Search banks" /></div>
             {bankSelections.length > 0 && <div className="selected-bank-chips">{bankSelections.map((bank) => <button type="button" key={bank} onClick={() => setBankSelections((current) => current.filter((item) => item !== bank))}>{bank}<span>×</span></button>)}</div>}
             <div className="bank-search-results">
-              {commonBanks.filter((bank) => !bankSelections.includes(bank) && bank.toLowerCase().includes(bankSearch.trim().toLowerCase())).slice(0, bankSearch ? 12 : 8).map((bank) => <button type="button" key={bank} onClick={() => { setBankSelections((current) => [...current, bank]); setBankSearch(""); }}><span>{bank}</span><b>+ Add</b></button>)}
+              {filteredBanks.map((bank) => <button type="button" key={bank} onClick={() => { setBankSelections((current) => [...current, bank]); setBankSearch(""); }}><span>{bank}</span><b>+ Add</b></button>)}
               {bankSearch.trim().length >= 2 && !commonBanks.some((bank) => bank.toLowerCase() === bankSearch.trim().toLowerCase()) && !bankSelections.some((bank) => bank.toLowerCase() === bankSearch.trim().toLowerCase()) && <button className="custom-bank-add" type="button" onClick={() => { setBankSelections((current) => [...current, bankSearch.trim()]); setBankSearch(""); }}><span>Add “{bankSearch.trim()}”</span><b>+ Custom</b></button>}
             </div>
-            <p className="bank-selector-help">Add any bank or credit union you currently use or have used for deposit bonuses before. This does not mean you are automatically ineligible; it tells Churning to flag that bank for a stricter eligibility re-check.</p>
+            <p className="bank-selector-help">Add institutions you currently use or have used for deposit bonuses before. We use this to trigger a stricter eligibility check—not to automatically disqualify you.</p>
           </div>
         </section>
       </div>
+
       {error && <div className="form-error" style={{ marginTop: 18 }}>{error}</div>}
-      <div className="form-actions">{guestMode && <Link className="text-link back-link" href="/"><ArrowLeft size={16} /> Back home</Link>}<button className="button primary" type="submit" disabled={saving}>{saving ? "Building…" : <>{guestMode ? "See my practice plan" : "Build my plan"} <ArrowRight size={18} /></>}</button></div>
+      <div className="form-actions">{guestMode && <Link className="text-link back-link" href="/"><ArrowLeft size={16} /> Back home</Link>}<button className="button primary" type="submit" disabled={saving}>{saving ? "Building your matches…" : <><Sparkles size={17} /> See my recommendations <ArrowRight size={18} /></>}</button></div>
     </form>
   );
 }

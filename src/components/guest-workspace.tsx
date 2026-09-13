@@ -150,11 +150,13 @@ export function GuestWorkspace({
   opportunities,
   usedBanks,
   stateCode,
+  resultsPage = false,
 }: {
   profile: FinancialProfile;
   opportunities: Opportunity[];
   usedBanks: string[];
   stateCode?: string | null;
+  resultsPage?: boolean;
 }) {
   const [missions, setMissions] = useState<Mission[]>([]);
   const addedOpportunityIds = useMemo(() => missions.map((mission) => mission.opportunity_id).filter(Boolean) as string[], [missions]);
@@ -168,21 +170,21 @@ export function GuestWorkspace({
   return (
     <div className="guest-workspace">
       <div className="guest-workspace-banner">
-        <div><DatabaseZap size={18} /><span><b>Temporary practice workspace</b><small>Everything below lives only in this browser page. Refreshing or leaving clears it.</small></span></div>
-        <div><ShieldCheck size={16} /><span>Same recommendation and tracking flow · no database writes</span></div>
+        <div><DatabaseZap size={18} /><span><b>Guest preview</b><small>Use the full recommendation and tracking flow without creating an account.</small></span></div>
+        <div><ShieldCheck size={16} /><span>Not saved to a permanent profile · create an account when you want ongoing tracking</span></div>
       </div>
 
       {missions.length === 0 ? (
         <>
-          <div className="workspace-start-callout"><Sparkles size={18} /><div><b>Start here</b><p>Your numbers are ready. Review the safety-cleared queue below. If research is still on hold, you can inspect the candidates without starting a tracker yet.</p></div></div>
-          <RecommendedOpportunities profile={profile} opportunities={opportunities} usedBanks={usedBanks} stateCode={stateCode} guestMode onGuestAdd={addGuestMission} addedOpportunityIds={addedOpportunityIds} prominent />
+          <div className="workspace-start-callout"><Sparkles size={18} /><div><b>Your profile is ready.</b><p>Start with the top three matches, then compare the additional options below. Research status is shown on every candidate.</p></div></div>
+          <RecommendedOpportunities profile={profile} opportunities={opportunities} usedBanks={usedBanks} stateCode={stateCode} guestMode onGuestAdd={addGuestMission} addedOpportunityIds={addedOpportunityIds} prominent resultsPage={resultsPage} />
           <div className="dashboard-section-label"><span className="kicker">PRACTICE CASH ALLOCATION</span><p>See how the rest of your available cash could stay liquid while you evaluate a reward.</p></div>
           <PlanDashboard profile={profile} opportunities={opportunities} guestMode stateCode={stateCode} />
         </>
       ) : (
         <>
           <RewardTracker missions={missions} guestMode onGuestMissionsChange={setMissions} />
-          <RecommendedOpportunities profile={profile} opportunities={opportunities} usedBanks={usedBanks} stateCode={stateCode} guestMode onGuestAdd={addGuestMission} addedOpportunityIds={addedOpportunityIds} />
+          <RecommendedOpportunities profile={profile} opportunities={opportunities} usedBanks={usedBanks} stateCode={stateCode} guestMode onGuestAdd={addGuestMission} addedOpportunityIds={addedOpportunityIds} resultsPage={resultsPage} />
           <div className="dashboard-section-label"><span className="kicker">PRACTICE CASH ALLOCATION</span><p>Keep the cash that is not committed to a reward working without sacrificing your emergency reserve.</p></div>
           <PlanDashboard profile={profile} opportunities={opportunities} guestMode stateCode={stateCode} />
         </>

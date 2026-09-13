@@ -7,7 +7,7 @@ export const money = new Intl.NumberFormat("en-US", {
 });
 
 export function numberValue(value: number | string | null | undefined) {
-  const parsed = Number(value || 0);
+  const parsed = Number(String(value ?? 0).replace(/,/g, ""));
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
@@ -143,8 +143,9 @@ export function opportunityFit(opportunity: Opportunity, profile: FinancialProfi
   const spendFit = purchaseCount <= 0 ? 100 : requiredSpend > 0 ? Math.min(100, (availableSpend / requiredSpend) * 100) : numberValue(profile.monthly_card_spend) > 0 ? 100 : 45;
   const confidence = Math.max(0, Math.min(100, numberValue(opportunity.evidence_confidence)));
   const verificationAge = verificationAgeDays(opportunity.last_verified_at);
-  const freshEnough = verificationAge !== null && verificationAge <= 14;
-  const safetyPassed = (opportunity.safety_gate || "").toLowerCase() === "pass" && confidence >= 80 && freshEnough;
+  const freshEnough = verificationAge !== null && verificationAge <= 7;
+  const researchReady = confidence >= 80 && freshEnough;
+  const safetyPassed = (opportunity.safety_gate || "").toLowerCase() === "pass" && researchReady;
   const liquidity = Math.max(0, Math.min(100, numberValue(opportunity.liquidity_score)));
   const effort = Math.max(1, numberValue(opportunity.effort));
   const historyMatch = usedBanks.some((bank) => bank.trim().toLowerCase() === opportunity.institution.trim().toLowerCase());
@@ -153,8 +154,8 @@ export function opportunityFit(opportunity: Opportunity, profile: FinancialProfi
   const historyPenalty = historyMatch ? 22 : 0;
   const fitBonus = Math.max(-250, Math.min(1000, economics.estimatedAfterTaxAdvantage));
 
-  let score = fitBonus * 0.08 + cashFit * 0.20 + ddFit * 0.16 + spendFit * 0.10 + confidence * 0.22 + liquidity * 0.16 - modePenalty - historyPenalty;
-  if (!safetyPassed) score -= 1000;
+  const baseScore = fitBonus * 0.08 + cashFit * 0.20 + ddFit * 0.16 + spendFit * 0.10 + confidence * 0.22 + liquidity * 0.16 - modePenalty - historyPenalty;
+  const score = baseScore + (safetyPassed ? 35 : researchReady ? 8 : -25);
 
   const reasons: string[] = [];
   if (cashFit >= 95 && economics.requiredCash > 0) reasons.push("fits your available cash");
@@ -174,6 +175,8 @@ export function opportunityFit(opportunity: Opportunity, profile: FinancialProfi
     effort,
     historyMatch,
     safetyPassed,
+    researchReady,
+    baseScore,
     verificationAge,
     freshEnough,
     reasons,
@@ -194,5 +197,14 @@ export function rankResearchQueue(opportunities: Opportunity[], profile: Financi
     .filter((item) => item.offer_status === "live" && stateEligible(item, stateCode))
     .map((item) => ({ item, ...opportunityFit(item, profile, usedBanks) }))
     .filter((result) => !result.safetyPassed)
-    .sort((a, b) => b.confidence - a.confidence || b.score - a.score);
+    .sort((a, b) => Number(b.researchReady) - Number(a.researchReady) || b.baseScore - a.baseScore || b.confidence - a.confidence);
+}
+
+
+export function rankMatches(opportunities: Opportunity[], profile: FinancialProfile, usedBanks: string[], stateCode?: string | null) {
+  return opportunities
+    .filter((item) => item.offer_status === "live" && stateEligible(item, stateCode))
+    .map((item) => ({ item, ...opportunityFit(item, profile, usedBanks) }))
+    .filter((result) => result.cashFit >= 80 && result.ddFit >= 75 && result.spendFit >= 60)
+    .sort((a, b) => Number(b.safetyPassed) - Number(a.safetyPassed) || Number(b.researchReady) - Number(a.researchReady) || b.score - a.score);
 }

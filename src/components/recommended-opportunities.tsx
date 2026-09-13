@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowUpRight, BadgeDollarSign, CalendarClock, Droplets, ShieldCheck, Sparkles, TriangleAlert } from "lucide-react";
+import { ArrowUpRight, BadgeDollarSign, CalendarClock, CircleAlert, Droplets, Gauge, ShieldCheck, Sparkles } from "lucide-react";
 import { AddToPlanButton } from "@/components/add-to-plan-button";
-import { latestReview, money, numberValue, rankOpportunities, rankResearchQueue, reviewStatusLabel, verificationAgeDays } from "@/lib/plan-math";
+import { latestReview, money, numberValue, rankMatches, reviewStatusLabel, verificationAgeDays } from "@/lib/plan-math";
 import type { FinancialProfile, Opportunity, PlanStartDetails } from "@/lib/types";
 
 function freshnessLabel(lastVerifiedAt?: string | null) {
@@ -10,7 +10,26 @@ function freshnessLabel(lastVerifiedAt?: string | null) {
   if (days === null) return { text: "Verification date missing", stale: true };
   if (days === 0) return { text: "Verified today", stale: false };
   if (days <= 7) return { text: `Verified ${days}d ago`, stale: false };
-  return { text: `Re-check · ${days}d old`, stale: true };
+  return { text: `Review due · ${days}d old`, stale: true };
+}
+
+function requirementLabel(item: Opportunity) {
+  if (numberValue(item.direct_deposit_required)) return `${money.format(numberValue(item.direct_deposit_required))} qualifying DD`;
+  if (numberValue(item.required_balance)) return `${money.format(numberValue(item.required_balance))} balance`;
+  if (Number(item.purchase_count || 0) > 0) return `${Number(item.purchase_count)} qualifying purchases`;
+  if (numberValue(item.min_opening_deposit)) return `${money.format(numberValue(item.min_opening_deposit))} opening deposit`;
+  return "No fixed cash requirement";
+}
+
+function opportunityValue(item: Opportunity) {
+  const reward = numberValue(item.bonus_amount);
+  return reward ? money.format(reward) : `${numberValue(item.apy).toFixed(2)}% APY`;
+}
+
+function paceText(mode: number) {
+  if (mode === 1) return { title: "Simple pace", count: "1 primary move", copy: "Keep tracking light and prioritize the clearest fit." };
+  if (mode === 3) return { title: "Active pace", count: "Compare up to 3 lanes", copy: "Built for users willing to track more at once; confirm the combined DD and cash requirements before activating multiple offers." };
+  return { title: "Balanced pace", count: "Usually 1–2 moves", copy: "Our recommended starting point for a practical mix of return, flexibility, and upkeep." };
 }
 
 export function RecommendedOpportunities({
@@ -22,6 +41,7 @@ export function RecommendedOpportunities({
   addedOpportunityIds = [],
   prominent = false,
   stateCode,
+  resultsPage = false,
 }: {
   profile: FinancialProfile;
   opportunities: Opportunity[];
@@ -31,124 +51,112 @@ export function RecommendedOpportunities({
   addedOpportunityIds?: string[];
   prominent?: boolean;
   stateCode?: string | null;
+  resultsPage?: boolean;
 }) {
-  const ranked = rankOpportunities(opportunities, profile, usedBanks, stateCode).slice(0, 5);
-  const researchQueue = rankResearchQueue(opportunities, profile, usedBanks, stateCode).slice(0, 5);
+  const matches = rankMatches(opportunities, profile, usedBanks, stateCode).slice(0, 10);
+  const topMatches = matches.slice(0, 3);
+  const moreMatches = matches.slice(3);
+  const pace = paceText(Number(profile.strategy_mode || 2));
 
   return (
-    <section className={`recommendations-shell ${prominent ? "recommendations-prominent" : ""}`}>
+    <section className={`recommendations-shell ${prominent ? "recommendations-prominent" : ""} ${resultsPage ? "recommendations-results-layout" : ""}`}>
       <div className="recommendations-head">
         <div>
-          <span className="kicker">PERSONALIZED OPPORTUNITY QUEUE</span>
-          <h2>{prominent ? "Start with the best-fitting moves." : "Your next best opportunities."}</h2>
-          <p>Only offers that clear the current 80/100 research-confidence safety floor and stored safety gate are ranked here. An actionable recommendation must also be recently verified and fit your cash, paycheck/spending capacity, liquidity, effort, current APY, bank history, and state availability.</p>
+          <span className="kicker">BEST MATCHES FOR YOUR PROFILE</span>
+          <h2>{resultsPage ? "Your strongest opportunities, ranked." : prominent ? "Start with the best-fitting moves." : "Your next best opportunities."}</h2>
+          <p>We compare each offer with your current savings baseline, available cash, paycheck capacity, normal spending, liquidity preference, bank history, state availability, and the freshness of our stored research.</p>
         </div>
-        <span className="recommendation-refresh"><span /> {guestMode ? "Practice ranking" : "Personalized ranking"}</span>
+        <div className="recommendation-head-meta">
+          <span className="recommendation-refresh"><span /> 7-day research freshness standard</span>
+          <div className="pace-summary"><Gauge size={16} /><span><b>{pace.title}</b><small>{pace.count} · {pace.copy}</small></span></div>
+        </div>
       </div>
 
       {prominent && (
         <div className="recommendation-intro-strip">
-          <div><Sparkles size={17} /><span><b>1. Pick an opportunity</b><small>Compare net advantage and requirements.</small></span></div>
-          <div><BadgeDollarSign size={17} /><span><b>2. Add real starting details</b><small>Opening date, committed cash, and DD plan.</small></span></div>
-          <div><CalendarClock size={17} /><span><b>3. Track it to payout</b><small>The reward tracker takes over from there.</small></span></div>
+          <div><Sparkles size={17} /><span><b>1. Compare your top matches</b><small>See estimated advantage, requirements, and research status.</small></span></div>
+          <div><BadgeDollarSign size={17} /><span><b>2. Add the ones you want to track</b><small>Planning does not open an account or move money.</small></span></div>
+          <div><CalendarClock size={17} /><span><b>3. Start the clock only when opened</b><small>Real opening dates drive qualification and payout tracking.</small></span></div>
         </div>
       )}
 
-      <div className="recommendation-list">
-        {ranked.length ? ranked.map((result, index) => {
-          const item = result.item;
-          const reward = numberValue(item.bonus_amount);
-          const requirement = numberValue(item.direct_deposit_required)
-            ? `${money.format(numberValue(item.direct_deposit_required))} DD`
-            : numberValue(item.required_balance)
-              ? `${money.format(numberValue(item.required_balance))} balance`
-              : numberValue(item.min_opening_deposit)
-                ? `${money.format(numberValue(item.min_opening_deposit))} opening deposit`
-                : "No fixed balance";
-          const freshness = freshnessLabel(item.last_verified_at);
-          const review = latestReview(item);
-          const advantage = profile.tax_rate_known ? result.estimatedAfterTaxAdvantage : result.grossAdvantage;
-          const reasons = result.reasons.slice(0, 2);
-
-          return (
-            <article className="recommendation-card" key={item.id}>
-              <div className="recommendation-rank"><span>#{index + 1}</span><small>FIT</small></div>
-              <div className="recommendation-main">
-                <div className="recommendation-title-row">
-                  <div><span>{item.institution}</span><h3>{item.product_name}</h3></div>
-                  <div className="recommendation-value"><small>{reward ? "Potential reward" : "Current APY"}</small><strong>{reward ? money.format(reward) : `${numberValue(item.apy).toFixed(2)}%`}</strong></div>
-                </div>
-
-                <div className="recommendation-net-row">
-                  <div><small>{profile.tax_rate_known ? "Est. advantage after tax" : "Est. advantage vs current cash baseline"}</small><strong className={advantage >= 0 ? "positive" : "negative"}>{advantage >= 0 ? "+" : ""}{money.format(advantage)}</strong></div>
-                  <div><small>Cash required</small><strong>{result.requiredCash > 0 ? money.format(result.requiredCash) : "No lockup"}</strong></div>
-                  <div><small>Liquidity</small><strong>{Math.round(result.liquidity)}/100</strong></div>
-                </div>
-
-                <div className="recommendation-metrics">
-                  <span className="safe"><ShieldCheck size={14} /> Safety cleared · {Math.round(result.confidence)}%</span>
-                  <span><BadgeDollarSign size={14} /> {requirement}</span>
-                  <span><CalendarClock size={14} /> {item.qualification_days ? `${item.qualification_days} day qualification` : "Ongoing"}</span>
-                  <span><Droplets size={14} /> Effort {Math.round(result.effort)}/3</span>
-                  <span className={freshness.stale ? "stale" : ""}>{freshness.stale ? <TriangleAlert size={14} /> : <ShieldCheck size={14} />} {freshness.text}</span>
-                </div>
-
-                <div className="recommendation-safety-grid" aria-label="Safety research details">
-                  <span><small>Hard pull</small><b>{reviewStatusLabel(review?.hard_pull_status)}</b></span>
-                  <span><small>ChexSystems</small><b>{reviewStatusLabel(review?.chexsystems_status)}</b></span>
-                  <span><small>EWS</small><b>{reviewStatusLabel(review?.ews_status)}</b></span>
-                  <span><small>Tax</small><b>{reviewStatusLabel(review?.tax_status)}</b></span>
-                  <span><small>Deposit insurance</small><b>{reviewStatusLabel(review?.insurance_status)}</b></span>
-                  <span><small>Close rules</small><b>{reviewStatusLabel(review?.close_rule_status)}</b></span>
-                </div>
-
-                <p className="recommendation-why"><b>Why it fits:</b> {reasons.length ? reasons.join(" · ") : "fits the current ranking settings"}. {result.historyMatch ? `You reported prior ${item.institution} history, so new-customer eligibility needs an extra check. ` : ""}{item.terms_summary || "Official terms still need to be rechecked immediately before applying."}</p>
-              </div>
-
-              <div className="recommendation-cta">
-                <AddToPlanButton
-                  opportunity={item}
-                  guestMode={guestMode}
-                  onGuestAdd={onGuestAdd}
-                  alreadyAdded={addedOpportunityIds.includes(item.id)}
-                />
-                <a href={item.official_url} target="_blank" rel="noreferrer">Official terms <ArrowUpRight size={13} /></a>
-              </div>
-            </article>
-          );
-        }) : (
-          <div className="recommendation-empty">
-            <ShieldCheck size={30} />
-            <div><h3>No opportunity clears the current safety floor yet.</h3><p>Churning will not pretend a research-hold offer is ready just to fill the screen. The candidates below stay visible for review, but they cannot be added until the safety gate, confidence floor, and verification freshness all clear.</p></div>
-          </div>
-        )}
-      </div>
-
-      {ranked.length === 0 && researchQueue.length > 0 && (
-        <div className="research-queue">
-          <div className="research-queue-head"><div><span>RESEARCH QUEUE</span><h3>High-interest candidates waiting for clearance.</h3></div><small>Visible ≠ recommended</small></div>
-          <div className="research-queue-grid">
-            {researchQueue.map((result) => {
+      {topMatches.length ? (
+        <>
+          <div className="top-match-label"><span>TOP 3</span><p>Best overall fit based on the answers you gave us.</p></div>
+          <div className="top-match-grid">
+            {topMatches.map((result, index) => {
               const item = result.item;
-              const age = verificationAgeDays(item.last_verified_at);
-              const gatePassed = (item.safety_gate || "").toLowerCase() === "pass";
-              const reasons = [
-                !gatePassed ? "safety review still on hold" : null,
-                result.confidence < 80 ? `confidence ${Math.round(result.confidence)}%` : null,
-                age === null ? "verification date missing" : age > 14 ? `verification ${age} days old` : null,
-              ].filter(Boolean);
+              const freshness = freshnessLabel(item.last_verified_at);
+              const review = latestReview(item);
+              const advantage = profile.tax_rate_known ? result.estimatedAfterTaxAdvantage : result.grossAdvantage;
+              const reasons = result.reasons.slice(0, 3);
+              const safetyText = result.safetyPassed ? "Safety cleared" : result.researchReady ? "Final safety review pending" : "Research refresh required";
+
               return (
-                <article key={item.id}>
-                  <div className="research-queue-top"><span>{item.institution}</span><b>{numberValue(item.bonus_amount) > 0 ? money.format(numberValue(item.bonus_amount)) : `${numberValue(item.apy).toFixed(2)}% APY`}</b></div>
-                  <h4>{item.product_name}</h4>
-                  <p>{reasons.length ? reasons.join(" · ") : "Additional verification is still required before this can become actionable."}</p>
-                  <div className="research-queue-actions"><AddToPlanButton opportunity={item} guestMode={guestMode} onGuestAdd={onGuestAdd} alreadyAdded={addedOpportunityIds.includes(item.id)} allowGuestSimulationOnHold compact /><a href={item.official_url} target="_blank" rel="noreferrer">Review terms <ArrowUpRight size={12} /></a></div>
+                <article className={`top-match-card ${result.safetyPassed ? "cleared" : "pending"}`} key={item.id}>
+                  <div className="top-match-card-head">
+                    <span className="match-rank">#{index + 1}</span>
+                    <span className={result.safetyPassed ? "match-status cleared" : "match-status pending"}>{result.safetyPassed ? <ShieldCheck size={13} /> : <CircleAlert size={13} />}{safetyText}</span>
+                  </div>
+                  <span className="match-bank">{item.institution}</span>
+                  <h3>{item.product_name}</h3>
+                  <div className="match-value-row"><div><small>{numberValue(item.bonus_amount) ? "Potential reward" : "Current APY"}</small><strong>{opportunityValue(item)}</strong></div><div><small>{profile.tax_rate_known ? "Est. advantage after tax" : "Est. advantage vs current baseline"}</small><strong className={advantage >= 0 ? "positive" : "negative"}>{advantage >= 0 ? "+" : ""}{money.format(advantage)}</strong></div></div>
+                  <div className="match-core-metrics">
+                    <span><small>Requirement</small><b>{requirementLabel(item)}</b></span>
+                    <span><small>Liquidity</small><b>{Math.round(result.liquidity)}/100</b></span>
+                    <span><small>Effort</small><b>{Math.round(result.effort)}/3</b></span>
+                  </div>
+                  <p className="match-fit-copy"><b>Why it fits:</b> {reasons.length ? reasons.join(" · ") : "strong overall fit for your current preferences"}.{result.historyMatch ? ` You reported prior ${item.institution} history, so eligibility needs an extra re-check.` : ""}</p>
+                  <div className="match-research-row"><span className={freshness.stale ? "stale" : ""}>{freshness.text}</span><span>Research confidence {Math.round(result.confidence)}%</span></div>
+                  <div className="match-actions">
+                    <AddToPlanButton opportunity={item} guestMode={guestMode} onGuestAdd={onGuestAdd} alreadyAdded={addedOpportunityIds.includes(item.id)} allowPlanningOnHold />
+                    <a href={item.official_url} target="_blank" rel="noreferrer">Official terms <ArrowUpRight size={13} /></a>
+                  </div>
                 </article>
               );
             })}
           </div>
+
+          {moreMatches.length > 0 && (
+            <div className="more-matches-section">
+              <div className="more-matches-head"><div><span>MORE OPTIONS</span><h3>Other opportunities that fit your profile.</h3></div><p>Useful if you want another savings home, a second direct-deposit lane, or a different effort/liquidity tradeoff.</p></div>
+              <div className="more-match-list">
+                {moreMatches.map((result, index) => {
+                  const item = result.item;
+                  const advantage = profile.tax_rate_known ? result.estimatedAfterTaxAdvantage : result.grossAdvantage;
+                  return (
+                    <article key={item.id}>
+                      <span className="more-rank">#{index + 4}</span>
+                      <div className="more-name"><small>{item.institution}</small><strong>{item.product_name}</strong></div>
+                      <div><small>Value</small><b>{opportunityValue(item)}</b></div>
+                      <div><small>Est. advantage</small><b className={advantage >= 0 ? "positive" : "negative"}>{advantage >= 0 ? "+" : ""}{money.format(advantage)}</b></div>
+                      <div><small>Research</small><b>{result.safetyPassed ? "Cleared" : result.researchReady ? "Final review" : "Refresh due"}</b></div>
+                      <AddToPlanButton opportunity={item} guestMode={guestMode} onGuestAdd={onGuestAdd} alreadyAdded={addedOpportunityIds.includes(item.id)} allowPlanningOnHold compact />
+                    </article>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="recommendation-empty">
+          <ShieldCheck size={30} />
+          <div><h3>No current opportunity fits the profile closely enough.</h3><p>Instead of forcing a weak match, adjust your questionnaire or check again after the opportunity library refreshes.</p></div>
         </div>
       )}
+
+      <div className="research-standard">
+        <div className="research-standard-head"><div><span>RESEARCH & RISK</span><h3>What we check before you act.</h3></div><p>These fields are published because a large advertised bonus is not enough by itself.</p></div>
+        <div className="research-standard-grid">
+          {[{ k: "Hard inquiry", v: "Whether account opening is known to use a hard credit pull." }, { k: "ChexSystems", v: "Known deposit-account screening behavior when verified." }, { k: "Early Warning", v: "EWS screening notes when verified." }, { k: "Taxes", v: "Known bonus/interest reporting treatment." }, { k: "Deposit insurance", v: "FDIC/NCUA or program-bank structure." }, { k: "Close & clawback rules", v: "Minimum age, payout, fee, and early-closing restrictions." }].map((item) => <div key={item.k}><strong>{item.k}</strong><span>{item.v}</span></div>)}
+        </div>
+        {topMatches[0] && (() => {
+          const review = latestReview(topMatches[0].item);
+          return <div className="research-example-line"><span>Top match research snapshot</span><b>Hard pull: {reviewStatusLabel(review?.hard_pull_status)} · Chex: {reviewStatusLabel(review?.chexsystems_status)} · EWS: {reviewStatusLabel(review?.ews_status)} · Tax: {reviewStatusLabel(review?.tax_status)} · Insurance: {reviewStatusLabel(review?.insurance_status)} · Close rules: {reviewStatusLabel(review?.close_rule_status)}</b></div>;
+        })()}
+        <p className="research-disclaimer">Churning is an educational comparison and tracking tool, not financial, tax, legal, or credit advice. Bank approval and bonus eligibility are controlled by each institution’s current official terms.</p>
+      </div>
     </section>
   );
 }

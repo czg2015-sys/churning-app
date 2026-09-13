@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { CalendarDays, Check, Landmark, Plus, ShieldCheck, Sparkles, WalletCards, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { FormattedNumberInput } from "@/components/formatted-number-input";
 import { money, numberValue, timelineFromOpenedDate, trackedInterestEstimate, verificationAgeDays } from "@/lib/plan-math";
 import type { Opportunity, PlanStartDetails } from "@/lib/types";
 
@@ -27,6 +28,7 @@ export function AddToPlanButton({
   onGuestAdd,
   alreadyAdded = false,
   allowGuestSimulationOnHold = false,
+  allowPlanningOnHold = false,
 }: {
   opportunity: Opportunity;
   compact?: boolean;
@@ -34,6 +36,7 @@ export function AddToPlanButton({
   onGuestAdd?: (opportunity: Opportunity, details: PlanStartDetails) => void;
   alreadyAdded?: boolean;
   allowGuestSimulationOnHold?: boolean;
+  allowPlanningOnHold?: boolean;
 }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -60,8 +63,8 @@ export function AddToPlanButton({
     const details: PlanStartDetails = {
       openedAlready,
       openedAt: openedAlready ? String(form.get("opened_at") || todayIso()) : null,
-      amountCommitted: Math.max(0, Number(form.get("amount_committed") || 0)),
-      plannedDirectDeposit: Math.max(0, Number(form.get("planned_dd") || 0)),
+      amountCommitted: Math.max(0, numberValue(String(form.get("amount_committed") || 0))),
+      plannedDirectDeposit: Math.max(0, numberValue(String(form.get("planned_dd") || 0))),
       trackingDays,
     };
 
@@ -238,9 +241,10 @@ export function AddToPlanButton({
   const safetyCleared = (opportunity.safety_gate || "").toLowerCase() === "pass"
     && numberValue(opportunity.evidence_confidence) >= 80
     && verificationAge !== null
-    && verificationAge <= 14;
+    && verificationAge <= 7;
   const simulationOnly = !safetyCleared && guestMode && allowGuestSimulationOnHold;
-  const canOpen = safetyCleared || simulationOnly;
+  const planningWithPendingResearch = !safetyCleared && allowPlanningOnHold;
+  const canOpen = safetyCleared || simulationOnly || planningWithPendingResearch;
 
   return (
     <div className={compact ? "add-plan-wrap compact" : "add-plan-wrap"}>
@@ -249,9 +253,9 @@ export function AddToPlanButton({
         type="button"
         onClick={() => !displayedAdded && canOpen && setOpen(true)}
         disabled={displayedAdded || !canOpen}
-        title={!safetyCleared && !simulationOnly ? "This offer has not cleared Churning’s current confidence, safety, and freshness checks." : simulationOnly ? "Guest simulation only — this offer is still on research hold." : undefined}
+        title={!safetyCleared && !simulationOnly && !planningWithPendingResearch ? "This offer has not cleared Churning’s current confidence, safety, and freshness checks." : simulationOnly ? "Guest simulation only — this offer is still on research hold." : planningWithPendingResearch ? "Add this candidate to your plan for tracking and final verification; this is not a recommendation to open it." : undefined}
       >
-        {displayedAdded ? <><Check size={16} /> In My Plan</> : simulationOnly ? <><Sparkles size={16} /> Simulate tracker</> : !safetyCleared ? <><ShieldCheck size={16} /> Research hold</> : <><Plus size={16} /> Add to My Plan</>}
+        {displayedAdded ? <><Check size={16} /> In My Plan</> : simulationOnly ? <><Sparkles size={16} /> Simulate tracker</> : planningWithPendingResearch ? <><Plus size={16} /> Add for review</> : !safetyCleared ? <><ShieldCheck size={16} /> Research hold</> : <><Plus size={16} /> Add to My Plan</>}
       </button>
       {error && <small className="add-plan-error">{error}</small>}
 
@@ -263,6 +267,7 @@ export function AddToPlanButton({
             <h2 id={`add-${opportunity.id}`}>Add {opportunity.institution} to your plan</h2>
             <p className="plan-modal-lede">Give Churning the real starting details so the countdown, cash commitment, and requirement progress are based on your situation—not a generic example.</p>
             {simulationOnly && <div className="simulation-warning"><Sparkles size={15} /><span><strong>Guest simulation only.</strong> This candidate is still on research hold. Use this to test the tracker experience—not as a recommendation to open the account.</span></div>}
+            {planningWithPendingResearch && !simulationOnly && <div className="simulation-warning"><ShieldCheck size={15} /><span><strong>Final verification is still pending.</strong> Adding this candidate creates a planning/tracking item only. Recheck the official terms and unresolved research before opening an account.</span></div>}
 
             <div className="plan-modal-offer">
               <span className="plan-modal-bank"><Landmark size={18} /></span>
@@ -278,8 +283,8 @@ export function AddToPlanButton({
 
               <div className="plan-modal-grid">
                 {openedAlready && <label className="modal-field"><span><CalendarDays size={15} /> Opening date</span><input name="opened_at" type="date" defaultValue={todayIso()} max={todayIso()} required /></label>}
-                <label className="modal-field"><span><WalletCards size={15} /> Cash committed</span><div className="money-input"><i>$</i><input name="amount_committed" type="number" min="0" step="1" defaultValue={suggestedCommitment} /></div><small>{suggestedCommitment > 0 ? `Stored offer target: ${money.format(suggestedCommitment)}` : "Enter only cash you actually plan to commit."}</small></label>
-                {suggestedDirectDeposit > 0 && <label className="modal-field"><span><Landmark size={15} /> Qualifying DD completed so far</span><div className="money-input"><i>$</i><input name="planned_dd" type="number" min="0" step="1" defaultValue="0" /></div><small>Stored target: {money.format(suggestedDirectDeposit)}. Update only deposits that actually posted.</small></label>}
+                <label className="modal-field"><span><WalletCards size={15} /> Cash committed</span><div className="money-input"><i>$</i><FormattedNumberInput name="amount_committed" defaultValue={suggestedCommitment} ariaLabel="Cash committed" /></div><small>{suggestedCommitment > 0 ? `Stored offer target: ${money.format(suggestedCommitment)}` : "Enter only cash you actually plan to commit."}</small></label>
+                {suggestedDirectDeposit > 0 && <label className="modal-field"><span><Landmark size={15} /> Qualifying DD completed so far</span><div className="money-input"><i>$</i><FormattedNumberInput name="planned_dd" defaultValue={0} ariaLabel="Qualifying direct deposit completed so far" /></div><small>Stored target: {money.format(suggestedDirectDeposit)}. Update only deposits that actually posted.</small></label>}
                 {needsCustomHysaHorizon && <label className="modal-field"><span><CalendarDays size={15} /> Tracking horizon</span><select name="tracking_days" defaultValue="90"><option value="90">90 days</option><option value="180">180 days</option><option value="365">1 year</option></select><small>This is your review horizon for an ongoing rate, not a bank lockup requirement.</small></label>}
               </div>
 

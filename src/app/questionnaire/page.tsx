@@ -22,7 +22,7 @@ export default async function QuestionnairePage() {
     <main className="page-shell">
       <div className="shell questionnaire-wrap">
         <div className="page-heading">
-          <div><span className="kicker">BUILD MY PLAN</span><h1>Start with your real numbers.</h1><p>Use estimates if you are unsure. Nothing here moves your money or opens an account.</p></div>
+          <div><span className="kicker">BUILD YOUR PROFILE</span><h1>A few answers. Better recommendations.</h1><p>Use estimates when you need to. The more accurate the inputs, the better Churning can compare offers against your real cash flow.</p></div>
         </div>
         <QuestionnaireForm initial={(profile as FinancialProfile | null) || null} initialBanks={((bankHistory || []) as Array<{ institution: string }>).map((row) => row.institution)} initialState={userProfile?.state_code || "CA"} />
       </div>

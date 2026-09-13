@@ -1,60 +1,55 @@
 import type { Metadata } from "next";
-import { DatabaseZap, EyeOff, ShieldCheck, Sparkles, TriangleAlert } from "lucide-react";
+import { BadgeCheck, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react";
 import { QuestionnaireForm } from "@/components/questionnaire-form";
-import { getLiveOpportunities } from "@/lib/opportunities";
 import styles from "./guest.module.css";
 
 export const metadata: Metadata = { title: "Guest Planner" };
 
-export default async function GuestPage() {
-  const { opportunities, dataAvailable } = await getLiveOpportunities();
-
+export default function GuestPage() {
   return (
     <main className={styles.guestExperience}>
       <div className="shell">
         <section className={styles.hero}>
           <div className={styles.heroCopy}>
-            <span className={styles.eyebrow}><i className={styles.eyebrowDot} /> GUEST LAB · NO ACCOUNT REQUIRED</span>
-            <h1>Build a real plan.<br /><em>Save nothing.</em></h1>
-            <p>Try Churning with real numbers or make up a scenario for fun. We’ll build a practice cash plan and show matching opportunities without creating an account.</p>
+            <span className={styles.eyebrow}><i className={styles.eyebrowDot} /> GUEST PREVIEW · NO ACCOUNT REQUIRED</span>
+            <h1>See what Churning would recommend <em>before you sign up.</em></h1>
+            <p>Use your real numbers or test a scenario. You’ll get the same questionnaire, ranking logic, research labels, and tracker experience as an account user.</p>
           </div>
 
-          <aside className={styles.sessionPanel} aria-label="Guest session status">
+          <aside className={styles.sessionPanel} aria-label="Guest preview details">
             <div className={styles.panelTop}>
-              <span className={styles.panelLabel}>TEMPORARY SESSION</span>
+              <span className={styles.panelLabel}>FULL PRODUCT PREVIEW</span>
               <span className={styles.liveBadge}><Sparkles size={13} /> Guest Mode</span>
             </div>
             <div className={styles.sessionBody}>
               <div className={styles.sessionItem}>
-                <span className={styles.sessionIcon}><DatabaseZap size={18} /></span>
-                <div><strong>Database storage</strong><small>Your guest plan is never written to Supabase.</small></div>
-                <span className={styles.sessionState}>OFF</span>
-              </div>
-              <div className={styles.sessionItem}>
-                <span className={styles.sessionIcon}><EyeOff size={18} /></span>
-                <div><strong>Account required</strong><small>No email, password, or signup needed.</small></div>
-                <span className={styles.sessionState}>NO</span>
+                <span className={styles.sessionIcon}><BadgeCheck size={18} /></span>
+                <div><strong>Same planning questions</strong><small>Guest and signed-in users use the exact same profile logic.</small></div>
+                <span className={styles.sessionState}>YES</span>
               </div>
               <div className={styles.sessionItem}>
                 <span className={styles.sessionIcon}><ShieldCheck size={18} /></span>
-                <div><strong>Practice recommendations</strong><small>See how your cash could be split and ranked.</small></div>
-                <span className={styles.sessionState}>ON</span>
+                <div><strong>Same research visibility</strong><small>See fit, freshness, and known risk/screening fields.</small></div>
+                <span className={styles.sessionState}>YES</span>
+              </div>
+              <div className={styles.sessionItem}>
+                <span className={styles.sessionIcon}><LockKeyhole size={18} /></span>
+                <div><strong>No permanent profile</strong><small>Create an account later only if you want saved tracking.</small></div>
+                <span className={styles.sessionState}>NO SAVE</span>
               </div>
             </div>
-            <div className={styles.panelFoot}><TriangleAlert size={16} /><span>Leaving or refreshing the page clears the plan. Create an account only if you want to save and track it later.</span></div>
+            <div className={styles.panelFoot}><LockKeyhole size={16} /><span>Your guest answers stay in the current browser session and are not written to a permanent Churning account.</span></div>
           </aside>
         </section>
 
-        <section className={styles.demoStrip} aria-label="What guest mode includes">
-          <article><span>01 · ENTER A SCENARIO</span><strong>Cash, paycheck, APY and spending</strong></article>
-          <article><span>02 · GET A PRACTICE PLAN</span><strong>Direct deposit, HYSA and spending picks</strong></article>
-          <article><span>03 · DECIDE LATER</span><strong>Create an account only if you want tracking</strong></article>
+        <section className={styles.demoStrip} aria-label="Guest planning flow">
+          <article><span>01 · YOUR CASH FLOW</span><strong>Tell us where your cash sits and what your paycheck can support</strong></article>
+          <article><span>02 · YOUR MATCHES</span><strong>Get a new recommendations page with your top three first</strong></article>
+          <article><span>03 · YOUR TRACKER</span><strong>Add a candidate and see the full progress system before signing up</strong></article>
         </section>
 
-        {!dataAvailable && <div className="disclaimer"><strong>Guest Mode is available.</strong> Live opportunity data is temporarily unavailable, so the practice allocation will still work but some recommendation cards may be empty.</div>}
-
         <section className={styles.formStage}>
-          <QuestionnaireForm initial={null} guestMode opportunities={opportunities} />
+          <QuestionnaireForm initial={null} guestMode />
         </section>
       </div>
     </main>
