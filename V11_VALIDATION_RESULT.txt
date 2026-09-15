@@ -1,0 +1,170 @@
+BUILD_EXIT=1
+LINT_EXIT=1
+
+===== BUILD =====
+
+> churning-app@0.1.0 build
+> next build
+
+▲ Next.js 16.3.4 (Turbopack)
+✓ Running next.config.ts took 25ms
+⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 5.1s
+  Running TypeScript ...
+  Finished TypeScript in 4.0s ...
+  Collecting page data using 3 workers ...
+  Generating static pages using 3 workers (0/13) ...
+  Generating static pages using 3 workers (3/13) 
+  Generating static pages using 3 workers (6/13) 
+[opportunities] Supabase public environment variables are unavailable
+[opportunities] Supabase public environment variables are unavailable
+  Generating static pages using 3 workers (9/13) 
+Error occurred prerendering page "/my-plan". Read more: https://nextjs.org/docs/messages/prerender-error
+Error: Supabase public environment variables are unavailable.
+    at v (src/lib/supabase/server.ts:7:27)
+    at C (src/app/my-plan/page.tsx:17:26)
+   5 | export async function createClient() {
+   6 |   const { url, key } = getSupabasePublicConfig();
+>  7 |   if (!url || !key) throw new Error("Supabase public environment variables are unavailable.");
+     |                           ^
+   8 |
+   9 |   const cookieStore = await cookies();
+  10 |   return createServerClient(url, key, { {
+  digest: '1086573534'
+}
+Export encountered an error on /my-plan/page: /my-plan, exiting the build.
+⨯ Next.js build worker exited with code: 1 and signal: null
+
+===== LINT =====
+
+> churning-app@0.1.0 lint
+> eslint
+
+
+/home/runner/work/churning-app/churning-app/src/app/page.tsx
+  10:3  warning  'Landmark' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/runner/work/churning-app/churning-app/src/components/formatted-number-input.tsx
+  44:21  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/runner/work/churning-app/churning-app/src/components/formatted-number-input.tsx:44:21
+  42 |
+  43 |   useEffect(() => {
+> 44 |     if (controlled) setDisplay(format(value));
+     |                     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  45 |   }, [controlled, value]);
+  46 |
+  47 |   return (  react-hooks/set-state-in-effect
+
+/home/runner/work/churning-app/churning-app/src/components/formatted-percent-input.tsx
+  35:21  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/runner/work/churning-app/churning-app/src/components/formatted-percent-input.tsx:35:21
+  33 |
+  34 |   useEffect(() => {
+> 35 |     if (controlled) setDisplay(normalize(value, max));
+     |                     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  36 |   }, [controlled, max, value]);
+  37 |
+  38 |   return (  react-hooks/set-state-in-effect
+
+/home/runner/work/churning-app/churning-app/src/components/plan-command-summary.tsx
+  21:12  error  Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+/home/runner/work/churning-app/churning-app/src/components/plan-command-summary.tsx:21:12
+  19 |     if (!mission.opened_at) return false;
+  20 |     const opened = new Date(`${mission.opened_at.slice(0, 10)}T12:00:00`).getTime();
+> 21 |     return Date.now() - opened <= 365 * 86_400_000;
+     |            ^^^^^^^^^^ Cannot call impure function
+  22 |   }).length;
+  23 |   const reportedRecentOpenings = Math.max(0, numberValue(profile.recent_bank_openings));
+  24 |   const recentOpenings = Math.max(reportedRecentOpenings, trackedRecentOpenings);  react-hooks/purity
+
+/home/runner/work/churning-app/churning-app/src/components/recommended-opportunities.tsx
+   70:5   error    Error: Cannot reassign variable after render completes
+
+Reassigning `ddCount` after render has completed can cause inconsistent behavior on subsequent renders. Consider using state instead.
+
+/home/runner/work/churning-app/churning-app/src/components/recommended-opportunities.tsx:70:5
+  68 |   const matches = ranked.filter((result) => {
+  69 |     if (result.item.category !== "checking_bonus") return true;
+> 70 |     ddCount += 1;
+     |     ^^^^^^^ Cannot reassign `ddCount` after render completes
+  71 |     return ddCount <= ddLimit;
+  72 |   }).slice(0, 10);
+  73 |   const topMatches = matches.slice(0, 3);  react-hooks/immutability
+  111:21  warning  'review' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+
+/home/runner/work/churning-app/churning-app/src/components/reward-tracker.tsx
+  130:19  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/runner/work/churning-app/churning-app/src/components/reward-tracker.tsx:130:19
+  128 |   const rewardNeedsAmount = step.step_type === "reward_received" && target > 0 && current <= 0;
+  129 |
+> 130 |   useEffect(() => setAmount(current), [current]);
+      |                   ^^^^^^^^^ Avoid calling setState() directly within an effect
+  131 |
+  132 |   return (
+  133 |     <div className="reward-step">                                                              react-hooks/set-state-in-effect
+  177:19  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/runner/work/churning-app/churning-app/src/components/reward-tracker.tsx:177:19
+  175 |   const feeStartDate = addDaysIso(mission.opened_at, opportunity?.fee_starts_after_days);
+  176 |
+> 177 |   useEffect(() => setSteps(mission.mission_steps || []), [mission.mission_steps]);
+      |                   ^^^^^^^^ Avoid calling setState() directly within an effect
+  178 |
+  179 |   function emitGuest(nextMission: Mission) {
+  180 |     onGuestUpdate?.(nextMission);  react-hooks/set-state-in-effect
+  376:20  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/runner/work/churning-app/churning-app/src/components/reward-tracker.tsx:376:20
+  374 |
+  375 |   useEffect(() => {
+> 376 |     if (guestMode) setGuestMissions(missions);
+      |                    ^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  377 |   }, [guestMode, missions]);
+  378 |
+  379 |   const source = guestMode ? guestMissions : missions;                                                                                              react-hooks/set-state-in-effect
+
+✖ 9 problems (7 errors, 2 warnings)
+
