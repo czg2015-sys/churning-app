@@ -1,0 +1,53 @@
+BUILD_EXIT=0
+
+
+> churning-app@0.1.0 build
+> next build
+
+▲ Next.js 16.3.4 (Turbopack)
+✓ Running next.config.ts took 20ms
+⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 5.5s
+  Running TypeScript ...
+  Finished TypeScript in 4.2s ...
+  Collecting page data using 3 workers ...
+  Generating static pages using 3 workers (0/12) ...
+  Generating static pages using 3 workers (3/12) 
+  Generating static pages using 3 workers (6/12) 
+[opportunities] Supabase public environment variables are unavailable
+[opportunities] Supabase public environment variables are unavailable
+  Generating static pages using 3 workers (9/12) 
+✓ Generating static pages using 3 workers (12/12) in 287ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/research/action
+├ ƒ /api/research/cron
+├ ƒ /api/research/run
+├ ○ /auth
+├ ƒ /auth/confirm
+├ ƒ /cards
+├ ○ /guest
+├ ○ /guest/recommendations
+├ ○ /icon.svg
+├ ƒ /my-plan
+├ ○ /opportunities
+├ ƒ /questionnaire
+├ ƒ /recommendations
+└ ƒ /research
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
