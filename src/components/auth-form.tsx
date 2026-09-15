@@ -19,17 +19,22 @@ export function AuthForm() {
     event.preventDefault();
     setLoading(true);
     setMessage(null);
-    const supabase = createClient();
 
-    if (mode === "signin") {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        setMessage({ type: "error", text: error.message });
-      } else {
+    try {
+      const supabase = createClient();
+
+      if (mode === "signin") {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+          setMessage({ type: "error", text: error.message });
+          return;
+        }
+
         router.push(searchParams.get("next") || "/my-plan");
         router.refresh();
+        return;
       }
-    } else {
+
       const emailRedirectTo = window.location.origin + "/auth/confirm?next=/questionnaire";
       const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo } });
       if (error) {
@@ -40,8 +45,15 @@ export function AuthForm() {
       } else {
         setMessage({ type: "success", text: "Check your email and tap the confirmation link. Then we’ll build your plan." });
       }
+    } catch (error) {
+      console.error("[auth] Sign-in unavailable", error);
+      setMessage({
+        type: "error",
+        text: "Sign-in is temporarily unavailable on this deployment. Please try again after the preview account settings are enabled.",
+      });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   return (
