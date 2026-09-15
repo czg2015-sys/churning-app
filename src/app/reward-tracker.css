@@ -127,3 +127,18 @@
 /* Money-green / slightly lighter surface pass */
 .reward-tracker-head { background:radial-gradient(circle at 100% 0,rgba(59,178,115,.12),transparent 28rem),linear-gradient(145deg,rgba(26,36,30,.98),rgba(15,22,17,.98)); }
 .reward-card { background:linear-gradient(155deg,rgba(27,37,31,.98),rgba(16,23,18,.98)); }
+
+.reward-do-not-warning, .reward-lifecycle-note {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  margin-top: 10px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.reward-do-not-warning { border: 1px solid rgba(255,141,130,.18); background: rgba(255,141,130,.055); color: var(--muted-strong); }
+.reward-do-not-warning svg { color: var(--danger); flex: 0 0 auto; margin-top: 1px; }
+.reward-lifecycle-note { border: 1px solid rgba(59,178,115,.16); background: rgba(59,178,115,.045); color: var(--muted-strong); }
+.reward-lifecycle-note svg { color: var(--green); flex: 0 0 auto; margin-top: 1px; }

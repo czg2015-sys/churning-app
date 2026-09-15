@@ -1,0 +1,52 @@
+.page { min-height: 100vh; padding: 48px 0 88px; }
+.shell { display: grid; gap: 24px; }
+.back { width: fit-content; display: inline-flex; align-items: center; gap: 6px; color: var(--muted-strong); font-size: 13px; font-weight: 700; }
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 390px); gap: 28px; align-items: end; padding: 28px; border: 1px solid var(--line); border-radius: 20px; background: linear-gradient(145deg, rgba(35,49,40,.95), rgba(25,37,30,.98)); }
+.hero h1 { margin: 7px 0 12px; max-width: 780px; font-size: clamp(34px, 4.5vw, 56px); line-height: 1; letter-spacing: -.045em; }
+.hero p { margin: 0; color: var(--muted); max-width: 780px; }
+.disclosure { display: flex; gap: 10px; align-items: flex-start; padding: 14px; border: 1px solid rgba(255,211,122,.18); border-radius: 13px; background: rgba(255,211,122,.055); color: var(--muted-strong); font-size: 13px; }
+.disclosure svg { color: var(--amber); flex: 0 0 auto; }
+.setupCard, .section { padding: 24px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
+.toggleRow, .sectionHead, .offerTop, .valueRow { display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+.toggleRow h2, .sectionHead h2 { margin: 0; }
+.toggleRow p, .sectionHead p { margin: 4px 0 0; color: var(--muted); }
+.toggleOn, .toggleOff { min-width: 72px; height: 38px; border-radius: 999px; border: 1px solid var(--line); cursor: pointer; font-weight: 800; }
+.toggleOn { color: var(--green-ink); background: var(--green); }
+.toggleOff { color: var(--muted-strong); background: var(--surface-2); }
+.formGrid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 15px; margin: 22px 0; }
+.formGrid label { display: grid; gap: 7px; color: var(--muted-strong); font-size: 13px; }
+.formGrid select, .searchBox { min-height: 46px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface-2); color: var(--ink); }
+.formGrid select { padding: 0 12px; }
+.formGrid small { color: var(--muted); }
+.checkbox { grid-template-columns: auto 1fr; align-content: start; padding: 13px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-2); }
+.checkbox input { margin-top: 3px; }
+.checkbox span { display: grid; gap: 4px; }
+.cardSearch { margin: 0 0 20px; }
+.cardSearch > label { display: block; margin-bottom: 8px; color: var(--muted-strong); font-size: 13px; font-weight: 700; }
+.searchBox { display: flex; align-items: center; gap: 8px; padding: 0 12px; }
+.searchBox input { flex: 1; border: 0; outline: 0; background: transparent; color: var(--ink); }
+.chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.chips button { border: 1px solid rgba(59,178,115,.2); border-radius: 999px; padding: 7px 10px; background: var(--green-soft); color: var(--muted-strong); }
+.chips span { margin-left: 5px; }
+.results { display: grid; margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.results button { padding: 10px 12px; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: var(--surface-2); color: var(--ink); cursor: pointer; }
+.message { color: var(--green); font-size: 13px; }
+.sectionHead > div { display: flex; gap: 10px; align-items: center; }
+.sectionHead small { color: var(--green); font-weight: 800; letter-spacing: .08em; }
+.sectionHead p { max-width: 430px; text-align: right; font-size: 13px; }
+.grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; margin-top: 18px; }
+.offerCard { padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); }
+.offerTop span { color: var(--muted-strong); font-size: 12px; }
+.offerTop b { color: var(--green); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+.offerCard h3 { margin: 8px 0 16px; }
+.valueRow { align-items: flex-start; }
+.valueRow span { display: grid; }
+.valueRow small, .facts small { color: var(--muted); font-size: 11px; }
+.valueRow strong { font-size: 24px; }
+.facts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin-top: 14px; }
+.facts span { display: grid; gap: 2px; padding: 10px; border-radius: 9px; background: rgba(255,255,255,.025); }
+.facts b { font-size: 12px; }
+.terms { color: var(--muted); font-size: 13px; min-height: 58px; }
+.offerCard a { color: var(--green); display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 750; }
+.empty, .payFullGate { display: flex; gap: 9px; align-items: center; margin-top: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; color: var(--muted-strong); background: var(--surface-2); }
+@media (max-width: 850px) { .hero, .formGrid, .grid { grid-template-columns: 1fr; } .sectionHead { align-items: flex-start; } .sectionHead p { text-align: left; } }

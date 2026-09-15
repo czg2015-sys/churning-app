@@ -196,3 +196,21 @@
 /* Money-green / slightly lighter surface pass */
 .recommendations-shell { background:rgba(16,23,18,.86); }
 .top-match-card { background:linear-gradient(155deg,rgba(27,37,31,.98),rgba(16,23,18,.98)); }
+
+.before-open-box {
+  margin-top: 14px;
+  padding: 13px;
+  border: 1px solid rgba(59,178,115,.16);
+  border-radius: 12px;
+  background: rgba(59,178,115,.045);
+}
+.before-open-title { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin-bottom: 10px; }
+.before-open-title span { color: var(--green); font-size: 11px; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+.before-open-title b { color: var(--muted-strong); font-size: 11px; }
+.before-open-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
+.before-open-grid span { display: grid; gap: 2px; padding: 8px; border-radius: 8px; background: rgba(255,255,255,.025); }
+.before-open-grid small { color: var(--muted); font-size: 10px; }
+.before-open-grid b { font-size: 11px; }
+.before-open-box p { margin: 9px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.before-open-box p strong { color: var(--muted-strong); }
+@media (max-width: 560px) { .before-open-grid { grid-template-columns: 1fr; } }

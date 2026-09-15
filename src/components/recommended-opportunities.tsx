@@ -2,7 +2,7 @@
 
 import { ArrowUpRight, BadgeDollarSign, CalendarClock, CircleAlert, Gauge, ShieldCheck, Sparkles } from "lucide-react";
 import { AddToPlanButton } from "@/components/add-to-plan-button";
-import { latestReview, money, numberValue, rankMatches, reviewStatusLabel, verificationAgeDays } from "@/lib/plan-math";
+import { accountLifecycleGuidance, beforeOpenFacts, latestReview, money, numberValue, rankMatches, reviewStatusLabel, verificationAgeDays } from "@/lib/plan-math";
 import type { FinancialProfile, Opportunity, PlanStartDetails } from "@/lib/types";
 
 function freshnessLabel(lastVerifiedAt?: string | null) {
@@ -62,7 +62,14 @@ export function RecommendedOpportunities({
   stateCode?: string | null;
   resultsPage?: boolean;
 }) {
-  const matches = rankMatches(opportunities, profile, usedBanks, stateCode).slice(0, 10);
+  const ranked = rankMatches(opportunities, profile, usedBanks, stateCode);
+  const ddLimit = Number(profile.strategy_mode || 2) === 3 && profile.employer_multiple_dd === true ? 2 : 1;
+  let ddCount = 0;
+  const matches = ranked.filter((result) => {
+    if (result.item.category !== "checking_bonus") return true;
+    ddCount += 1;
+    return ddCount <= ddLimit;
+  }).slice(0, 10);
   const topMatches = matches.slice(0, 3);
   const moreMatches = matches.slice(3);
   const moreLanes = [
@@ -104,7 +111,9 @@ export function RecommendedOpportunities({
               const review = latestReview(item);
               const advantage = profile.tax_rate_known ? result.estimatedAfterTaxAdvantage : result.grossAdvantage;
               const reasons = result.reasons.slice(0, 3);
-              const safetyText = result.safetyPassed ? "Safety cleared" : result.researchReady ? "Final safety review pending" : "Research refresh required";
+              const safetyText = result.safetyPassed ? "Research Verified" : result.researchReady ? "Final review pending" : "Research refresh required";
+              const beforeOpen = beforeOpenFacts(item);
+              const lifecycle = accountLifecycleGuidance(item);
 
               return (
                 <article className={`top-match-card ${result.safetyPassed ? "cleared" : "pending"}`} key={item.id}>
@@ -122,6 +131,18 @@ export function RecommendedOpportunities({
                     <span><small>Effort</small><b>{Math.round(result.effort)}/3</b></span>
                   </div>
                   <p className="match-fit-copy"><b>Why it fits:</b> {reasons.length ? reasons.join(" · ") : "strong overall fit for your current preferences"}.{result.historyMatch ? ` You reported prior ${item.institution} history, so eligibility needs an extra re-check.` : ""}</p>
+                  <div className="before-open-box">
+                    <div className="before-open-title"><span>Before you open</span><b>{lifecycle.label}</b></div>
+                    <div className="before-open-grid">
+                      <span><small>Cash needed</small><b>{beforeOpen.requiredCash > 0 ? money.format(beforeOpen.requiredCash) : "No fixed cash minimum"}</b></span>
+                      <span><small>Stored hold / review window</small><b>{beforeOpen.holdDays > 0 ? `${beforeOpen.holdDays} days` : "Offer-specific"}</b></span>
+                      <span><small>Recurring fee</small><b>{beforeOpen.monthlyFee > 0 ? `${money.format(beforeOpen.monthlyFee)}/mo` : beforeOpen.annualFee > 0 ? `${money.format(beforeOpen.annualFee)}/yr` : "None stored"}</b></span>
+                      <span><small>Deposit protection</small><b>{beforeOpen.insurance}</b></span>
+                    </div>
+                    <p><strong>Fee / keep note:</strong> {beforeOpen.feeNote}</p>
+                    <p><strong>Close rule:</strong> {beforeOpen.closeRule}</p>
+                    <p><strong>After the reward:</strong> {lifecycle.text}</p>
+                  </div>
                   <div className="match-research-row"><span className={freshness.stale ? "stale" : ""}>{freshness.text}</span><span>Research confidence {Math.round(result.confidence)}%</span></div>
                   <div className="match-actions">
                     <AddToPlanButton opportunity={item} guestMode={guestMode} onGuestAdd={onGuestAdd} alreadyAdded={addedOpportunityIds.includes(item.id)} allowGuestSimulationOnHold={guestMode} />

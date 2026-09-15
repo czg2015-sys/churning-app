@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowUpRight, Settings2 } from "lucide-react";
+import { ArrowUpRight, CircleHelp, CreditCard, Settings2 } from "lucide-react";
 import { PlanCommandSummary } from "@/components/plan-command-summary";
 import { PlanDashboard } from "@/components/plan-dashboard";
 import { RecommendedOpportunities } from "@/components/recommended-opportunities";
 import { RewardTracker } from "@/components/reward-tracker";
 import { SignOutButton } from "@/components/sign-out-button";
 import { createClient } from "@/lib/supabase/server";
+import { isResearchAdminEmail } from "@/lib/research/server";
 import type { FinancialProfile, Mission, Opportunity } from "@/lib/types";
 
-export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "My Plan" };
 
 export default async function MyPlanPage() {
@@ -18,6 +18,8 @@ export default async function MyPlanPage() {
   const { data: claimsData } = await supabase.auth.getClaims();
   const userId = claimsData?.claims?.sub;
   if (!userId) redirect("/auth?next=/my-plan");
+  const { data: userData } = await supabase.auth.getUser();
+  const isResearchAdmin = isResearchAdminEmail(userData.user?.email);
 
   const [{ data: profile }, { data: opportunities }, { data: missions }, { data: bankHistory }, { data: userProfile }] = await Promise.all([
     supabase.from("financial_profiles").select("*").eq("user_id", userId).maybeSingle(),
@@ -40,12 +42,17 @@ export default async function MyPlanPage() {
       <div className="shell">
         <div className="plan-topbar">
           <div><span className="workspace-dot" /> Workspace synced to your saved profile</div>
-          <div className="plan-topbar-actions"><Link href="/opportunities">Opportunity library <ArrowUpRight size={13} /></Link><Link href="/questionnaire"><Settings2 size={14} /> Update profile</Link><SignOutButton /></div>
+          <div className="plan-topbar-actions"><Link href="/opportunities">Opportunity library <ArrowUpRight size={13} /></Link>{isResearchAdmin ? <Link href="/research">Research Center <ArrowUpRight size={13} /></Link> : null}<Link href="/questionnaire"><Settings2 size={14} /> Update profile</Link><SignOutButton /></div>
         </div>
 
         {typedProfile ? (
           <>
             <PlanCommandSummary profile={typedProfile} missions={typedMissions} usedBanks={usedBanks} />
+
+            <aside className="optional-card-helper">
+              <div><span className="optional-card-icon"><CreditCard size={18} /></span><div><strong>Want help with debit or credit-card offers?</strong><p>Optional and separate from your cash plan. Answer a few card-specific questions only if you want researched spending or welcome-offer comparisons.</p></div></div>
+              <Link href="/cards">Open Cards & Spending <CircleHelp size={15} /></Link>
+            </aside>
 
             {!hasTrackedRewards ? (
               <>

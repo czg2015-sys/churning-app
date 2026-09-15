@@ -25,6 +25,12 @@ const defaults: FinancialProfile = {
   ranking_preference: "balanced",
   annual_extra_goal: 1000,
   recent_bank_openings: 0,
+  employer_multiple_dd: null,
+  alerts_opt_in: false,
+  card_helper_opt_in: false,
+  credit_score_band: null,
+  no_credit_card: false,
+  credit_cards_pay_in_full: false,
 };
 
 const commonBanks = ["Chase", "Bank of America", "Wells Fargo", "Citi", "Capital One", "Discover", "SoFi", "BMO", "U.S. Bank", "PNC", "Ally", "American Express", "Charles Schwab", "Fidelity", "Navy Federal Credit Union", "Golden 1 Credit Union", "SchoolsFirst FCU", "Truist", "TD Bank", "Citizens", "Huntington", "KeyBank", "Regions", "Santander", "Synchrony", "Marcus by Goldman Sachs", "Barclays", "Local credit union", "Other bank"];
@@ -98,6 +104,17 @@ export function QuestionnaireForm({
       current_spend_reward_rate: cardSpendKnown ? numberValue(form.get("current_spend_reward_rate")) : 0,
       annual_extra_goal: numberValue(form.get("annual_extra_goal")),
       recent_bank_openings: numberValue(form.get("recent_bank_openings")),
+      employer_multiple_dd:
+        form.get("employer_multiple_dd") === "yes"
+          ? true
+          : form.get("employer_multiple_dd") === "no"
+            ? false
+            : null,
+      alerts_opt_in: form.get("alerts_opt_in") === "on",
+      card_helper_opt_in: Boolean(profile.card_helper_opt_in),
+      credit_score_band: profile.credit_score_band || null,
+      no_credit_card: Boolean(profile.no_credit_card),
+      credit_cards_pay_in_full: Boolean(profile.credit_cards_pay_in_full),
       estimated_tax_rate: taxKnown ? numberValue(form.get("estimated_tax_rate")) : null,
       tax_rate_known: taxKnown,
       strategy_mode: numberValue(form.get("strategy_mode")),
@@ -219,6 +236,8 @@ export function QuestionnaireForm({
           <div className="form-grid" style={{ marginTop: 17 }}>
             <div className="field"><label htmlFor="ranking_preference">What should we prioritize first?</label><select id="ranking_preference" name="ranking_preference" defaultValue={profile.ranking_preference}><option value="balanced">Best overall fit</option><option value="profit">Highest estimated value</option><option value="ease">Simplest requirements</option><option value="liquidity">Keep cash most accessible</option></select><small>Balanced considers value, effort, liquidity, and fit together.</small></div>
             <div className="field"><label htmlFor="annual_extra_goal">Extra annual cash earnings goal</label><FormattedNumberInput id="annual_extra_goal" name="annual_extra_goal" defaultValue={Number(profile.annual_extra_goal)} placeholder="1,000" /><small>Optional target for bonuses + incremental interest.</small></div>
+            <div className="field"><label htmlFor="employer_multiple_dd">Can your payroll split direct deposit between multiple accounts?</label><select id="employer_multiple_dd" name="employer_multiple_dd" defaultValue={profile.employer_multiple_dd === true ? "yes" : profile.employer_multiple_dd === false ? "no" : "unknown"}><option value="unknown">I don’t know</option><option value="yes">Yes</option><option value="no">No</option></select><small>Only Active mode will use multiple DD lanes, and only when this is set to Yes.</small></div>
+            <div className="field"><label className="switch-row" htmlFor="alerts_opt_in"><input id="alerts_opt_in" name="alerts_opt_in" type="checkbox" defaultChecked={Boolean(profile.alerts_opt_in)} /><span>Enable important tracker alerts</span></label><small>Used for deadline, fee, payout and safe-close reminders once notification delivery is connected.</small></div>
           </div>
         </section>
 

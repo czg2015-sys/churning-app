@@ -212,3 +212,21 @@
 
 /* Money-green / slightly lighter surface pass */
 .command-summary { background:radial-gradient(circle at 90% 5%,rgba(59,178,115,.13),transparent 25rem),radial-gradient(circle at 54% 120%,rgba(129,116,255,.055),transparent 22rem),linear-gradient(145deg,#1a241e,#101712); }
+
+.optional-card-helper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 18px 0 22px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: rgba(255,255,255,.022);
+}
+.optional-card-helper > div { display: flex; align-items: center; gap: 11px; }
+.optional-card-helper strong { display: block; font-size: 13px; }
+.optional-card-helper p { margin: 2px 0 0; max-width: 720px; color: var(--muted); font-size: 12px; }
+.optional-card-helper a { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; color: var(--green); font-size: 12px; font-weight: 800; }
+.optional-card-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; background: var(--green-soft); color: var(--green); }
+@media (max-width: 760px) { .optional-card-helper { align-items: flex-start; flex-direction: column; } }

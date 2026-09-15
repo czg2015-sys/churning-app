@@ -144,7 +144,17 @@ export function opportunityFit(opportunity: Opportunity, profile: FinancialProfi
   const confidence = Math.max(0, Math.min(100, numberValue(opportunity.evidence_confidence)));
   const verificationAge = verificationAgeDays(opportunity.last_verified_at);
   const freshEnough = verificationAge !== null && verificationAge <= 7;
-  const researchReady = confidence >= 80 && freshEnough;
+  const review = latestReview(opportunity);
+  const known = (value?: string | null) => Boolean(value && !["unknown", "pending", "unreviewed"].includes(value.toLowerCase()));
+  const depositProduct = ["checking_bonus", "savings_bonus", "hysa", "debit_spend", "cd"].includes(opportunity.category);
+  const cardProduct = opportunity.category === "credit_card_bonus";
+  const requiredReviewFields = depositProduct
+    ? [review?.hard_pull_status, review?.chexsystems_status, review?.ews_status, review?.tax_status, review?.insurance_status, review?.close_rule_status]
+    : cardProduct
+      ? [review?.hard_pull_status, review?.tax_status, review?.close_rule_status]
+      : [review?.tax_status, review?.close_rule_status];
+  const reviewComplete = Boolean(review) && requiredReviewFields.every(known);
+  const researchReady = confidence >= 80 && freshEnough && reviewComplete;
   const safetyPassed = (opportunity.safety_gate || "").toLowerCase() === "pass" && researchReady;
   const liquidity = Math.max(0, Math.min(100, numberValue(opportunity.liquidity_score)));
   const effort = Math.max(1, numberValue(opportunity.effort));
@@ -176,6 +186,7 @@ export function opportunityFit(opportunity: Opportunity, profile: FinancialProfi
     historyMatch,
     safetyPassed,
     researchReady,
+    reviewComplete,
     baseScore,
     verificationAge,
     freshEnough,
@@ -184,9 +195,60 @@ export function opportunityFit(opportunity: Opportunity, profile: FinancialProfi
   };
 }
 
+export function accountLifecycleGuidance(opportunity: Opportunity) {
+  const monthlyFee = numberValue(opportunity.monthly_fee);
+  const annualFee = numberValue(opportunity.annual_fee);
+  const feeWaiver = (opportunity.fee_waiver_summary || "").trim();
+  const researchedClose = latestReview(opportunity)?.safe_close_summary?.trim();
+
+  if (opportunity.category === "credit_card_bonus") {
+    if (annualFee > 0) {
+      return {
+        label: "Review before renewal",
+        tone: "review",
+        text: `This card has a stored ${money.format(annualFee)} annual fee. Before the next fee posts, compare the ongoing benefits with keeping, downgrading, or closing it.`,
+      };
+    }
+    return { label: "Keep optional", tone: "neutral", text: "No annual fee is stored. Keeping the card may be reasonable if it still fits your credit and spending goals; do not close it only because the welcome bonus is complete." };
+  }
+
+  if (monthlyFee > 0) {
+    return {
+      label: feeWaiver ? "Keep while useful" : "Review for closure",
+      tone: "review",
+      text: feeWaiver
+        ? `Stored monthly fee: ${money.format(monthlyFee)}. A waiver is available: ${feeWaiver} After the reward and minimum-open period are complete, keep it only while the waiver or account benefits still make sense.`
+        : `Stored monthly fee: ${money.format(monthlyFee)}. After the reward, payout, and minimum-open period are complete, review whether the account should be closed to avoid unnecessary fees.`,
+    };
+  }
+
+  if (["hysa", "savings_bonus", "checking_bonus", "debit_spend"].includes(opportunity.category)) {
+    return { label: "Keep optional", tone: "neutral", text: researchedClose || "No recurring fee is stored. There is no automatic reason to close the account after the reward; review the rate, benefits, eligibility rules, and account-opening history before deciding." };
+  }
+
+  return { label: "Review after completion", tone: "neutral", text: researchedClose || "Review the current official terms and ongoing value after all reward requirements are complete." };
+}
+
+export function beforeOpenFacts(opportunity: Opportunity) {
+  const review = latestReview(opportunity);
+  const requiredCash = Math.max(numberValue(opportunity.required_balance), numberValue(opportunity.min_opening_deposit));
+  const holdDays = Math.max(numberValue(opportunity.qualification_days), numberValue(opportunity.min_account_age_days));
+  const monthlyFee = numberValue(opportunity.monthly_fee);
+  const annualFee = numberValue(opportunity.annual_fee);
+  return {
+    requiredCash,
+    holdDays,
+    monthlyFee,
+    annualFee,
+    insurance: opportunity.issuer_kind === "credit_card" ? "Not a deposit product" : (opportunity as Opportunity & { insurance_type?: string | null }).insurance_type || "Verify FDIC/NCUA",
+    closeRule: review?.safe_close_summary || opportunity.keep_guidance || "Review current official close/clawback terms before opening.",
+    feeNote: opportunity.fee_waiver_summary || (monthlyFee > 0 ? "No fee waiver is stored; re-check current terms." : "No recurring monthly fee is stored."),
+  };
+}
+
 export function rankOpportunities(opportunities: Opportunity[], profile: FinancialProfile, usedBanks: string[], stateCode?: string | null) {
   return opportunities
-    .filter((item) => item.offer_status === "live" && stateEligible(item, stateCode))
+    .filter((item) => item.offer_status === "live" && stateEligible(item, stateCode) && !["credit_card_bonus", "brokerage_bonus"].includes(item.category))
     .map((item) => ({ item, ...opportunityFit(item, profile, usedBanks) }))
     .filter((result) => result.safetyPassed && result.cashFit >= 95 && result.ddFit >= 90 && result.spendFit >= 75)
     .sort((a, b) => b.score - a.score);
@@ -194,7 +256,7 @@ export function rankOpportunities(opportunities: Opportunity[], profile: Financi
 
 export function rankResearchQueue(opportunities: Opportunity[], profile: FinancialProfile, usedBanks: string[], stateCode?: string | null) {
   return opportunities
-    .filter((item) => item.offer_status === "live" && stateEligible(item, stateCode))
+    .filter((item) => item.offer_status === "live" && stateEligible(item, stateCode) && !["credit_card_bonus", "brokerage_bonus"].includes(item.category))
     .map((item) => ({ item, ...opportunityFit(item, profile, usedBanks) }))
     .filter((result) => !result.safetyPassed)
     .sort((a, b) => Number(b.researchReady) - Number(a.researchReady) || b.baseScore - a.baseScore || b.confidence - a.confidence);
@@ -203,7 +265,7 @@ export function rankResearchQueue(opportunities: Opportunity[], profile: Financi
 
 export function rankMatches(opportunities: Opportunity[], profile: FinancialProfile, usedBanks: string[], stateCode?: string | null) {
   return opportunities
-    .filter((item) => item.offer_status === "live" && stateEligible(item, stateCode))
+    .filter((item) => item.offer_status === "live" && stateEligible(item, stateCode) && !["credit_card_bonus", "brokerage_bonus"].includes(item.category))
     .map((item) => ({ item, ...opportunityFit(item, profile, usedBanks) }))
     .filter((result) => result.cashFit >= 80 && result.ddFit >= 75 && result.spendFit >= 60)
     .sort((a, b) => Number(b.safetyPassed) - Number(a.safetyPassed) || Number(b.researchReady) - Number(a.researchReady) || b.score - a.score);

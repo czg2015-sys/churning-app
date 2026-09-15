@@ -17,7 +17,7 @@ import {
 import type { Mission, MissionStep } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { FormattedNumberInput } from "@/components/formatted-number-input";
-import { latestReview, money, numberValue, reviewStatusLabel, timelineFromOpenedDate } from "@/lib/plan-math";
+import { accountLifecycleGuidance, latestReview, money, numberValue, reviewStatusLabel, timelineFromOpenedDate } from "@/lib/plan-math";
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -55,9 +55,9 @@ function readableDate(value?: string | null) {
 function safetyLabel(mission: Mission) {
   const confidence = numberValue(mission.opportunity?.evidence_confidence);
   const gate = mission.opportunity?.safety_gate;
-  if ((gate || "").toLowerCase() === "pass" && confidence >= 80) return { label: "High", tone: "safe" };
-  if (confidence >= 70) return { label: "Review", tone: "review" };
-  return { label: "Re-check", tone: "warning" };
+  if ((gate || "").toLowerCase() === "pass" && confidence >= 80) return { label: "Verified", tone: "safe" };
+  if (confidence >= 70) return { label: "Needs review", tone: "review" };
+  return { label: "Research due", tone: "warning" };
 }
 
 function safeCloseState(mission: Mission) {
@@ -66,6 +66,31 @@ function safeCloseState(mission: Mission) {
   if (remaining === null) return { ready: false, text: "Review date unavailable" };
   if (remaining <= 0) return { ready: true, text: "Close review is due now" };
   return { ready: false, text: `${remaining} days until close review` };
+}
+
+function addDaysIso(value: string | null | undefined, days: number | null | undefined) {
+  if (!value || !days || days <= 0) return null;
+  const date = dateValue(value);
+  if (!date) return null;
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function doNotDoWarning(mission: Mission, steps: MissionStep[]) {
+  const opportunity = mission.opportunity;
+  if (!opportunity || mission.status === "completed" || mission.status === "closed") return null;
+  const requiredBalance = numberValue(opportunity.required_balance);
+  const ddRequired = numberValue(opportunity.direct_deposit_required);
+  const safeClose = mission.safe_close_review_date;
+  const incomplete = steps.filter((step) => !step.is_complete);
+  if (requiredBalance > 0 && mission.qualification_deadline) {
+    return `Do not let the tracked balance fall below ${money.format(requiredBalance)} before ${readableDate(mission.qualification_deadline)} unless the current official terms say otherwise.`;
+  }
+  if (ddRequired > 0 && incomplete.some((step) => step.step_type.toLowerCase().includes("deposit") || step.label.toLowerCase().includes("deposit"))) {
+    return `Do not stop or redirect the qualifying direct deposit until the required amount is confirmed in the tracker.`;
+  }
+  if (safeClose) return `Do not close this account yet. The earliest Churning review date is ${readableDate(safeClose)}; current official terms still control.`;
+  return null;
 }
 
 
@@ -145,6 +170,9 @@ function MissionCard({
   const monthlyFee = numberValue(opportunity?.monthly_fee);
   const safety = safetyLabel(mission);
   const closeState = safeCloseState(mission);
+  const lifecycle = opportunity ? accountLifecycleGuidance(opportunity) : null;
+  const doNotDo = doNotDoWarning(mission, steps);
+  const feeStartDate = addDaysIso(mission.opened_at, opportunity?.fee_starts_after_days);
 
   useEffect(() => setSteps(mission.mission_steps || []), [mission.mission_steps]);
 
@@ -271,7 +299,7 @@ function MissionCard({
   return (
     <article className={`reward-card ${mission.status === "planned" ? "planned" : ""}`}>
       <div className="reward-card-top">
-        <div className="reward-title-group"><span className="reward-bank">{mission.institution}</span><h3>{mission.title}</h3><span className={`reward-safety ${safety.tone}`}><ShieldCheck size={13} /> {safety.label} safety</span></div>
+        <div className="reward-title-group"><span className="reward-bank">{mission.institution}</span><h3>{mission.title}</h3><span className={`reward-safety ${safety.tone}`}><ShieldCheck size={13} /> {safety.label}</span></div>
         <div className="reward-value"><small>{mission.status === "completed" ? "Reward earned" : "Expected reward"}</small><strong>{money.format(reward)}</strong>{numberValue(mission.amount_committed) > 0 && <span>{money.format(numberValue(mission.amount_committed))} committed</span>}</div>
       </div>
 
@@ -302,7 +330,9 @@ function MissionCard({
 
       <div className="reward-next-action"><span>NEXT ACTION</span><strong>{mission.next_action || "Review the official offer requirements."}</strong></div>
 
-      {monthlyFee > 0 && <div className="reward-fee-warning"><TriangleAlert size={15} /><span><strong>{money.format(monthlyFee)}/mo stored monthly fee.</strong> {opportunity?.fee_waiver_summary || "Review the current fee-waiver rule before deciding whether to keep the account."}</span></div>}
+      {doNotDo && <div className="reward-do-not-warning"><TriangleAlert size={15} /><span><strong>Do not do this yet:</strong> {doNotDo}</span></div>}
+      {monthlyFee > 0 && <div className="reward-fee-warning"><TriangleAlert size={15} /><span><strong>{money.format(monthlyFee)}/mo stored monthly fee{feeStartDate ? ` · fee watch starts ${readableDate(feeStartDate)}` : ""}.</strong> {opportunity?.fee_waiver_summary || "Review the current fee-waiver rule before deciding whether to keep the account."}</span></div>}
+      {lifecycle && <div className="reward-lifecycle-note"><BadgeCheck size={15} /><span><strong>{lifecycle.label}:</strong> {lifecycle.text}</span></div>}
 
       <button type="button" className="reward-expand" onClick={() => setExpanded((value) => !value)}>{expanded ? "Hide tracker details" : "Requirements, terms & closing plan"}<ChevronDown size={17} className={expanded ? "rotated" : ""} /></button>
 

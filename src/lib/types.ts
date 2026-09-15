@@ -19,7 +19,15 @@ export type Opportunity = {
   id: string;
   institution: string;
   product_name: string;
-  category: "checking_bonus" | "savings_bonus" | "hysa" | "debit_spend" | "cd" | "treasury";
+  category:
+    | "checking_bonus"
+    | "savings_bonus"
+    | "hysa"
+    | "debit_spend"
+    | "credit_card_bonus"
+    | "cd"
+    | "treasury"
+    | "brokerage_bonus";
   official_url: string;
   offer_status: string;
   safety_gate: string;
@@ -47,8 +55,20 @@ export type Opportunity = {
   terms_summary: string | null;
   eligibility_notes?: string | null;
   fee_waiver_summary?: string | null;
+  annual_fee?: number | string | null;
+  fee_starts_after_days?: number | null;
+  purchase_required_spend?: number | string | null;
+  spend_window_days?: number | null;
+  reward_points?: number | string | null;
+  cash_value_per_point?: number | string | null;
+  travel_value_per_point?: number | string | null;
+  issuer_kind?: string | null;
+  credit_score_band_hint?: string | null;
+  keep_guidance?: string | null;
   state_scope?: string | null;
+  insurance_type?: string | null;
   last_verified_at: string | null;
+  expires_at?: string | null;
   opportunity_reviews?: OpportunityReview[];
 };
 
@@ -102,6 +122,12 @@ export type FinancialProfile = {
   ranking_preference: string;
   annual_extra_goal: number | string;
   recent_bank_openings?: number | string;
+  employer_multiple_dd?: boolean | null;
+  alerts_opt_in?: boolean;
+  card_helper_opt_in?: boolean;
+  credit_score_band?: string | null;
+  no_credit_card?: boolean;
+  credit_cards_pay_in_full?: boolean;
 };
 
 export type PlanStartDetails = {
