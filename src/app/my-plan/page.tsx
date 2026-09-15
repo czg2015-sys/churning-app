@@ -12,6 +12,7 @@ import { isResearchAdminEmail } from "@/lib/research/server";
 import type { FinancialProfile, Mission, Opportunity } from "@/lib/types";
 
 export const metadata: Metadata = { title: "My Plan" };
+export const dynamic = "force-dynamic";
 
 export default async function MyPlanPage() {
   const supabase = await createClient();
