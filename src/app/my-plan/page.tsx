@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowUpRight, CircleHelp, CreditCard, Settings2 } from "lucide-react";
+import { ArrowUpRight, Settings2 } from "lucide-react";
+import { CardsOptInPrompt } from "@/components/cards-opt-in-prompt";
 import { PlanCommandSummary } from "@/components/plan-command-summary";
-import { PlanDashboard } from "@/components/plan-dashboard";
 import { RecommendedOpportunities } from "@/components/recommended-opportunities";
 import { RewardTracker } from "@/components/reward-tracker";
 import { SignOutButton } from "@/components/sign-out-button";
 import { createClient } from "@/lib/supabase/server";
-import { isResearchAdminEmail } from "@/lib/research/server";
 import type { FinancialProfile, Mission, Opportunity } from "@/lib/types";
 
 export const metadata: Metadata = { title: "My Plan" };
@@ -18,9 +17,7 @@ export default async function MyPlanPage() {
   const supabase = await createClient();
   const { data: claimsData } = await supabase.auth.getClaims();
   const userId = claimsData?.claims?.sub;
-  if (!userId) redirect("/auth?next=/my-plan");
-  const { data: userData } = await supabase.auth.getUser();
-  const isResearchAdmin = isResearchAdminEmail(userData.user?.email);
+  if (!userId) redirect("/auth");
 
   const [{ data: profile }, { data: opportunities }, { data: missions }, { data: bankHistory }, { data: userProfile }] = await Promise.all([
     supabase.from("financial_profiles").select("*").eq("user_id", userId).maybeSingle(),
@@ -30,49 +27,44 @@ export default async function MyPlanPage() {
     supabase.from("profiles").select("state_code").eq("user_id", userId).maybeSingle(),
   ]);
 
-  const typedProfile = profile as FinancialProfile | null;
+  if (!profile) redirect("/questionnaire");
+
+  const typedProfile = profile as FinancialProfile;
   const typedOpportunities = (opportunities || []) as Opportunity[];
   const typedMissions = (missions || []) as Mission[];
   const usedBanks: string[] = Array.from(new Set(((bankHistory || []) as Array<{ institution?: string | null }>).map((row) => row.institution).filter((bank): bank is string => Boolean(bank))));
   const addedOpportunityIds = typedMissions.filter((mission) => !["completed", "closed"].includes(mission.status)).map((mission) => mission.opportunity_id).filter((id): id is string => Boolean(id));
-  const hasTrackedRewards = typedMissions.length > 0;
   const stateCode = userProfile?.state_code || "CA";
 
   return (
     <main className="page-shell my-plan-page">
       <div className="shell">
         <div className="plan-topbar">
-          <div><span className="workspace-dot" /> Workspace synced to your saved profile</div>
-          <div className="plan-topbar-actions"><Link href="/opportunities">Opportunity library <ArrowUpRight size={13} /></Link>{isResearchAdmin ? <Link href="/research">Research Center <ArrowUpRight size={13} /></Link> : null}<Link href="/questionnaire"><Settings2 size={14} /> Update profile</Link><SignOutButton /></div>
+          <div><span className="workspace-dot" /> Your saved plan</div>
+          <div className="plan-topbar-actions">
+            <Link href="/opportunities">All opportunities <ArrowUpRight size={13} /></Link>
+            <Link href="/questionnaire"><Settings2 size={14} /> Update profile</Link>
+            <SignOutButton />
+          </div>
         </div>
 
-        {typedProfile ? (
-          <>
-            <PlanCommandSummary profile={typedProfile} missions={typedMissions} usedBanks={usedBanks} />
+        <PlanCommandSummary profile={typedProfile} missions={typedMissions} usedBanks={usedBanks} />
 
-            <aside className="optional-card-helper">
-              <div><span className="optional-card-icon"><CreditCard size={18} /></span><div><strong>Want help with debit or credit-card offers?</strong><p>Optional and separate from your cash plan. Answer a few card-specific questions only if you want researched spending or welcome-offer comparisons.</p></div></div>
-              <Link href="/cards">Open Cards & Spending <CircleHelp size={15} /></Link>
-            </aside>
+        <CardsOptInPrompt
+          answered={Boolean(typedProfile.card_helper_prompt_answered)}
+          enabled={Boolean(typedProfile.card_helper_opt_in)}
+        />
 
-            {!hasTrackedRewards ? (
-              <>
-                <RecommendedOpportunities profile={typedProfile} opportunities={typedOpportunities} usedBanks={usedBanks} addedOpportunityIds={addedOpportunityIds} stateCode={stateCode} prominent />
-                <RewardTracker missions={typedMissions} />
-              </>
-            ) : (
-              <>
-                <RewardTracker missions={typedMissions} />
-                <RecommendedOpportunities profile={typedProfile} opportunities={typedOpportunities} usedBanks={usedBanks} addedOpportunityIds={addedOpportunityIds} stateCode={stateCode} />
-              </>
-            )}
+        <RecommendedOpportunities
+          profile={typedProfile}
+          opportunities={typedOpportunities}
+          usedBanks={usedBanks}
+          addedOpportunityIds={addedOpportunityIds}
+          stateCode={stateCode}
+          prominent
+        />
 
-            <div className="dashboard-section-label"><div><span className="kicker">CASH ALLOCATION LAB</span><h2>Compare where uncommitted cash can work next.</h2></div><p>This section is a planning view. It never moves money and it does not override an active reward commitment.</p></div>
-            <PlanDashboard profile={typedProfile} opportunities={typedOpportunities} stateCode={stateCode} />
-          </>
-        ) : (
-          <section className="empty-plan"><h2>Build your first plan</h2><p>Answer a few questions so Churning can calculate your cash baseline, rank opportunities, and build accurate reward trackers.</p><Link className="button primary" href="/questionnaire">Start questionnaire</Link></section>
-        )}
+        <RewardTracker missions={typedMissions} />
       </div>
     </main>
   );
