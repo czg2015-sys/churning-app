@@ -31,11 +31,11 @@ function friendlySignInError(message: string) {
   const normalized = message.toLowerCase();
 
   if (normalized.includes("invalid login credentials")) {
-    return "We couldn’t sign you in. Check your email and password. If you may already have an account, use the password you originally created.";
+    return "Email or password is incorrect. If you haven’t made an account yet, choose Create an account.";
   }
 
   if (normalized.includes("email not confirmed")) {
-    return "Your email still needs to be confirmed. Check your inbox and spam folder for the confirmation email.";
+    return "Your email still needs to be confirmed. Check your inbox and spam folder, or use Resend confirmation below.";
   }
 
   return message;
@@ -48,12 +48,62 @@ export function AuthForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+
+  async function resendConfirmation() {
+    if (!email) {
+      setMessage({ type: "error", text: "Enter your email first." });
+      return;
+    }
+
+    setResending(true);
+    setMessage(null);
+
+    try {
+      const supabase = createClient();
+      const emailRedirectTo = window.location.origin + "/auth/confirm?next=/questionnaire";
+      const { error } = await withTimeout(
+        supabase.auth.resend({
+          type: "signup",
+          email,
+          options: { emailRedirectTo },
+        }),
+      );
+
+      if (error) {
+        setMessage({
+          type: "error",
+          text: error.message.toLowerCase().includes("already confirmed")
+            ? "This email is already confirmed. Switch to Sign in instead."
+            : error.message,
+        });
+        return;
+      }
+
+      setMessage({
+        type: "success",
+        text: "If this email still needs confirmation, we sent another link. Check your inbox and spam folder. It can take a minute to arrive.",
+      });
+    } catch (error) {
+      const timedOut = error instanceof Error && error.message === "AUTH_TIMEOUT";
+      setMessage({
+        type: "error",
+        text: timedOut
+          ? "The resend request timed out. Please try again in a moment."
+          : "We couldn’t resend the confirmation email right now. Please try again.",
+      });
+    } finally {
+      setResending(false);
+    }
+  }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setMessage(null);
+    setAwaitingConfirmation(false);
 
     try {
       const supabase = createClient();
@@ -84,9 +134,10 @@ export function AuthForm() {
         router.push("/questionnaire");
         router.refresh();
       } else {
+        setAwaitingConfirmation(true);
         setMessage({
           type: "success",
-          text: "If this is a new email, we sent a confirmation link. If you’ve used this email with Churning before, switch to Sign in instead—another confirmation email may not be sent.",
+          text: "Check your email for a confirmation link. If it doesn’t arrive, check spam or use Resend confirmation below. If you’ve used this email before, switch to Sign in instead.",
         });
       }
     } catch (error) {
@@ -121,10 +172,15 @@ export function AuthForm() {
         <button className="button primary full" type="submit" disabled={loading}>
           {loading ? "One moment…" : mode === "signin" ? "Sign in" : "Create account"}
         </button>
+        {mode === "signup" && awaitingConfirmation && (
+          <button className="button full" type="button" onClick={resendConfirmation} disabled={resending}>
+            {resending ? "Resending…" : "Resend confirmation email"}
+          </button>
+        )}
       </form>
       <div className="auth-toggle">
         {mode === "signin" ? "New to Churning? " : "Already have an account? "}
-        <button type="button" onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setMessage(null); }}>
+        <button type="button" onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setMessage(null); setAwaitingConfirmation(false); }}>
           {mode === "signin" ? "Create an account" : "Sign in"}
         </button>
       </div>
