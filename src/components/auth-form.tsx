@@ -6,6 +6,27 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
+const AUTH_TIMEOUT_MS = 12_000;
+
+function withTimeout<T>(promise: Promise<T>, ms = AUTH_TIMEOUT_MS): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error("AUTH_TIMEOUT"));
+    }, ms);
+
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 export function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -24,7 +45,10 @@ export function AuthForm() {
       const supabase = createClient();
 
       if (mode === "signin") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await withTimeout(
+          supabase.auth.signInWithPassword({ email, password }),
+        );
+
         if (error) {
           setMessage({ type: "error", text: error.message });
           return;
@@ -36,7 +60,10 @@ export function AuthForm() {
       }
 
       const emailRedirectTo = window.location.origin + "/auth/confirm?next=/questionnaire";
-      const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo } });
+      const { data, error } = await withTimeout(
+        supabase.auth.signUp({ email, password, options: { emailRedirectTo } }),
+      );
+
       if (error) {
         setMessage({ type: "error", text: error.message });
       } else if (data.session) {
@@ -47,9 +74,12 @@ export function AuthForm() {
       }
     } catch (error) {
       console.error("[auth] Sign-in unavailable", error);
+      const timedOut = error instanceof Error && error.message === "AUTH_TIMEOUT";
       setMessage({
         type: "error",
-        text: "Sign-in is temporarily unavailable on this deployment. Please try again after the preview account settings are enabled.",
+        text: timedOut
+          ? "The sign-in request timed out. The preview still cannot reach Supabase correctly."
+          : "Sign-in is temporarily unavailable on this deployment. Please try again after the preview account settings are enabled.",
       });
     } finally {
       setLoading(false);
