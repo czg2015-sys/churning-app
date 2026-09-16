@@ -125,6 +125,7 @@ export type FinancialProfile = {
   employer_multiple_dd?: boolean | null;
   alerts_opt_in?: boolean;
   card_helper_opt_in?: boolean;
+  card_helper_prompt_answered?: boolean;
   credit_score_band?: string | null;
   no_credit_card?: boolean;
   credit_cards_pay_in_full?: boolean;
