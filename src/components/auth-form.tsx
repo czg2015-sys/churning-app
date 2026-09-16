@@ -27,6 +27,20 @@ function withTimeout<T>(promise: Promise<T>, ms = AUTH_TIMEOUT_MS): Promise<T> {
   });
 }
 
+function friendlySignInError(message: string) {
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("invalid login credentials")) {
+    return "We couldn’t sign you in. Check your email and password. If you may already have an account, use the password you originally created.";
+  }
+
+  if (normalized.includes("email not confirmed")) {
+    return "Your email still needs to be confirmed. Check your inbox and spam folder for the confirmation email.";
+  }
+
+  return message;
+}
+
 export function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -50,7 +64,7 @@ export function AuthForm() {
         );
 
         if (error) {
-          setMessage({ type: "error", text: error.message });
+          setMessage({ type: "error", text: friendlySignInError(error.message) });
           return;
         }
 
@@ -70,7 +84,10 @@ export function AuthForm() {
         router.push("/questionnaire");
         router.refresh();
       } else {
-        setMessage({ type: "success", text: "Check your email and tap the confirmation link. Then we’ll build your plan." });
+        setMessage({
+          type: "success",
+          text: "If this is a new email, we sent a confirmation link. If you’ve used this email with Churning before, switch to Sign in instead—another confirmation email may not be sent.",
+        });
       }
     } catch (error) {
       console.error("[auth] Sign-in unavailable", error);
