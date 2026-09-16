@@ -1,21 +1,17 @@
 "use client";
 
-import { ArrowUpRight, BadgeDollarSign, CalendarClock, CircleAlert, Gauge, ShieldCheck, Sparkles } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowUpRight, ChevronDown, ChevronUp, CircleAlert, ShieldCheck, Sparkles } from "lucide-react";
 import { AddToPlanButton } from "@/components/add-to-plan-button";
-import { accountLifecycleGuidance, beforeOpenFacts, latestReview, money, numberValue, rankMatches, reviewStatusLabel, verificationAgeDays } from "@/lib/plan-math";
+import { money, numberValue, rankMatches } from "@/lib/plan-math";
 import type { FinancialProfile, Opportunity, PlanStartDetails } from "@/lib/types";
 
-function freshnessLabel(lastVerifiedAt?: string | null) {
-  const days = verificationAgeDays(lastVerifiedAt);
-  if (days === null) return { text: "Verification date missing", stale: true };
-  if (days === 0) return { text: "Verified today", stale: false };
-  if (days <= 7) return { text: `Verified ${days}d ago`, stale: false };
-  return { text: `Review due · ${days}d old`, stale: true };
-}
+type RankedMatch = ReturnType<typeof rankMatches>[number];
 
 function requirementLabel(item: Opportunity) {
-  if (numberValue(item.direct_deposit_required)) return `${money.format(numberValue(item.direct_deposit_required))} qualifying DD`;
+  if (numberValue(item.direct_deposit_required)) return `${money.format(numberValue(item.direct_deposit_required))} qualifying direct deposit`;
   if (numberValue(item.required_balance)) return `${money.format(numberValue(item.required_balance))} balance`;
+  if (numberValue(item.purchase_required_spend)) return `${money.format(numberValue(item.purchase_required_spend))} normal spend`;
   if (Number(item.purchase_count || 0) > 0) return `${Number(item.purchase_count)} qualifying purchases`;
   if (numberValue(item.min_opening_deposit)) return `${money.format(numberValue(item.min_opening_deposit))} opening deposit`;
   return "No fixed cash requirement";
@@ -23,22 +19,126 @@ function requirementLabel(item: Opportunity) {
 
 function opportunityValue(item: Opportunity) {
   const reward = numberValue(item.bonus_amount);
-  return reward ? money.format(reward) : `${numberValue(item.apy).toFixed(2)}% APY`;
+  return reward > 0 ? money.format(reward) : `${numberValue(item.apy).toFixed(2)}% APY`;
 }
 
-function categoryLabel(item: Opportunity) {
-  if (item.category === "checking_bonus") return "Direct deposit bonus";
-  if (item.category === "debit_spend") return "Debit & spending bonus";
-  if (item.category === "hysa") return "High-yield savings";
-  if (item.category === "savings_bonus") return "Savings bonus";
-  if (item.category === "cd") return "CD / fixed term";
-  return "Cash opportunity";
+function researchLabel(result: RankedMatch) {
+  if (result.safetyPassed) return "Research Verified";
+  if (result.researchReady) return "Final review";
+  return "Needs review";
 }
 
-function paceText(mode: number) {
-  if (mode === 1) return { title: "Simple pace", count: "1 primary move", copy: "Keep tracking light and prioritize the clearest fit." };
-  if (mode === 3) return { title: "Active pace", count: "Compare up to 3 lanes", copy: "Built for users willing to track more at once; confirm the combined DD and cash requirements before activating multiple offers." };
-  return { title: "Balanced pace", count: "Usually 1–2 moves", copy: "Our recommended starting point for a practical mix of return, flexibility, and upkeep." };
+function shortDescription(item: Opportunity) {
+  const text = item.terms_summary || item.eligibility_notes || "Review the current official terms before opening.";
+  return text.length > 165 ? `${text.slice(0, 162).trim()}…` : text;
+}
+
+function HysaComparison({ item, profile }: { item: Opportunity; profile: FinancialProfile }) {
+  const current = numberValue(profile.current_hysa_apy);
+  const offered = numberValue(item.apy);
+  if (current <= 0) return null;
+  const diff = Math.abs(offered - current);
+  if (offered > current) return <p className="match-fit-copy"><b>Rate note:</b> This stored APY is {diff.toFixed(2)} percentage points above your current {current.toFixed(2)}% APY.</p>;
+  if (offered < current) return <p className="match-fit-copy"><b>Rate note:</b> Your current {current.toFixed(2)}% APY is better by {diff.toFixed(2)} percentage points, so switching for rate alone may not help.</p>;
+  return <p className="match-fit-copy"><b>Rate note:</b> This matches your current {current.toFixed(2)}% APY, so compare convenience and account terms before switching.</p>;
+}
+
+function RecommendationCard({
+  result,
+  profile,
+  guestMode,
+  onGuestAdd,
+  addedOpportunityIds,
+}: {
+  result: RankedMatch;
+  profile: FinancialProfile;
+  guestMode: boolean;
+  onGuestAdd?: (opportunity: Opportunity, details: PlanStartDetails) => void;
+  addedOpportunityIds: string[];
+}) {
+  const item = result.item;
+  const advantage = profile.tax_rate_known ? result.estimatedAfterTaxAdvantage : result.grossAdvantage;
+  const verified = result.safetyPassed;
+  return (
+    <article className={`top-match-card ${verified ? "cleared" : "pending"}`}>
+      <div className="top-match-card-head">
+        <span className="match-bank">{item.institution}</span>
+        <span className={verified ? "match-status cleared" : "match-status pending"}>
+          {verified ? <ShieldCheck size={13} /> : <CircleAlert size={13} />}{researchLabel(result)}
+        </span>
+      </div>
+      <h3>{item.product_name}</h3>
+      <p className="match-fit-copy">{shortDescription(item)}</p>
+      {item.category === "hysa" ? <HysaComparison item={item} profile={profile} /> : null}
+      <div className="match-value-row">
+        <div><small>{numberValue(item.bonus_amount) > 0 ? "Potential value" : "Current APY"}</small><strong>{opportunityValue(item)}</strong></div>
+        <div><small>Est. advantage vs your baseline</small><strong className={advantage >= 0 ? "positive" : "negative"}>{advantage >= 0 ? "+" : ""}{money.format(advantage)}</strong></div>
+      </div>
+      <div className="match-core-metrics">
+        <span><small>Key requirement</small><b>{requirementLabel(item)}</b></span>
+        <span><small>Effort</small><b>{Math.round(result.effort)}/3</b></span>
+      </div>
+      <div className="match-actions">
+        <AddToPlanButton
+          opportunity={item}
+          guestMode={guestMode}
+          onGuestAdd={onGuestAdd}
+          alreadyAdded={addedOpportunityIds.includes(item.id)}
+          allowGuestSimulationOnHold={guestMode}
+          allowPlanningOnHold={!guestMode}
+        />
+        <a href={item.official_url} target="_blank" rel="noreferrer">Official terms <ArrowUpRight size={13} /></a>
+      </div>
+    </article>
+  );
+}
+
+function CategorySection({
+  title,
+  subtitle,
+  items,
+  profile,
+  guestMode,
+  onGuestAdd,
+  addedOpportunityIds,
+}: {
+  title: string;
+  subtitle: string;
+  items: RankedMatch[];
+  profile: FinancialProfile;
+  guestMode: boolean;
+  onGuestAdd?: (opportunity: Opportunity, details: PlanStartDetails) => void;
+  addedOpportunityIds: string[];
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? items : items.slice(0, 3);
+  if (!items.length) return null;
+
+  return (
+    <section className="more-matches-section">
+      <div className="more-matches-head">
+        <div><span>{title.toUpperCase()}</span><h3>{title}</h3></div>
+        <p>{subtitle}</p>
+      </div>
+      <div className="top-match-grid">
+        {visible.map((result) => (
+          <RecommendationCard
+            key={result.item.id}
+            result={result}
+            profile={profile}
+            guestMode={guestMode}
+            onGuestAdd={onGuestAdd}
+            addedOpportunityIds={addedOpportunityIds}
+          />
+        ))}
+      </div>
+      {items.length > 3 ? (
+        <button className="button ghost compact" type="button" onClick={() => setExpanded((value) => !value)}>
+          {expanded ? <><ChevronUp size={15} /> Show top 3</> : <><ChevronDown size={15} /> See more ({items.length - 3})</>}
+        </button>
+      ) : null}
+    </section>
+  );
 }
 
 export function RecommendedOpportunities({
@@ -62,145 +162,83 @@ export function RecommendedOpportunities({
   stateCode?: string | null;
   resultsPage?: boolean;
 }) {
-  const ranked = rankMatches(opportunities, profile, usedBanks, stateCode);
-  const ddLimit = Number(profile.strategy_mode || 2) === 3 && profile.employer_multiple_dd === true ? 2 : 1;
-  let ddCount = 0;
-  const matches = ranked.filter((result) => {
-    if (result.item.category !== "checking_bonus") return true;
-    ddCount += 1;
-    return ddCount <= ddLimit;
-  }).slice(0, 10);
-  const topMatches = matches.slice(0, 3);
-  const moreMatches = matches.slice(3);
-  const moreLanes = [
-    { key: "direct-deposit", title: "Direct deposit bonuses", copy: "Checking offers that use qualifying payroll or other eligible direct deposits.", items: moreMatches.filter((result) => result.item.category === "checking_bonus") },
-    { key: "savings", title: "Savings & yield", copy: "High-yield savings and savings bonuses for cash you want to keep liquid or semi-liquid.", items: moreMatches.filter((result) => ["hysa", "savings_bonus", "cd", "treasury"].includes(result.item.category)) },
-    { key: "spending", title: "Debit & spending bonuses", copy: "Rewards tied to debit purchases or normal spending requirements—not borrowing or opening a credit card.", items: moreMatches.filter((result) => result.item.category === "debit_spend") },
-  ].filter((lane) => lane.items.length > 0);
-  const pace = paceText(Number(profile.strategy_mode || 2));
+  const ranked = useMemo(() => rankMatches(opportunities, profile, usedBanks, stateCode), [opportunities, profile, usedBanks, stateCode]);
+
+  const hysa = ranked.filter((result) => result.item.category === "hysa");
+  const savings = ranked.filter((result) => result.item.category === "savings_bonus");
+  const checking = ranked.filter((result) => result.item.category === "checking_bonus");
+  const debit = profile.card_helper_opt_in ? ranked.filter((result) => result.item.category === "debit_spend") : [];
+
+  const planPicks = [hysa[0], savings[0], checking[0]].filter((value): value is RankedMatch => Boolean(value));
 
   return (
     <section className={`recommendations-shell ${prominent ? "recommendations-prominent" : ""} ${resultsPage ? "recommendations-results-layout" : ""}`}>
       <div className="recommendations-head">
         <div>
-          <span className="kicker">BEST MATCHES FOR YOUR PROFILE</span>
-          <h2>{resultsPage ? "Your strongest opportunities, ranked." : prominent ? "Start with the best-fitting moves." : "Your next best opportunities."}</h2>
-          <p>We compare each offer with your current savings baseline, available cash, paycheck capacity, normal spending, liquidity preference, bank history, state availability, and the freshness of our stored research.</p>
-        </div>
-        <div className="recommendation-head-meta">
-          <span className="recommendation-refresh"><span /> 7-day research freshness standard</span>
-          <div className="pace-summary"><Gauge size={16} /><span><b>{pace.title}</b><small>{pace.count} · {pace.copy}</small></span></div>
+          <span className="kicker">YOUR SUGGESTED PLAN</span>
+          <h2>{resultsPage ? "A practical starting sequence from your profile." : "Start with a cash home base, then layer bonuses that fit."}</h2>
+          <p>This is an educational planning path based on the information you entered. You choose whether to open anything, and current bank terms control eligibility and payout.</p>
         </div>
       </div>
 
-      {prominent && (
+      {planPicks.length ? (
         <div className="recommendation-intro-strip">
-          <div><Sparkles size={17} /><span><b>1. Compare your top matches</b><small>See estimated advantage, requirements, and research status.</small></span></div>
-          <div><BadgeDollarSign size={17} /><span><b>2. Add the ones you want to track</b><small>Planning does not open an account or move money.</small></span></div>
-          <div><CalendarClock size={17} /><span><b>3. Start the clock only when opened</b><small>Real opening dates drive qualification and payout tracking.</small></span></div>
-        </div>
-      )}
-
-      {topMatches.length ? (
-        <>
-          <div className="top-match-label"><span>TOP 3</span><p>Best overall fit based on the answers you gave us.</p></div>
-          <div className="top-match-grid">
-            {topMatches.map((result, index) => {
-              const item = result.item;
-              const freshness = freshnessLabel(item.last_verified_at);
-              const review = latestReview(item);
-              const advantage = profile.tax_rate_known ? result.estimatedAfterTaxAdvantage : result.grossAdvantage;
-              const reasons = result.reasons.slice(0, 3);
-              const safetyText = result.safetyPassed ? "Research Verified" : result.researchReady ? "Final review pending" : "Research refresh required";
-              const beforeOpen = beforeOpenFacts(item);
-              const lifecycle = accountLifecycleGuidance(item);
-
-              return (
-                <article className={`top-match-card ${result.safetyPassed ? "cleared" : "pending"}`} key={item.id}>
-                  <div className="top-match-card-head">
-                    <span className="match-rank">#{index + 1}</span>
-                    <span className={result.safetyPassed ? "match-status cleared" : "match-status pending"}>{result.safetyPassed ? <ShieldCheck size={13} /> : <CircleAlert size={13} />}{safetyText}</span>
-                  </div>
-                  <span className="match-bank">{item.institution}</span>
-                  <span className="match-category-pill">{categoryLabel(item)}</span>
-                  <h3>{item.product_name}</h3>
-                  <div className="match-value-row"><div><small>{numberValue(item.bonus_amount) ? "Potential reward" : "Current APY"}</small><strong>{opportunityValue(item)}</strong></div><div><small>{profile.tax_rate_known ? "Est. advantage after tax" : "Est. advantage vs current baseline"}</small><strong className={advantage >= 0 ? "positive" : "negative"}>{advantage >= 0 ? "+" : ""}{money.format(advantage)}</strong></div></div>
-                  <div className="match-core-metrics">
-                    <span><small>Requirement</small><b>{requirementLabel(item)}</b></span>
-                    <span><small>Liquidity</small><b>{Math.round(result.liquidity)}/100</b></span>
-                    <span><small>Effort</small><b>{Math.round(result.effort)}/3</b></span>
-                  </div>
-                  <p className="match-fit-copy"><b>Why it fits:</b> {reasons.length ? reasons.join(" · ") : "strong overall fit for your current preferences"}.{result.historyMatch ? ` You reported prior ${item.institution} history, so eligibility needs an extra re-check.` : ""}</p>
-                  <div className="before-open-box">
-                    <div className="before-open-title"><span>Before you open</span><b>{lifecycle.label}</b></div>
-                    <div className="before-open-grid">
-                      <span><small>Cash needed</small><b>{beforeOpen.requiredCash > 0 ? money.format(beforeOpen.requiredCash) : "No fixed cash minimum"}</b></span>
-                      <span><small>Stored hold / review window</small><b>{beforeOpen.holdDays > 0 ? `${beforeOpen.holdDays} days` : "Offer-specific"}</b></span>
-                      <span><small>Recurring fee</small><b>{beforeOpen.monthlyFee > 0 ? `${money.format(beforeOpen.monthlyFee)}/mo` : beforeOpen.annualFee > 0 ? `${money.format(beforeOpen.annualFee)}/yr` : "None stored"}</b></span>
-                      <span><small>Deposit protection</small><b>{beforeOpen.insurance}</b></span>
-                    </div>
-                    <p><strong>Fee / keep note:</strong> {beforeOpen.feeNote}</p>
-                    <p><strong>Close rule:</strong> {beforeOpen.closeRule}</p>
-                    <p><strong>After the reward:</strong> {lifecycle.text}</p>
-                  </div>
-                  <div className="match-research-row"><span className={freshness.stale ? "stale" : ""}>{freshness.text}</span><span>Research confidence {Math.round(result.confidence)}%</span></div>
-                  <div className="match-actions">
-                    <AddToPlanButton opportunity={item} guestMode={guestMode} onGuestAdd={onGuestAdd} alreadyAdded={addedOpportunityIds.includes(item.id)} allowGuestSimulationOnHold={guestMode} />
-                    <a href={item.official_url} target="_blank" rel="noreferrer">Official terms <ArrowUpRight size={13} /></a>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-
-          {moreLanes.length > 0 && (
-            <div className="more-matches-section">
-              <div className="more-matches-head"><div><span>TOP 10 · MORE BY TYPE</span><h3>Compare the rest without mixing every strategy together.</h3></div><p>Your top three stay above. These are the remaining ranked matches, grouped so you can compare a second DD lane, savings option, or debit/spending reward without duplicating cards.</p></div>
-              <div className="match-lanes">
-                {moreLanes.map((lane) => (
-                  <section className="match-lane" key={lane.key}>
-                    <div className="match-lane-head"><div><h4>{lane.title}</h4><p>{lane.copy}</p></div><span>{lane.items.length} option{lane.items.length === 1 ? "" : "s"}</span></div>
-                    <div className="more-match-list">
-                      {lane.items.map((result) => {
-                        const item = result.item;
-                        const overallIndex = matches.findIndex((match) => match.item.id === item.id) + 1;
-                        const advantage = profile.tax_rate_known ? result.estimatedAfterTaxAdvantage : result.grossAdvantage;
-                        return (
-                          <article key={item.id}>
-                            <span className="more-rank">#{overallIndex}</span>
-                            <div className="more-name"><small>{item.institution}</small><strong>{item.product_name}</strong></div>
-                            <div><small>Value</small><b>{opportunityValue(item)}</b></div>
-                            <div><small>Est. advantage</small><b className={advantage >= 0 ? "positive" : "negative"}>{advantage >= 0 ? "+" : ""}{money.format(advantage)}</b></div>
-                            <div><small>Research</small><b>{result.safetyPassed ? "Cleared" : result.researchReady ? "Final review" : "Refresh due"}</b></div>
-                            <AddToPlanButton opportunity={item} guestMode={guestMode} onGuestAdd={onGuestAdd} alreadyAdded={addedOpportunityIds.includes(item.id)} allowGuestSimulationOnHold={guestMode} compact />
-                          </article>
-                        );
-                      })}
-                    </div>
-                  </section>
-                ))}
-              </div>
+          {planPicks.map((result, index) => (
+            <div key={result.item.id}>
+              <Sparkles size={17} />
+              <span>
+                <b>{index + 1}. {index === 0 ? "Savings home base" : index === 1 ? "Savings bonus layer" : "Direct-deposit lane"}</b>
+                <small>{result.item.institution} · {result.item.product_name}</small>
+              </span>
             </div>
-          )}
-        </>
-      ) : (
-        <div className="recommendation-empty">
-          <ShieldCheck size={30} />
-          <div><h3>No current opportunity fits the profile closely enough.</h3><p>Instead of forcing a weak match, adjust your questionnaire or check again after the opportunity library refreshes.</p></div>
+          ))}
         </div>
-      )}
+      ) : null}
 
-      <div className="research-standard">
-        <div className="research-standard-head"><div><span>RESEARCH & RISK</span><h3>What we check before you act.</h3></div><p>These fields are published because a large advertised bonus is not enough by itself.</p></div>
-        <div className="research-standard-grid">
-          {[{ k: "Hard inquiry", v: "Whether account opening is known to use a hard credit pull." }, { k: "ChexSystems", v: "Known deposit-account screening behavior when verified." }, { k: "Early Warning", v: "EWS screening notes when verified." }, { k: "Taxes", v: "Known bonus/interest reporting treatment." }, { k: "Deposit insurance", v: "FDIC/NCUA or program-bank structure." }, { k: "Close & clawback rules", v: "Minimum age, payout, fee, and early-closing restrictions." }].map((item) => <div key={item.k}><strong>{item.k}</strong><span>{item.v}</span></div>)}
-        </div>
-        {topMatches[0] && (() => {
-          const review = latestReview(topMatches[0].item);
-          return <div className="research-example-line"><span>Top match research snapshot</span><b>Hard pull: {reviewStatusLabel(review?.hard_pull_status)} · Chex: {reviewStatusLabel(review?.chexsystems_status)} · EWS: {reviewStatusLabel(review?.ews_status)} · Tax: {reviewStatusLabel(review?.tax_status)} · Insurance: {reviewStatusLabel(review?.insurance_status)} · Close rules: {reviewStatusLabel(review?.close_rule_status)}</b></div>;
-        })()}
-        <p className="research-disclaimer">Churning is an educational comparison and tracking tool, not financial, tax, legal, or credit advice. Bank approval and bonus eligibility are controlled by each institution’s current official terms.</p>
-      </div>
+      <div className="top-match-label"><span>BEST MATCHES FOR YOU</span><p>Top 3 are shown in each category. Use “See more” when additional matches are available.</p></div>
+
+      <CategorySection
+        title="High-yield savings"
+        subtitle="Your cash home base comes first. We still show alternatives even when your current HYSA is stronger, with a clear rate note before you switch."
+        items={hysa}
+        profile={profile}
+        guestMode={guestMode}
+        onGuestAdd={onGuestAdd}
+        addedOpportunityIds={addedOpportunityIds}
+      />
+      <CategorySection
+        title="Savings bonuses"
+        subtitle="Cash bonuses that require a deposit or balance hold. We compare the bonus with the interest you could have earned by leaving the money in your current HYSA."
+        items={savings}
+        profile={profile}
+        guestMode={guestMode}
+        onGuestAdd={onGuestAdd}
+        addedOpportunityIds={addedOpportunityIds}
+      />
+      <CategorySection
+        title="Checking & direct-deposit bonuses"
+        subtitle={Number(profile.strategy_mode || 2) === 3 && profile.employer_multiple_dd === true ? "Your profile supports comparing multiple DD lanes, but confirm payroll can actually split deposits before activating more than one." : "Compare all matching offers here, but plan around one primary DD lane unless your payroll actually supports splitting deposits."}
+        items={checking}
+        profile={profile}
+        guestMode={guestMode}
+        onGuestAdd={onGuestAdd}
+        addedOpportunityIds={addedOpportunityIds}
+      />
+      {profile.card_helper_opt_in ? (
+        <CategorySection
+          title="Debit rewards"
+          subtitle="Optional spending rewards that fit the normal spending you entered. Credit-card welcome offers stay separate in Cards & Spending."
+          items={debit}
+          profile={profile}
+          guestMode={guestMode}
+          onGuestAdd={onGuestAdd}
+          addedOpportunityIds={addedOpportunityIds}
+        />
+      ) : null}
+
+      {!ranked.length ? (
+        <div className="recommendation-empty"><ShieldCheck size={30} /><div><h3>No current matches fit the profile yet.</h3><p>Update the questionnaire or check again after the opportunity library refreshes.</p></div></div>
+      ) : null}
     </section>
   );
 }
