@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowUpRight, Settings2 } from "lucide-react";
+import { ArrowUpRight, CreditCard, Settings2 } from "lucide-react";
 import { CardsOptInPrompt } from "@/components/cards-opt-in-prompt";
 import { PlanCommandSummary } from "@/components/plan-command-summary";
 import { RecommendedOpportunities } from "@/components/recommended-opportunities";
@@ -43,6 +43,7 @@ export default async function MyPlanPage() {
           <div><span className="workspace-dot" /> Your saved plan</div>
           <div className="plan-topbar-actions">
             <Link href="/opportunities">All opportunities <ArrowUpRight size={13} /></Link>
+            {typedProfile.card_helper_opt_in ? <Link href="/cards"><CreditCard size={14} /> Cards & Spending</Link> : null}
             <Link href="/questionnaire"><Settings2 size={14} /> Update profile</Link>
             <SignOutButton />
           </div>
