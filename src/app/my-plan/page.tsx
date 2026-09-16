@@ -3,7 +3,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowUpRight, CreditCard, Settings2 } from "lucide-react";
 import { CardsOptInPrompt } from "@/components/cards-opt-in-prompt";
-import { PlanCommandSummary } from "@/components/plan-command-summary";
 import { RecommendedOpportunities } from "@/components/recommended-opportunities";
 import { RewardTracker } from "@/components/reward-tracker";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -49,13 +48,6 @@ export default async function MyPlanPage() {
           </div>
         </div>
 
-        <PlanCommandSummary profile={typedProfile} missions={typedMissions} usedBanks={usedBanks} />
-
-        <CardsOptInPrompt
-          answered={Boolean(typedProfile.card_helper_prompt_answered)}
-          enabled={Boolean(typedProfile.card_helper_opt_in)}
-        />
-
         <RecommendedOpportunities
           profile={typedProfile}
           opportunities={typedOpportunities}
@@ -63,6 +55,11 @@ export default async function MyPlanPage() {
           addedOpportunityIds={addedOpportunityIds}
           stateCode={stateCode}
           prominent
+        />
+
+        <CardsOptInPrompt
+          answered={Boolean(typedProfile.card_helper_prompt_answered)}
+          enabled={Boolean(typedProfile.card_helper_opt_in)}
         />
 
         <RewardTracker missions={typedMissions} />
