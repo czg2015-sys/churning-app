@@ -160,7 +160,7 @@ export function QuestionnaireForm({
 
     const { error: historyDeleteError } = await supabase.from("account_history").delete().eq("user_id", userId).eq("notes", "Reported during onboarding");
     const bankHistoryError = !historyDeleteError && selectedBanks.length
-      ? (await supabase.from("account_history").insert(selectedBanks.map((institution) => ({ user_id: userId, institution, notes: "Reported during onboarding", outcome: "existing_or_previous" })))).error
+      ? (await supabase.from("account_history").insert(selectedBanks.map((institution) => ({ user_id: userId, institution, notes: "Reported during onboarding", outcome: null })))).error
       : historyDeleteError;
 
     if (bankHistoryError) {
