@@ -17,7 +17,8 @@ const filters = [
 
 function isCleared(item: Opportunity) {
   const days = verificationAgeDays(item.last_verified_at);
-  return (item.safety_gate || "").toLowerCase() === "pass" && numberValue(item.evidence_confidence) >= 80 && days !== null && days <= 7;
+  const gate = (item.safety_gate || "").toLowerCase();
+  return ["pass", "green"].includes(gate) && numberValue(item.evidence_confidence) >= 80 && days !== null && days <= 7;
 }
 
 function freshness(item: Opportunity) {
