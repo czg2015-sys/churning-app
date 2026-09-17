@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, LoaderCircle, PauseCircle, RefreshCw } from "lucide-react";
+import { CheckCircle2, LoaderCircle, PauseCircle, RefreshCw, Search } from "lucide-react";
 
 export function RunResearchScanButton() {
   const router = useRouter();
@@ -34,6 +34,42 @@ export function RunResearchScanButton() {
       <button className="button primary research-run-button" onClick={runScan} disabled={running}>
         {running ? <LoaderCircle className="research-spin" size={16} /> : <RefreshCw size={16} />}
         {running ? "Scanning official sources…" : "Run Research Scan"}
+      </button>
+      {message ? <span className="research-run-message">{message}</span> : null}
+    </div>
+  );
+}
+
+export function RunDiscoverySweepButton({ configured }: { configured: boolean }) {
+  const router = useRouter();
+  const [running, setRunning] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function runDiscovery() {
+    setRunning(true);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/research/discovery/run", { method: "POST" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || payload.message || "Discovery sweep failed.");
+      setMessage(
+        payload.status === "already_running"
+          ? "A discovery sweep is already running."
+          : `Found ${payload.resultsCount} candidates · ${payload.newCandidates} new · ${payload.duplicateCandidates} already known`,
+      );
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Discovery sweep failed.");
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <div className="research-run-control">
+      <button className="button ghost research-run-button" onClick={runDiscovery} disabled={running || !configured}>
+        {running ? <LoaderCircle className="research-spin" size={16} /> : <Search size={16} />}
+        {running ? "Searching for new offers…" : configured ? "Run Discovery Sweep" : "Discovery key required"}
       </button>
       {message ? <span className="research-run-message">{message}</span> : null}
     </div>
