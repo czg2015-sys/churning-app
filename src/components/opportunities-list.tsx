@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { ArrowUpRight, CalendarClock, ShieldCheck, TriangleAlert } from "lucide-react";
 import { AddToPlanButton } from "@/components/add-to-plan-button";
-import { latestReview, money, numberValue, reviewStatusLabel, verificationAgeDays } from "@/lib/plan-math";
+import { benefitDurationLabel, latestReview, money, numberValue, reviewStatusLabel, verificationAgeDays } from "@/lib/plan-math";
 import type { Opportunity } from "@/lib/types";
 
 const filters = [
@@ -28,23 +28,13 @@ function freshness(item: Opportunity) {
   return { text: `${days}d old`, stale: true };
 }
 
-function promoDuration(item: Opportunity) {
-  const days = Math.max(0, Number(item.qualification_days || 0));
-  if (item.category !== "hysa" || !days) return null;
-  const months = Math.round(days / 30.44);
-  if (months >= 1 && Math.abs(days - months * 30.44) <= 18) return `${months}-month promo`;
-  return `${days}-day promo`;
-}
-
 function valueCaption(item: Opportunity) {
   if (numberValue(item.bonus_amount)) return "Potential reward";
-  const promo = promoDuration(item);
-  return promo ? `Promotional APY · ${promo.replace(" promo", "")}` : "Current APY";
+  return benefitDurationLabel(item) || "Current APY";
 }
 
 function requirementWindow(item: Opportunity) {
-  const promo = promoDuration(item);
-  if (promo) return `${promo} period`;
+  if (item.benefit_duration_days) return benefitDurationLabel(item) || "Limited benefit";
   return item.qualification_days ? `${item.qualification_days}-day window` : "Ongoing";
 }
 
