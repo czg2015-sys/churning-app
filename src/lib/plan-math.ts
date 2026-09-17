@@ -41,7 +41,6 @@ export function trackedInterestEstimate(opportunity: Opportunity, amountCommitte
   return amountCommitted * apy * (days / 365);
 }
 
-
 const stateNames: Record<string, string> = {
   AL:"alabama", AK:"alaska", AZ:"arizona", AR:"arkansas", CA:"california", CO:"colorado", CT:"connecticut", DE:"delaware", FL:"florida", GA:"georgia", HI:"hawaii", ID:"idaho", IL:"illinois", IN:"indiana", IA:"iowa", KS:"kansas", KY:"kentucky", LA:"louisiana", ME:"maine", MD:"maryland", MA:"massachusetts", MI:"michigan", MN:"minnesota", MS:"mississippi", MO:"missouri", MT:"montana", NE:"nebraska", NV:"nevada", NH:"new hampshire", NJ:"new jersey", NM:"new mexico", NY:"new york", NC:"north carolina", ND:"north dakota", OH:"ohio", OK:"oklahoma", OR:"oregon", PA:"pennsylvania", RI:"rhode island", SC:"south carolina", SD:"south dakota", TN:"tennessee", TX:"texas", UT:"utah", VT:"vermont", VA:"virginia", WA:"washington", WV:"west virginia", WI:"wisconsin", WY:"wyoming", DC:"district of columbia"
 };
@@ -155,7 +154,8 @@ export function opportunityFit(opportunity: Opportunity, profile: FinancialProfi
       : [review?.tax_status, review?.close_rule_status];
   const reviewComplete = Boolean(review) && requiredReviewFields.every(known);
   const researchReady = confidence >= 80 && freshEnough && reviewComplete;
-  const safetyPassed = (opportunity.safety_gate || "").toLowerCase() === "pass" && researchReady;
+  const gate = (opportunity.safety_gate || "").toLowerCase();
+  const safetyPassed = ["green", "pass"].includes(gate) && researchReady;
   const liquidity = Math.max(0, Math.min(100, numberValue(opportunity.liquidity_score)));
   const effort = Math.max(1, numberValue(opportunity.effort));
   const historyMatch = usedBanks.some((bank) => bank.trim().toLowerCase() === opportunity.institution.trim().toLowerCase());
@@ -262,11 +262,16 @@ export function rankResearchQueue(opportunities: Opportunity[], profile: Financi
     .sort((a, b) => Number(b.researchReady) - Number(a.researchReady) || b.baseScore - a.baseScore || b.confidence - a.confidence);
 }
 
-
 export function rankMatches(opportunities: Opportunity[], profile: FinancialProfile, usedBanks: string[], stateCode?: string | null) {
   return opportunities
     .filter((item) => item.offer_status === "live" && stateEligible(item, stateCode) && !["credit_card_bonus", "brokerage_bonus"].includes(item.category))
     .map((item) => ({ item, ...opportunityFit(item, profile, usedBanks) }))
-    .filter((result) => result.cashFit >= 80 && result.ddFit >= 75 && result.spendFit >= 60)
-    .sort((a, b) => Number(b.safetyPassed) - Number(a.safetyPassed) || Number(b.researchReady) - Number(a.researchReady) || b.score - a.score);
+    .sort((a, b) => {
+      const bFit = Number(b.cashFit >= 95 && b.ddFit >= 90 && b.spendFit >= 75);
+      const aFit = Number(a.cashFit >= 95 && a.ddFit >= 90 && a.spendFit >= 75);
+      return bFit - aFit
+        || Number(b.safetyPassed) - Number(a.safetyPassed)
+        || Number(b.researchReady) - Number(a.researchReady)
+        || b.score - a.score;
+    });
 }
