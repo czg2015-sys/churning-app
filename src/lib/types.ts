@@ -43,6 +43,7 @@ export type Opportunity = {
   purchase_min_amount?: number | string | null;
   reward_rate?: number | string | null;
   reward_cap_annual?: number | string | null;
+  reward_monthly_dd_threshold?: number | string | null;
   qualification_days: number | null;
   payout_days: number | null;
   min_account_age_days?: number | null;
