@@ -28,6 +28,26 @@ function freshness(item: Opportunity) {
   return { text: `${days}d old`, stale: true };
 }
 
+function promoDuration(item: Opportunity) {
+  const days = Math.max(0, Number(item.qualification_days || 0));
+  if (item.category !== "hysa" || !days) return null;
+  const months = Math.round(days / 30.44);
+  if (months >= 1 && Math.abs(days - months * 30.44) <= 18) return `${months}-month promo`;
+  return `${days}-day promo`;
+}
+
+function valueCaption(item: Opportunity) {
+  if (numberValue(item.bonus_amount)) return "Potential reward";
+  const promo = promoDuration(item);
+  return promo ? `Promotional APY · ${promo.replace(" promo", "")}` : "Current APY";
+}
+
+function requirementWindow(item: Opportunity) {
+  const promo = promoDuration(item);
+  if (promo) return `${promo} period`;
+  return item.qualification_days ? `${item.qualification_days}-day window` : "Ongoing";
+}
+
 export function OpportunitiesList({ opportunities }: { opportunities: Opportunity[] }) {
   const [filter, setFilter] = useState("all");
   const visible = useMemo(() => opportunities
@@ -67,8 +87,8 @@ export function OpportunitiesList({ opportunities }: { opportunities: Opportunit
           return (
             <article className={`opportunity-row opportunity-row-expanded ${!cleared ? "research-hold" : ""}`} key={item.id}>
               <div className="institution"><span className={`institution-mark ${cleared ? "cleared" : ""}`}>{item.institution.slice(0, 1)}</span><p><strong>{item.institution}</strong><small>{item.product_name}</small></p></div>
-              <div className="metric"><strong>{numberValue(item.bonus_amount) ? money.format(numberValue(item.bonus_amount)) : `${numberValue(item.apy).toFixed(2)}%`}</strong><small>{numberValue(item.bonus_amount) ? "Potential reward" : "Current APY"}</small></div>
-              <div className="metric"><strong>{numberValue(item.direct_deposit_required) ? `${money.format(numberValue(item.direct_deposit_required))} DD${item.dd_deposit_count ? ` · ${item.dd_deposit_count} deposits` : ""}` : item.purchase_count ? `${item.purchase_count} qualifying purchases${numberValue(item.purchase_min_amount) > 0 ? ` · ${money.format(numberValue(item.purchase_min_amount))}+ each` : ""}` : numberValue(item.required_balance) ? money.format(numberValue(item.required_balance)) : numberValue(item.min_opening_deposit) ? `${money.format(numberValue(item.min_opening_deposit))} opening deposit` : "None listed"}</strong><small>{item.qualification_days ? `${item.qualification_days}-day window` : "Ongoing"}{numberValue(item.monthly_fee) > 0 ? ` · ${money.format(numberValue(item.monthly_fee))}/mo fee` : ""}</small></div>
+              <div className="metric"><strong>{numberValue(item.bonus_amount) ? money.format(numberValue(item.bonus_amount)) : `${numberValue(item.apy).toFixed(2)}%`}</strong><small>{valueCaption(item)}</small></div>
+              <div className="metric"><strong>{numberValue(item.direct_deposit_required) ? `${money.format(numberValue(item.direct_deposit_required))} DD${item.dd_deposit_count ? ` · ${item.dd_deposit_count} deposits` : ""}` : item.purchase_count ? `${item.purchase_count} qualifying purchases${numberValue(item.purchase_min_amount) > 0 ? ` · ${money.format(numberValue(item.purchase_min_amount))}+ each` : ""}` : numberValue(item.required_balance) ? money.format(numberValue(item.required_balance)) : numberValue(item.min_opening_deposit) ? `${money.format(numberValue(item.min_opening_deposit))} opening deposit` : "None listed"}</strong><small>{requirementWindow(item)}{numberValue(item.monthly_fee) > 0 ? ` · ${money.format(numberValue(item.monthly_fee))}/mo fee` : ""}</small></div>
               <div className="metric research-cell"><div className={`confidence ${cleared ? "cleared" : "hold"}`}>{cleared ? <ShieldCheck size={14} /> : <TriangleAlert size={14} />} {cleared ? "Cleared" : "Hold"} · {Math.round(numberValue(item.evidence_confidence))}%</div><small className={fresh.stale ? "stale" : ""}><CalendarClock size={12} /> {fresh.text}</small><small className="screening-line">Pull {reviewStatusLabel(review?.hard_pull_status)} · Chex {reviewStatusLabel(review?.chexsystems_status)}</small></div>
               <div className="opportunity-actions">
                 <AddToPlanButton opportunity={item} compact />
