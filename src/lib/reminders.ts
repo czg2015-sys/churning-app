@@ -166,7 +166,7 @@ export async function runReminderSweep() {
   let inAppOnly = 0;
 
   for (const mission of (missions || []) as MissionRow[]) {
-    const level = effectiveLevel(preferenceByUser.get(mission.user_id) || "important", mission.email_reminders_enabled);
+    const level = effectiveLevel(preferenceByUser.get(mission.user_id) || "off", mission.email_reminders_enabled);
     if (level === "off") continue;
 
     const rules = rulesForMission(mission, level, today);
