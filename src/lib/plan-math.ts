@@ -17,28 +17,62 @@ export function addDaysIso(dateValue: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
-export function timelineFromOpenedDate(opportunity: Opportunity, openedAt: string, trackingDays?: number | null) {
-  const qualificationDays = Math.max(0, numberValue(opportunity.qualification_days || opportunity.direct_deposit_window_days || trackingDays));
+export function timelineFromOpenedDate(
+  opportunity: Opportunity,
+  openedAt: string,
+  trackingDays?: number | null,
+  benefitStartOverride?: string | null,
+) {
+  const qualificationDays = Math.max(0, numberValue(opportunity.qualification_days || opportunity.direct_deposit_window_days));
   const payoutDays = Math.max(0, numberValue(opportunity.payout_days));
   const minimumAgeDays = Math.max(0, numberValue(opportunity.min_account_age_days));
+  const benefitDurationDays = Math.max(0, numberValue(opportunity.benefit_duration_days || trackingDays));
   const qualificationDeadline = qualificationDays ? addDaysIso(openedAt, qualificationDays) : null;
   const payoutDueDate = qualificationDays || payoutDays ? addDaysIso(openedAt, qualificationDays + payoutDays) : null;
   const minimumAccountAgeDate = minimumAgeDays ? addDaysIso(openedAt, minimumAgeDays) : null;
-  const safeCloseDays = Math.max(minimumAgeDays, qualificationDays + payoutDays);
+  const benefitStartDate = benefitDurationDays ? (benefitStartOverride || openedAt) : null;
+  const benefitEndDate = benefitStartDate && benefitDurationDays ? addDaysIso(benefitStartDate, benefitDurationDays) : null;
+  const safeCloseDays = Math.max(minimumAgeDays, qualificationDays + payoutDays, benefitDurationDays);
 
   return {
     qualificationDeadline,
     payoutDueDate,
     minimumAccountAgeDate,
     safeCloseReviewDate: safeCloseDays ? addDaysIso(openedAt, safeCloseDays) : null,
+    benefitStartDate,
+    benefitEndDate,
   };
 }
 
 export function trackedInterestEstimate(opportunity: Opportunity, amountCommitted: number, trackingDays?: number | null) {
   const apy = Math.max(0, numberValue(opportunity.apy)) / 100;
-  const days = Math.max(0, numberValue(opportunity.qualification_days || opportunity.direct_deposit_window_days || trackingDays));
+  const days = Math.max(0, numberValue(opportunity.benefit_duration_days || opportunity.qualification_days || opportunity.direct_deposit_window_days || trackingDays));
   if (apy <= 0 || amountCommitted <= 0 || days <= 0) return 0;
   return amountCommitted * apy * (days / 365);
+}
+
+export function categoryLabel(opportunity: Opportunity) {
+  const labels: Record<Opportunity["category"], string> = {
+    hysa: "High-yield savings",
+    savings_bonus: "Savings bonus",
+    checking_bonus: "Checking / direct deposit",
+    debit_spend: "Debit rewards",
+    credit_card_bonus: "Credit card offer",
+    cd: "CD",
+    treasury: "Treasury",
+    brokerage_bonus: "Brokerage bonus",
+  };
+  return labels[opportunity.category] || opportunity.category.replaceAll("_", " ");
+}
+
+export function benefitDurationLabel(opportunity: Opportunity) {
+  const days = Math.max(0, numberValue(opportunity.benefit_duration_days));
+  if (!days) return null;
+  const months = Math.round(days / 30.4375);
+  const duration = months >= 2 && Math.abs(days - months * 30.4375) <= 8
+    ? `${months} month${months === 1 ? "" : "s"}`
+    : `${days} days`;
+  return opportunity.benefit_label ? `${opportunity.benefit_label} · ${duration}` : `Limited benefit · ${duration}`;
 }
 
 const stateNames: Record<string, string> = {
@@ -274,4 +308,88 @@ export function rankMatches(opportunities: Opportunity[], profile: FinancialProf
         || Number(b.researchReady) - Number(a.researchReady)
         || b.score - a.score;
     });
+}
+
+
+export function selectFeasibleRecommendations(
+  opportunities: Opportunity[],
+  profile: FinancialProfile,
+  usedBanks: string[],
+  stateCode?: string | null,
+  limit = 3,
+) {
+  const ranked = rankMatches(opportunities, profile, usedBanks, stateCode)
+    .filter((result) => result.safetyPassed && result.cashFit >= 95 && result.ddFit >= 90 && result.spendFit >= 75)
+    .slice(0, 12);
+
+  if (ranked.length <= 1) return ranked.slice(0, limit);
+
+  const deployableCash = Math.max(0, numberValue(profile.total_cash) - numberValue(profile.emergency_reserve));
+  const monthlyDdCapacity = Math.max(0, numberValue(profile.biweekly_pay) - numberValue(profile.biweekly_essential_spend)) * (26 / 12);
+  const monthlySpendCapacity = Math.max(0, numberValue(profile.monthly_card_spend));
+  const allowMultipleDd = profile.employer_multiple_dd === true;
+
+  function monthlyDdNeed(item: Opportunity) {
+    const explicit = numberValue(item.reward_monthly_dd_threshold);
+    if (explicit > 0) return explicit;
+    const required = numberValue(item.direct_deposit_required);
+    if (required <= 0) return 0;
+    const days = Math.max(30, numberValue(item.direct_deposit_window_days || item.qualification_days || 30));
+    return required / Math.max(1, days / 30);
+  }
+
+  function monthlySpendNeed(item: Opportunity) {
+    const direct = numberValue(item.purchase_required_spend);
+    const counted = Math.max(0, Number(item.purchase_count || 0)) * numberValue(item.purchase_min_amount);
+    const required = Math.max(direct, counted);
+    if (required <= 0) return 0;
+    const days = Math.max(30, numberValue(item.spend_window_days || item.qualification_days || 30));
+    return required / Math.max(1, days / 30);
+  }
+
+  function feasible(bundle: typeof ranked) {
+    const cashNeed = bundle.reduce((sum, result) => sum + Math.max(numberValue(result.item.required_balance), numberValue(result.item.min_opening_deposit)), 0);
+    if (cashNeed > deployableCash + 0.01) return false;
+
+    const ddItems = bundle.filter((result) => numberValue(result.item.direct_deposit_required) > 0 || numberValue(result.item.reward_monthly_dd_threshold) > 0);
+    if (!allowMultipleDd && ddItems.length > 1) return false;
+    const ddNeed = ddItems.reduce((sum, result) => sum + monthlyDdNeed(result.item), 0);
+    if (ddNeed > monthlyDdCapacity + 0.01) return false;
+
+    const spendNeed = bundle.reduce((sum, result) => sum + monthlySpendNeed(result.item), 0);
+    if (spendNeed > monthlySpendCapacity + 0.01 && spendNeed > 0) return false;
+
+    return true;
+  }
+
+  let best: typeof ranked = [];
+  let bestScore = -Infinity;
+  const n = ranked.length;
+  for (let i = 0; i < n; i++) {
+    const one = [ranked[i]];
+    if (feasible(one) && (one[0].score > bestScore || best.length < 1)) {
+      best = one;
+      bestScore = one[0].score;
+    }
+    for (let j = i + 1; j < n; j++) {
+      const two = [ranked[i], ranked[j]];
+      const twoScore = two.reduce((sum, result) => sum + result.score, 0);
+      if (feasible(two) && (best.length < 2 || twoScore > bestScore)) {
+        best = two;
+        bestScore = twoScore;
+      }
+      if (limit < 3) continue;
+      for (let k = j + 1; k < n; k++) {
+        const three = [ranked[i], ranked[j], ranked[k]];
+        if (!feasible(three)) continue;
+        const score = three.reduce((sum, result) => sum + result.score, 0);
+        if (best.length < 3 || score > bestScore) {
+          best = three;
+          bestScore = score;
+        }
+      }
+    }
+  }
+
+  return best.sort((a, b) => b.score - a.score).slice(0, limit);
 }
