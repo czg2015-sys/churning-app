@@ -238,7 +238,8 @@ export function AddToPlanButton({
 
   const displayedAdded = added || alreadyAdded;
   const verificationAge = verificationAgeDays(opportunity.last_verified_at);
-  const safetyCleared = (opportunity.safety_gate || "").toLowerCase() === "pass"
+  const safetyGate = (opportunity.safety_gate || "").toLowerCase();
+  const safetyCleared = ["green", "pass"].includes(safetyGate)
     && numberValue(opportunity.evidence_confidence) >= 80
     && verificationAge !== null
     && verificationAge <= 7;
@@ -255,7 +256,7 @@ export function AddToPlanButton({
         disabled={displayedAdded || !canOpen}
         title={!safetyCleared && !simulationOnly && !planningWithPendingResearch ? "This offer has not cleared Churning’s current confidence, safety, and freshness checks." : simulationOnly ? "Guest simulation only — this offer is still on research hold." : planningWithPendingResearch ? "Add this candidate to your plan for tracking and final verification; this is not a recommendation to open it." : undefined}
       >
-        {displayedAdded ? <><Check size={16} /> In My Plan</> : simulationOnly ? <><Sparkles size={16} /> Simulate tracker</> : planningWithPendingResearch ? <><Plus size={16} /> Add for review</> : !safetyCleared ? <><ShieldCheck size={16} /> Research hold</> : <><Plus size={16} /> Add to My Plan</>}
+        {displayedAdded ? <><Check size={16} /> Added ✓</> : simulationOnly ? <><Sparkles size={16} /> Simulate tracker</> : planningWithPendingResearch ? <><Plus size={16} /> Add for review</> : !safetyCleared ? <><ShieldCheck size={16} /> Research hold</> : <><Plus size={16} /> Add to My Plan</>}
       </button>
       {error && <small className="add-plan-error">{error}</small>}
 
