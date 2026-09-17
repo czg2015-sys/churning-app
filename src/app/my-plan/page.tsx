@@ -3,11 +3,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowUpRight, CreditCard, Settings2 } from "lucide-react";
 import { CardsOptInPrompt } from "@/components/cards-opt-in-prompt";
+import { PersonalPlanDashboard } from "@/components/personal-plan-dashboard";
 import { RecommendedOpportunities } from "@/components/recommended-opportunities";
 import { RewardTracker } from "@/components/reward-tracker";
 import { SignOutButton } from "@/components/sign-out-button";
 import { createClient } from "@/lib/supabase/server";
-import type { FinancialProfile, Mission, Opportunity } from "@/lib/types";
+import type { AccountHistory, FinancialProfile, Mission, Opportunity } from "@/lib/types";
 
 export const metadata: Metadata = { title: "My Plan" };
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export default async function MyPlanPage() {
     supabase.from("financial_profiles").select("*").eq("user_id", userId).maybeSingle(),
     supabase.from("opportunities").select("*, opportunity_reviews(*)").eq("offer_status", "live"),
     supabase.from("missions").select("*, mission_steps(*), opportunity:opportunities(*, opportunity_reviews(*))").eq("user_id", userId).order("created_at", { ascending: false }),
-    supabase.from("account_history").select("institution").eq("user_id", userId),
+    supabase.from("account_history").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
     supabase.from("profiles").select("state_code").eq("user_id", userId).maybeSingle(),
   ]);
 
@@ -31,7 +32,8 @@ export default async function MyPlanPage() {
   const typedProfile = profile as FinancialProfile;
   const typedOpportunities = (opportunities || []) as Opportunity[];
   const typedMissions = (missions || []) as Mission[];
-  const usedBanks: string[] = Array.from(new Set(((bankHistory || []) as Array<{ institution?: string | null }>).map((row) => row.institution).filter((bank): bank is string => Boolean(bank))));
+  const typedHistory = (bankHistory || []) as AccountHistory[];
+  const usedBanks: string[] = Array.from(new Set(typedHistory.map((row) => row.institution).filter((bank): bank is string => Boolean(bank))));
   const addedOpportunityIds = typedMissions.filter((mission) => !["completed", "closed"].includes(mission.status)).map((mission) => mission.opportunity_id).filter((id): id is string => Boolean(id));
   const stateCode = userProfile?.state_code || "CA";
 
@@ -47,6 +49,13 @@ export default async function MyPlanPage() {
             <SignOutButton />
           </div>
         </div>
+
+        <PersonalPlanDashboard
+          missions={typedMissions}
+          opportunities={typedOpportunities}
+          accountHistory={typedHistory}
+          reminderPreference={typedProfile.reminder_preference || "important"}
+        />
 
         <RecommendedOpportunities
           profile={typedProfile}
