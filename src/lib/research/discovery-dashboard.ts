@@ -27,6 +27,8 @@ export type DiscoveryDashboardData = {
     matchedOpportunityId: string | null;
     firstDiscoveredAt: string;
     lastSeenAt: string;
+    detectedBenefitDurationDays: number | null;
+    detectedBenefitText: string | null;
   }>;
   runs: Array<{
     id: string;
@@ -48,7 +50,7 @@ export async function getDiscoveryDashboardData(): Promise<DiscoveryDashboardDat
   const [{ data: candidates, error: candidateError }, { data: runs, error: runError }] = await Promise.all([
     supabase
       .from("discovery_candidates")
-      .select("id,institution_guess,product_name_guess,category_guess,source_title,source_url,source_domain,source_snippet,official_source_status,official_url,candidate_status,matched_opportunity_id,first_discovered_at,last_seen_at")
+      .select("id,institution_guess,product_name_guess,category_guess,source_title,source_url,source_domain,source_snippet,official_source_status,official_url,candidate_status,matched_opportunity_id,first_discovered_at,last_seen_at,detected_benefit_duration_days,detected_benefit_text")
       .order("last_seen_at", { ascending: false })
       .limit(40),
     supabase
@@ -75,6 +77,8 @@ export async function getDiscoveryDashboardData(): Promise<DiscoveryDashboardDat
     matched_opportunity_id: string | null;
     first_discovered_at: string;
     last_seen_at: string;
+    detected_benefit_duration_days: number | null;
+    detected_benefit_text: string | null;
   };
 
   const rows = (candidates || []) as CandidateRow[];
@@ -107,6 +111,8 @@ export async function getDiscoveryDashboardData(): Promise<DiscoveryDashboardDat
       matchedOpportunityId: row.matched_opportunity_id,
       firstDiscoveredAt: row.first_discovered_at,
       lastSeenAt: row.last_seen_at,
+      detectedBenefitDurationDays: row.detected_benefit_duration_days,
+      detectedBenefitText: row.detected_benefit_text,
     })),
     runs: (runs || []) as DiscoveryDashboardData["runs"],
   };
