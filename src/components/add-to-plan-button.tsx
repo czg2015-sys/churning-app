@@ -112,7 +112,13 @@ export function AddToPlanButton({
       : opportunity.benefit_start_trigger === "first_dd_at"
         ? details.firstDdAt
         : details.openedAt;
-    const timeline = details.openedAt ? timelineFromOpenedDate(opportunity, details.openedAt, details.trackingDays, benefitStartOverride) : {
+    const qualificationStartOverride = opportunity.qualification_start_trigger === "funded_at"
+      ? details.fundedAt
+      : opportunity.qualification_start_trigger === "first_dd_at"
+        ? details.firstDdAt
+        : details.openedAt;
+    const timeline = details.openedAt ? timelineFromOpenedDate(opportunity, details.openedAt, details.trackingDays, benefitStartOverride, qualificationStartOverride) : {
+      qualificationStartDate: null,
       qualificationDeadline: null,
       payoutDueDate: null,
       minimumAccountAgeDate: null,
@@ -146,6 +152,7 @@ export function AddToPlanButton({
         expected_bonus: numberValue(opportunity.bonus_amount),
         expected_interest: expectedInterest,
         opened_at: details.openedAt,
+        qualification_start_date: timeline.qualificationStartDate,
         qualification_deadline: timeline.qualificationDeadline,
         payout_due_date: timeline.payoutDueDate,
         minimum_account_age_date: timeline.minimumAccountAgeDate,
