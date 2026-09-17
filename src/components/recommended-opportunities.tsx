@@ -19,7 +19,15 @@ function requirementLabel(item: Opportunity) {
 
 function opportunityValue(item: Opportunity) {
   const reward = numberValue(item.bonus_amount);
-  return reward > 0 ? money.format(reward) : `${numberValue(item.apy).toFixed(2)}% APY`;
+  if (reward > 0) return money.format(reward);
+  if (item.category === "savings_bonus") return `${numberValue(item.apy).toFixed(2)}% promo rate`;
+  return `${numberValue(item.apy).toFixed(2)}% APY`;
+}
+
+function valueLabel(item: Opportunity) {
+  if (numberValue(item.bonus_amount) > 0) return "Potential value";
+  if (item.category === "savings_bonus") return "Promotional rate";
+  return "Current APY";
 }
 
 function researchLabel(result: RankedMatch) {
@@ -43,6 +51,15 @@ function HysaComparison({ item, profile }: { item: Opportunity; profile: Financi
   return <p className="match-fit-copy"><b>Rate note:</b> This matches your current {current.toFixed(2)}% APY, so compare convenience and account terms before switching.</p>;
 }
 
+function fitNote(result: RankedMatch) {
+  const notes: string[] = [];
+  if (result.cashFit < 95) notes.push("the stored cash requirement is above the amount your profile can currently deploy");
+  if (result.ddFit < 90) notes.push("the direct-deposit requirement may be too high for the paycheck amount and deadline you entered");
+  if (result.spendFit < 75) notes.push("the spending requirement is above the normal spending you entered");
+  if (result.historyMatch) notes.push(`you reported prior ${result.item.institution} history, so bonus eligibility needs an extra check`);
+  return notes;
+}
+
 function RecommendationCard({
   result,
   profile,
@@ -59,6 +76,7 @@ function RecommendationCard({
   const item = result.item;
   const advantage = profile.tax_rate_known ? result.estimatedAfterTaxAdvantage : result.grossAdvantage;
   const verified = result.safetyPassed;
+  const notes = fitNote(result);
   return (
     <article className={`top-match-card ${verified ? "cleared" : "pending"}`}>
       <div className="top-match-card-head">
@@ -70,8 +88,9 @@ function RecommendationCard({
       <h3>{item.product_name}</h3>
       <p className="match-fit-copy">{shortDescription(item)}</p>
       {item.category === "hysa" ? <HysaComparison item={item} profile={profile} /> : null}
+      {notes.length ? <p className="match-fit-copy"><b>Fit note:</b> {notes.join("; ")}.</p> : null}
       <div className="match-value-row">
-        <div><small>{numberValue(item.bonus_amount) > 0 ? "Potential value" : "Current APY"}</small><strong>{opportunityValue(item)}</strong></div>
+        <div><small>{valueLabel(item)}</small><strong>{opportunityValue(item)}</strong></div>
         <div><small>Est. advantage vs your baseline</small><strong className={advantage >= 0 ? "positive" : "negative"}>{advantage >= 0 ? "+" : ""}{money.format(advantage)}</strong></div>
       </div>
       <div className="match-core-metrics">
@@ -141,6 +160,11 @@ function CategorySection({
   );
 }
 
+function bestPlanPick(items: RankedMatch[], kind: "cash" | "dd") {
+  if (kind === "dd") return items.find((result) => result.cashFit >= 95 && result.ddFit >= 90) || items[0];
+  return items.find((result) => result.cashFit >= 95) || items[0];
+}
+
 export function RecommendedOpportunities({
   profile,
   opportunities,
@@ -169,7 +193,8 @@ export function RecommendedOpportunities({
   const checking = ranked.filter((result) => result.item.category === "checking_bonus");
   const debit = profile.card_helper_opt_in ? ranked.filter((result) => result.item.category === "debit_spend") : [];
 
-  const planPicks = [hysa[0], savings[0], checking[0]].filter((value): value is RankedMatch => Boolean(value));
+  const planPicks = [bestPlanPick(hysa, "cash"), bestPlanPick(savings, "cash"), bestPlanPick(checking, "dd")]
+    .filter((value): value is RankedMatch => Boolean(value));
 
   return (
     <section className={`recommendations-shell ${prominent ? "recommendations-prominent" : ""} ${resultsPage ? "recommendations-results-layout" : ""}`}>
@@ -177,29 +202,44 @@ export function RecommendedOpportunities({
         <div>
           <span className="kicker">YOUR SUGGESTED PLAN</span>
           <h2>{resultsPage ? "A practical starting sequence from your profile." : "Start with a cash home base, then layer bonuses that fit."}</h2>
-          <p>This is an educational planning path based on the information you entered. You choose whether to open anything, and current bank terms control eligibility and payout.</p>
+          <p>This is an educational planning path based on the information you entered. It is not a direction to open an account. You decide what to use, and each institution’s current terms control eligibility, rates, fees, and payout.</p>
         </div>
       </div>
 
       {planPicks.length ? (
-        <div className="recommendation-intro-strip">
-          {planPicks.map((result, index) => (
-            <div key={result.item.id}>
-              <Sparkles size={17} />
-              <span>
-                <b>{index + 1}. {index === 0 ? "Savings home base" : index === 1 ? "Savings bonus layer" : "Direct-deposit lane"}</b>
-                <small>{result.item.institution} · {result.item.product_name}</small>
-              </span>
-            </div>
-          ))}
-        </div>
+        <>
+          <div className="recommendation-intro-strip">
+            {planPicks.map((result, index) => (
+              <div key={result.item.id}>
+                <Sparkles size={17} />
+                <span>
+                  <b>{index + 1}. {index === 0 ? "Savings home base" : index === 1 ? "Savings bonus layer" : "Direct-deposit lane"}</b>
+                  <small>{result.item.institution} · {result.item.product_name}</small>
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="top-match-label"><span>3 PLAN OPTIONS</span><p>These are the strongest starting comparisons from the categories below. Review any warning or research badge before acting.</p></div>
+          <div className="top-match-grid">
+            {planPicks.map((result) => (
+              <RecommendationCard
+                key={`plan-${result.item.id}`}
+                result={result}
+                profile={profile}
+                guestMode={guestMode}
+                onGuestAdd={onGuestAdd}
+                addedOpportunityIds={addedOpportunityIds}
+              />
+            ))}
+          </div>
+        </>
       ) : null}
 
-      <div className="top-match-label"><span>BEST MATCHES FOR YOU</span><p>Top 3 are shown in each category. Use “See more” when additional matches are available.</p></div>
+      <div className="top-match-label"><span>EXPLORE BY CATEGORY</span><p>Top 3 are shown in each category. Use “See more” when additional live options are available.</p></div>
 
       <CategorySection
         title="High-yield savings"
-        subtitle="Your cash home base comes first. We still show alternatives even when your current HYSA is stronger, with a clear rate note before you switch."
+        subtitle="Your cash home base comes first. We still show alternatives when your current HYSA is stronger, with a clear rate note before you consider switching."
         items={hysa}
         profile={profile}
         guestMode={guestMode}
@@ -208,7 +248,7 @@ export function RecommendedOpportunities({
       />
       <CategorySection
         title="Savings bonuses"
-        subtitle="Cash bonuses that require a deposit or balance hold. We compare the bonus with the interest you could have earned by leaving the money in your current HYSA."
+        subtitle="Cash and promotional savings offers. We compare the stored value with the return you could have earned by leaving the money in your current savings baseline."
         items={savings}
         profile={profile}
         guestMode={guestMode}
@@ -217,7 +257,7 @@ export function RecommendedOpportunities({
       />
       <CategorySection
         title="Checking & direct-deposit bonuses"
-        subtitle={Number(profile.strategy_mode || 2) === 3 && profile.employer_multiple_dd === true ? "Your profile supports comparing multiple DD lanes, but confirm payroll can actually split deposits before activating more than one." : "Compare all matching offers here, but plan around one primary DD lane unless your payroll actually supports splitting deposits."}
+        subtitle={Number(profile.strategy_mode || 2) === 3 && profile.employer_multiple_dd === true ? "Your profile supports comparing multiple DD lanes, but confirm payroll can actually split deposits before activating more than one." : "All live matches are available here. Plan around one primary DD lane unless your payroll actually supports splitting deposits."}
         items={checking}
         profile={profile}
         guestMode={guestMode}
@@ -227,7 +267,7 @@ export function RecommendedOpportunities({
       {profile.card_helper_opt_in ? (
         <CategorySection
           title="Debit rewards"
-          subtitle="Optional spending rewards that fit the normal spending you entered. Credit-card welcome offers stay separate in Cards & Spending."
+          subtitle="Optional spending rewards. Credit-card welcome offers stay separate in Cards & Spending."
           items={debit}
           profile={profile}
           guestMode={guestMode}
@@ -237,7 +277,7 @@ export function RecommendedOpportunities({
       ) : null}
 
       {!ranked.length ? (
-        <div className="recommendation-empty"><ShieldCheck size={30} /><div><h3>No current matches fit the profile yet.</h3><p>Update the questionnaire or check again after the opportunity library refreshes.</p></div></div>
+        <div className="recommendation-empty"><ShieldCheck size={30} /><div><h3>No current matches are available for your state.</h3><p>Update the questionnaire or check again after the opportunity library refreshes.</p></div></div>
       ) : null}
     </section>
   );
