@@ -161,6 +161,8 @@ function MissionCard({
   const [steps, setSteps] = useState(mission.mission_steps || []);
   const [starting, setStarting] = useState(false);
   const [startDate, setStartDate] = useState(todayIso());
+  const [fundedDate, setFundedDate] = useState("");
+  const [firstDdDate, setFirstDdDate] = useState("");
   const timeline = timeProgress(mission);
   const requirements = requirementPercent(steps);
   const opportunity = mission.opportunity;
@@ -252,16 +254,84 @@ function MissionCard({
       is_complete: complete ? true : step.is_complete,
       completed_at: complete ? new Date().toISOString() : step.completed_at,
     });
+
+    if (
+      opportunity &&
+      step.step_type === "direct_deposit" &&
+      amount > 0 &&
+      opportunity.qualification_start_trigger === "first_dd_at" &&
+      !mission.first_dd_at &&
+      mission.opened_at
+    ) {
+      const firstDd = todayIso();
+      const benefitStartOverride = opportunity.benefit_start_trigger === "first_dd_at"
+        ? firstDd
+        : opportunity.benefit_start_trigger === "funded_at"
+          ? mission.funded_at || mission.opened_at
+          : mission.opened_at;
+      const nextTimeline = timelineFromOpenedDate(
+        opportunity,
+        mission.opened_at,
+        inferredTrackingDays(mission),
+        benefitStartOverride,
+        firstDd,
+      );
+
+      if (guestMode) {
+        emitGuest({
+          ...mission,
+          first_dd_at: firstDd,
+          qualification_start_date: nextTimeline.qualificationStartDate,
+          qualification_deadline: nextTimeline.qualificationDeadline,
+          payout_due_date: nextTimeline.payoutDueDate,
+          safe_close_review_date: nextTimeline.safeCloseReviewDate,
+          benefit_start_date: nextTimeline.benefitStartDate,
+          benefit_end_date: nextTimeline.benefitEndDate,
+        });
+      } else {
+        const supabase = createClient();
+        await supabase.from("missions").update({
+          first_dd_at: firstDd,
+          qualification_start_date: nextTimeline.qualificationStartDate,
+          qualification_deadline: nextTimeline.qualificationDeadline,
+          payout_due_date: nextTimeline.payoutDueDate,
+          safe_close_review_date: nextTimeline.safeCloseReviewDate,
+          benefit_start_date: nextTimeline.benefitStartDate,
+          benefit_end_date: nextTimeline.benefitEndDate,
+          updated_at: new Date().toISOString(),
+        }).eq("id", mission.id);
+        router.refresh();
+      }
+    }
   }
 
   async function startTracker() {
     if (!opportunity || !startDate) return;
-    const nextTimeline = timelineFromOpenedDate(opportunity, startDate, inferredTrackingDays(mission));
+    const benefitStartOverride = opportunity.benefit_start_trigger === "funded_at"
+      ? fundedDate || startDate
+      : opportunity.benefit_start_trigger === "first_dd_at"
+        ? firstDdDate || null
+        : startDate;
+    const qualificationStartOverride = opportunity.qualification_start_trigger === "funded_at"
+      ? fundedDate || null
+      : opportunity.qualification_start_trigger === "first_dd_at"
+        ? firstDdDate || null
+        : startDate;
+    const nextTimeline = timelineFromOpenedDate(
+      opportunity,
+      startDate,
+      inferredTrackingDays(mission),
+      benefitStartOverride,
+      qualificationStartOverride,
+    );
     const openedStep = steps.find((step) => step.step_type === "opened");
     const nextSteps = steps.map((step) => step.step_type === "opened" ? { ...step, is_complete: true, completed_at: new Date().toISOString() } : step);
     const nextMission: Mission = {
       ...mission,
       opened_at: startDate,
+      funded_at: fundedDate || null,
+      first_dd_at: firstDdDate || null,
+      qualification_start_date: nextTimeline.qualificationStartDate,
       qualification_deadline: nextTimeline.qualificationDeadline,
       payout_due_date: nextTimeline.payoutDueDate,
       minimum_account_age_date: nextTimeline.minimumAccountAgeDate,
@@ -285,6 +355,9 @@ function MissionCard({
     const supabase = createClient();
     await supabase.from("missions").update({
       opened_at: startDate,
+      funded_at: fundedDate || null,
+      first_dd_at: firstDdDate || null,
+      qualification_start_date: nextTimeline.qualificationStartDate,
       qualification_deadline: nextTimeline.qualificationDeadline,
       payout_due_date: nextTimeline.payoutDueDate,
       minimum_account_age_date: nextTimeline.minimumAccountAgeDate,
@@ -310,7 +383,12 @@ function MissionCard({
       {mission.status === "planned" && !mission.opened_at ? (
         <div className="reward-start-panel">
           <div><span className="reward-start-icon"><Landmark size={19} /></span><div><b>Added to your queue — clock not started</b><p>We will not guess an opening date. Confirm it only after the account is actually open.</p></div></div>
-          {starting ? <div className="reward-start-form"><input type="date" value={startDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setStartDate(event.target.value)} /><button type="button" className="button primary compact" onClick={startTracker}>Start tracker</button><button type="button" className="button ghost compact" onClick={() => setStarting(false)}>Cancel</button></div> : <button type="button" className="button primary compact" onClick={() => setStarting(true)}>I opened this account</button>}
+          {starting ? <div className="reward-start-form">
+            <label><small>Opened</small><input type="date" value={startDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setStartDate(event.target.value)} /></label>
+            {opportunity?.benefit_start_trigger === "funded_at" ? <label><small>Funded <em>optional</em></small><input type="date" value={fundedDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setFundedDate(event.target.value)} /></label> : null}
+            {opportunity?.qualification_start_trigger === "first_dd_at" || opportunity?.benefit_start_trigger === "first_dd_at" ? <label><small>First DD <em>optional</em></small><input type="date" value={firstDdDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setFirstDdDate(event.target.value)} /></label> : null}
+            <button type="button" className="button primary compact" onClick={startTracker}>Start tracker</button><button type="button" className="button ghost compact" onClick={() => setStarting(false)}>Cancel</button>
+          </div> : <button type="button" className="button primary compact" onClick={() => setStarting(true)}>I opened this account</button>}
         </div>
       ) : (
         <div className="reward-progress-zone">
