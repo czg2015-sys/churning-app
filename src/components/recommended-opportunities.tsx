@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowUpRight, ChevronDown, ChevronUp, CircleAlert, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowUpRight, ChevronDown, ChevronUp, CircleAlert, ShieldCheck } from "lucide-react";
 import { AddToPlanButton } from "@/components/add-to-plan-button";
 import { benefitDurationLabel, categoryLabel, money, numberValue, rankMatches, selectFeasibleRecommendations } from "@/lib/plan-math";
 import type { FinancialProfile, Opportunity, PlanStartDetails } from "@/lib/types";
