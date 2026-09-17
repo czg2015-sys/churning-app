@@ -79,14 +79,14 @@ export default function Home() {
       <section className="home-hero shell refreshed-home-hero">
         <div className="hero-copy">
           <div className="eyebrow"><span /> CASH STRATEGY + REWARD TRACKER</div>
-          <h1>Are you fully taking advantage of <em>your savings?</em></h1>
-          <p className="hero-lede">Churning helps you compare bank bonuses, high-yield savings, and debit/spending rewards against what your cash earns today—then tracks the requirements so you know what to do next.</p>
+          <h1>Are you getting the most from <em>your cash?</em></h1>
+          <p className="hero-lede">Churning helps you compare high-yield savings, promotional rates, checking and direct-deposit bonuses, savings offers, and spending rewards—then tracks the deadlines so you know what needs attention next.</p>
           <div className="cash-scope-note"><WalletCards size={17} /><span>Built for liquid cash you keep outside long-term investments—after bills and the emergency reserve you want left untouched.</span></div>
           <div className="hero-actions">
-            <Link className="button primary hero-primary" href="/guest"><Sparkles size={18} /> Find my opportunities <ArrowRight size={18} /></Link>
-            <Link className="button ghost" href="/auth">Create free account</Link>
+            <Link className="button primary hero-primary" href="/auth">Create free account <ArrowRight size={18} /></Link>
+            <Link className="button ghost" href="/guest"><Sparkles size={18} /> Try without an account</Link>
           </div>
-          <p className="guest-inline-note"><LockKeyhole size={15} /> Guest Mode uses the same planning questions without permanently saving your answers.</p>
+          <p className="guest-inline-note"><LockKeyhole size={15} /> Guest Mode lets you try the same planning flow without saving a permanent plan.</p>
           <div className="trust-row">
             <span><ShieldCheck size={17} /> Research status visible</span>
             <span><CircleCheck size={17} /> You move the money</span>
@@ -120,8 +120,8 @@ export default function Home() {
       </section>
 
       <section className="home-final-cta shell">
-        <div><span className="kicker">START WITH YOUR REAL NUMBERS</span><h2>See what your cash could be doing differently.</h2><p>No account is required to build the first plan.</p></div>
-        <Link className="button primary" href="/guest">Build my plan <ArrowRight size={17} /></Link>
+        <div><span className="kicker">START WITH YOUR REAL NUMBERS</span><h2>See what your cash could be doing differently.</h2><p>Create an account to save progress, or try the planning flow first.</p></div>
+        <div className="home-final-actions"><Link className="button primary" href="/auth">Create free account <ArrowRight size={17} /></Link><Link className="button ghost" href="/guest">Try Guest Mode</Link></div>
       </section>
     </main>
   );
