@@ -136,7 +136,7 @@ async function sendEmail(to: string, subject: string, message: string) {
   });
 
   if (!response.ok) {
-    return { sent: false, reason: `email_http_${response.status}` as const };
+    return { sent: false, reason: `email_http_${response.status}` };
   }
   return { sent: true, reason: null };
 }
