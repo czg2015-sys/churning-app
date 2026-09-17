@@ -22,23 +22,37 @@ export function timelineFromOpenedDate(
   openedAt: string,
   trackingDays?: number | null,
   benefitStartOverride?: string | null,
+  qualificationStartOverride?: string | null,
 ) {
   const qualificationDays = Math.max(0, numberValue(opportunity.qualification_days || opportunity.direct_deposit_window_days));
   const payoutDays = Math.max(0, numberValue(opportunity.payout_days));
   const minimumAgeDays = Math.max(0, numberValue(opportunity.min_account_age_days));
   const benefitDurationDays = Math.max(0, numberValue(opportunity.benefit_duration_days || trackingDays));
-  const qualificationDeadline = qualificationDays ? addDaysIso(openedAt, qualificationDays) : null;
-  const payoutDueDate = qualificationDays || payoutDays ? addDaysIso(openedAt, qualificationDays + payoutDays) : null;
+
+  const qualificationNeedsEvent = Boolean(opportunity.qualification_start_trigger);
+  const qualificationStartDate = qualificationDays
+    ? (qualificationNeedsEvent ? qualificationStartOverride || null : qualificationStartOverride || openedAt)
+    : null;
+  const qualificationDeadline = qualificationStartDate && qualificationDays
+    ? addDaysIso(qualificationStartDate, qualificationDays)
+    : null;
+  const payoutDueDate = qualificationDeadline
+    ? addDaysIso(qualificationDeadline, payoutDays)
+    : (!qualificationDays && payoutDays ? addDaysIso(openedAt, payoutDays) : null);
   const minimumAccountAgeDate = minimumAgeDays ? addDaysIso(openedAt, minimumAgeDays) : null;
   const benefitStartDate = benefitDurationDays ? (benefitStartOverride || openedAt) : null;
   const benefitEndDate = benefitStartDate && benefitDurationDays ? addDaysIso(benefitStartDate, benefitDurationDays) : null;
-  const safeCloseDays = Math.max(minimumAgeDays, qualificationDays + payoutDays, benefitDurationDays);
+  const safeCloseReviewDate = [minimumAccountAgeDate, payoutDueDate, benefitEndDate]
+    .filter((value): value is string => Boolean(value))
+    .sort()
+    .at(-1) || null;
 
   return {
+    qualificationStartDate,
     qualificationDeadline,
     payoutDueDate,
     minimumAccountAgeDate,
-    safeCloseReviewDate: safeCloseDays ? addDaysIso(openedAt, safeCloseDays) : null,
+    safeCloseReviewDate,
     benefitStartDate,
     benefitEndDate,
   };
