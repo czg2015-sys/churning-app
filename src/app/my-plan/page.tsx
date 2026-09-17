@@ -54,7 +54,7 @@ export default async function MyPlanPage() {
           missions={typedMissions}
           opportunities={typedOpportunities}
           accountHistory={typedHistory}
-          reminderPreference={typedProfile.reminder_preference || "important"}
+          reminderPreference={typedProfile.reminder_preference || "off"}
         />
 
         <RecommendedOpportunities
