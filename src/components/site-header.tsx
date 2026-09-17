@@ -5,7 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 export async function SiteHeader() {
   const supabase = await createClient();
   const { data: claimsData } = await supabase.auth.getClaims();
-  const signedIn = Boolean(claimsData?.claims?.sub);
+  const claims = claimsData?.claims as { sub?: string; email?: string } | undefined;
+  const signedIn = Boolean(claims?.sub);
+  const email = typeof claims?.email === "string" ? claims.email : "";
+  const accountLabel = email.includes("@") ? email.split("@")[0] : email || "Account";
 
   return (
     <header className="site-header">
@@ -19,7 +22,7 @@ export async function SiteHeader() {
         </nav>
         <div className="header-actions">
           {signedIn
-            ? <Link className="header-signin" href="/my-plan"><UserRound size={15} /> Account</Link>
+            ? <Link className="header-signin" href="/my-plan"><UserRound size={15} /> {accountLabel}</Link>
             : <Link className="header-signin" href="/auth">Sign in</Link>}
         </div>
       </div>
