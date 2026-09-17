@@ -142,3 +142,9 @@
 .reward-do-not-warning svg { color: var(--danger); flex: 0 0 auto; margin-top: 1px; }
 .reward-lifecycle-note { border: 1px solid rgba(59,178,115,.16); background: rgba(59,178,115,.045); color: var(--muted-strong); }
 .reward-lifecycle-note svg { color: var(--green); flex: 0 0 auto; margin-top: 1px; }
+
+
+.reward-start-form label { display:grid; gap:4px; min-width:120px; }
+.reward-start-form label small { color:var(--muted); font-size:8px; text-transform:uppercase; letter-spacing:.05em; }
+.reward-start-form label em { color:var(--muted); font-style:normal; font-weight:500; text-transform:none; letter-spacing:0; }
+.reward-start-form input { padding:0 9px; border:1px solid var(--line); border-radius:9px; background:rgba(7,11,8,.82); color:var(--ink); }
