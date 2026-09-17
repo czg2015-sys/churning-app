@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Research server credentials are not configured." }, { status: 503 });
   }
   if (!hasDiscoverySearchConfig()) {
-    return NextResponse.json({ error: "Discovery search is installed but DISCOVERY_SEARCH_API_KEY is not configured." }, { status: 503 });
+    return NextResponse.json({ status: "skipped", message: "Discovery search is installed but DISCOVERY_SEARCH_API_KEY is not configured." }, { status: 200 });
   }
 
   const result = await runDiscoverySweep({ triggerType: "cron" });
