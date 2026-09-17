@@ -69,6 +69,10 @@ export type Opportunity = {
   insurance_type?: string | null;
   last_verified_at: string | null;
   expires_at?: string | null;
+  benefit_duration_days?: number | null;
+  benefit_label?: string | null;
+  benefit_start_trigger?: string | null;
+  standard_apy_after_benefit?: number | string | null;
   opportunity_reviews?: OpportunityReview[];
 };
 
@@ -99,6 +103,11 @@ export type Mission = {
   payout_due_date?: string | null;
   minimum_account_age_date?: string | null;
   safe_close_review_date?: string | null;
+  funded_at?: string | null;
+  first_dd_at?: string | null;
+  benefit_start_date?: string | null;
+  benefit_end_date?: string | null;
+  email_reminders_enabled?: boolean | null;
   status: string;
   quick_access_url?: string | null;
   next_action?: string | null;
@@ -124,6 +133,7 @@ export type FinancialProfile = {
   recent_bank_openings?: number | string;
   employer_multiple_dd?: boolean | null;
   alerts_opt_in?: boolean;
+  reminder_preference?: "all" | "important" | "off";
   card_helper_opt_in?: boolean;
   card_helper_prompt_answered?: boolean;
   credit_score_band?: string | null;
@@ -134,7 +144,25 @@ export type FinancialProfile = {
 export type PlanStartDetails = {
   openedAlready: boolean;
   openedAt: string | null;
+  fundedAt?: string | null;
+  firstDdAt?: string | null;
   amountCommitted: number;
   plannedDirectDeposit: number;
   trackingDays?: number | null;
+  reminderEnabled?: boolean | null;
+};
+
+export type AccountHistory = {
+  id: string;
+  user_id: string;
+  opportunity_id?: string | null;
+  institution: string;
+  product_name?: string | null;
+  opened_at?: string | null;
+  closed_at?: string | null;
+  bonus_received_at?: string | null;
+  bonus_received?: boolean | null;
+  bonus_amount?: number | string | null;
+  outcome?: string | null;
+  notes?: string | null;
 };
