@@ -26,7 +26,7 @@ function opportunityValue(item: Opportunity) {
 
 function valueLabel(item: Opportunity) {
   if (numberValue(item.bonus_amount) > 0) return "Potential value";
-  if (item.category === "savings_bonus") return "Promotional rate";
+  if (item.benefit_duration_days || item.category === "savings_bonus") return "Promotional APY";
   return "Current APY";
 }
 
