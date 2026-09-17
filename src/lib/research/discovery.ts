@@ -161,6 +161,35 @@ function likelyOfferResult(hit: SearchHit) {
   return offerWords.test(text);
 }
 
+const discoveryDurationWords: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
+  seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+};
+
+function detectBenefitDuration(hit: SearchHit) {
+  const text = `${hit.title} ${hit.description}`;
+  const trigger = /promo(?:tional)?|\bboost\b|introductory|limited[- ]time|special\s+(?:apy|rate)|reward\s+period|bonus\s+period|rate\s+boost/i;
+  const triggerMatch = trigger.exec(text);
+  if (!triggerMatch || triggerMatch.index === undefined) return { days: null as number | null, text: null as string | null };
+
+  const start = Math.max(0, triggerMatch.index - 100);
+  const end = Math.min(text.length, triggerMatch.index + triggerMatch[0].length + 220);
+  const chunk = text.slice(start, end);
+  const duration = /\b(\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(day|week|month|year)s?\b/i.exec(chunk);
+  if (!duration) return { days: null as number | null, text: chunk.slice(0, 280) };
+
+  const rawCount = duration[1].toLowerCase();
+  const count = discoveryDurationWords[rawCount] || Number(rawCount);
+  const unit = duration[2].toLowerCase();
+  if (!Number.isFinite(count) || count <= 0) return { days: null as number | null, text: duration[0] };
+
+  const days = unit === "day" ? count
+    : unit === "week" ? count * 7
+      : unit === "month" ? Math.round(count * 30.4375)
+        : count * 365;
+  return { days: Math.round(days), text: duration[0] };
+}
+
 async function searchBrave(plan: SearchPlan): Promise<SearchHit[]> {
   const apiKey = getDiscoveryApiKey();
   if (!apiKey) throw new Error("Discovery search is not configured. Add DISCOVERY_SEARCH_API_KEY in Vercel.");
@@ -312,6 +341,7 @@ export async function runDiscoverySweep({ triggerType, force = false }: { trigge
       const existing = existingMap.get(key);
       const matched = matchesExistingOpportunity(hit, knownOpportunities);
       const possibleOfficial = possibleOfficialSource(hit);
+      const benefitDuration = detectBenefitDuration(hit);
       const preservedStatus = existing?.candidate_status && !["discovered", "duplicate"].includes(existing.candidate_status)
         ? existing.candidate_status
         : matched ? "duplicate" : "discovered";
@@ -328,6 +358,8 @@ export async function runDiscoverySweep({ triggerType, force = false }: { trigge
         source_url: canonicalizeUrl(hit.url),
         source_domain: hostnameFor(hit.url),
         source_snippet: hit.description.slice(0, 1200),
+        detected_benefit_duration_days: benefitDuration.days,
+        detected_benefit_text: benefitDuration.text,
         official_source_status: officialStatus,
         official_url: existing?.official_url || (possibleOfficial ? canonicalizeUrl(hit.url) : null),
         candidate_status: preservedStatus,
