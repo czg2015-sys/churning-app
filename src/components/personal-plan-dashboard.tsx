@@ -218,14 +218,14 @@ export function PersonalPlanDashboard({
       closed_at: form.get("closed_at") ? String(form.get("closed_at")) : null,
       bonus_received: bonusAnswer === "yes" ? true : bonusAnswer === "no" ? false : null,
       bonus_amount: 0,
-      outcome: "historical",
-      notes: "Added from My Plan history search",
+      outcome: form.get("closed_at") ? "closed_good_standing" : "other",
+      notes: "Prior offer added from My Plan history search",
       updated_at: new Date().toISOString(),
     };
 
     const { data, error } = await supabase.from("account_history").insert(payload).select("*").single();
     if (error) {
-      setHistoryMessage("Could not save that history yet.");
+      setHistoryMessage("Could not save that history yet. Please try again.");
     } else if (data) {
       setHistoryRows((current) => [data as AccountHistory, ...current]);
       setHistoryMessage("Saved. We’ll use it when checking future eligibility.");
