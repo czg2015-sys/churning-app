@@ -46,6 +46,7 @@ type LiveOpportunity = {
   purchase_count?: number | null;
   purchase_min_amount?: number | string | null;
   reward_rate?: number | string | null;
+  benefit_duration_days?: number | null;
   expires_at?: string | null;
   last_verified_at: string | null;
 };
@@ -60,6 +61,7 @@ type ExtractedTerms = {
   qualificationDays?: number;
   payoutDays?: number;
   minimumAccountAgeDays?: number;
+  benefitDurationDays?: number;
   cashBackRate?: number;
 };
 
@@ -142,11 +144,14 @@ function detectSignals(text: string) {
   const money = unique(text.match(/\$\s?\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|\$\s?\d+(?:\.\d{1,2})?/g) || []);
   const percentages = unique(text.match(/\b\d+(?:\.\d+)?\s?%/g) || []);
   const days = unique(text.match(/\b\d{1,3}\s+(?:calendar\s+)?days?\b/gi) || []);
+  const months = unique(text.match(/\b(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+months?\b/gi) || []);
 
   return {
     money,
     percentages,
     days,
+    months,
+    mentionsLimitedBenefit: /promo(?:tional)?|boost|introductory|limited[- ]time|special rate|reward period|bonus period/i.test(text),
     mentionsDirectDeposit: /direct\s+deposit/i.test(text),
     mentionsMonthlyFee: /monthly\s+(?:service\s+)?fee/i.test(text),
     mentionsAnnualFee: /annual\s+fee/i.test(text),
@@ -169,6 +174,43 @@ function parsePercent(raw?: string | null) {
   if (!raw) return undefined;
   const value = Number(raw.replace(/[%\s]/g, ""));
   return Number.isFinite(value) ? value : undefined;
+}
+
+const durationWords: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
+  seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+};
+
+function parseDurationCount(raw: string) {
+  const normalized = raw.trim().toLowerCase();
+  if (durationWords[normalized]) return durationWords[normalized];
+  const numeric = Number(normalized);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function extractLimitedBenefitDurationDays(text: string) {
+  const trigger = /promo(?:tional)?|\bboost\b|introductory|limited[- ]time|special\s+(?:apy|rate)|reward\s+period|bonus\s+period|rate\s+boost/i;
+  const duration = /\b(\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(day|week|month|year)s?\b/gi;
+  const triggerMatch = trigger.exec(text);
+  if (!triggerMatch || triggerMatch.index === undefined) return undefined;
+
+  const start = Math.max(0, triggerMatch.index - 180);
+  const end = Math.min(text.length, triggerMatch.index + triggerMatch[0].length + 260);
+  const chunk = text.slice(start, end);
+  const candidates = Array.from(chunk.matchAll(duration));
+  if (!candidates.length) return undefined;
+
+  const triggerCenter = triggerMatch.index - start + triggerMatch[0].length / 2;
+  candidates.sort((a, b) => Math.abs((a.index || 0) - triggerCenter) - Math.abs((b.index || 0) - triggerCenter));
+  const picked = candidates[0];
+  const count = parseDurationCount(picked?.[1] || "");
+  const unit = (picked?.[2] || "").toLowerCase();
+  if (count <= 0) return undefined;
+  if (unit === "day") return Math.round(count);
+  if (unit === "week") return Math.round(count * 7);
+  if (unit === "month") return Math.round(count * 30.4375);
+  if (unit === "year") return Math.round(count * 365);
+  return undefined;
 }
 
 function closestMatch(text: string, keyword: RegExp, valuePattern: RegExp, maxDistance = 180) {
@@ -196,6 +238,7 @@ function extractTerms(text: string): ExtractedTerms {
   const annualFee = parseMoney(closestMatch(text, /annual\s+fee/i, money));
   const spendRequirement = parseMoney(closestMatch(text, /(?:spend|purchases?|purchase requirement)/i, money));
   const cashBackRate = parsePercent(closestMatch(text, /(?:cash\s*back|cashback|rewards? rate)/i, percent));
+  const benefitDurationDays = extractLimitedBenefitDurationDays(text);
 
   const qualificationRaw = closestMatch(text, /(?:qualif|within|complete|make.*deposit|maintain)/i, days);
   const payoutRaw = closestMatch(text, /(?:payout|paid|payment|bonus.*within|receive.*bonus)/i, days);
@@ -212,6 +255,7 @@ function extractTerms(text: string): ExtractedTerms {
     ...(qualificationRaw ? { qualificationDays: Number(qualificationRaw.match(/\d+/)?.[0] || 0) } : {}),
     ...(payoutRaw ? { payoutDays: Number(payoutRaw.match(/\d+/)?.[0] || 0) } : {}),
     ...(minimumAgeRaw ? { minimumAccountAgeDays: Number(minimumAgeRaw.match(/\d+/)?.[0] || 0) } : {}),
+    ...(benefitDurationDays !== undefined ? { benefitDurationDays } : {}),
   };
 }
 
@@ -265,6 +309,7 @@ function buildTermDiffs(opportunity: LiveOpportunity, previous: ExtractedTerms |
     ["qualificationDays", "Qualification window"],
     ["payoutDays", "Payout window"],
     ["minimumAccountAgeDays", "Minimum account age"],
+    ["benefitDurationDays", "Limited benefit duration"],
     ["cashBackRate", "Cash-back rate"],
   ];
 
@@ -284,6 +329,7 @@ function buildTermDiffs(opportunity: LiveOpportunity, previous: ExtractedTerms |
     ["Qualification window", opportunity.qualification_days, current.qualificationDays],
     ["Payout window", opportunity.payout_days, current.payoutDays],
     ["Minimum account age", opportunity.min_account_age_days, current.minimumAccountAgeDays],
+    ["Limited benefit duration", opportunity.benefit_duration_days, current.benefitDurationDays],
     ["Cash-back rate", opportunity.reward_rate, current.cashBackRate],
   ];
 
@@ -466,7 +512,7 @@ export async function runResearchScan({
 
   try {
     let opportunityQuery = supabase.from("opportunities").select(
-      "id,institution,product_name,category,official_url,safety_gate,bonus_amount,apy,direct_deposit_required,monthly_fee,annual_fee,purchase_required_spend,qualification_days,payout_days,min_account_age_days,required_balance,purchase_count,purchase_min_amount,reward_rate,expires_at,last_verified_at",
+      "id,institution,product_name,category,official_url,safety_gate,bonus_amount,apy,direct_deposit_required,monthly_fee,annual_fee,purchase_required_spend,qualification_days,payout_days,min_account_age_days,required_balance,purchase_count,purchase_min_amount,reward_rate,benefit_duration_days,expires_at,last_verified_at",
     ).eq("offer_status", "live").order("institution");
 
     if (scope === "expiring") {
