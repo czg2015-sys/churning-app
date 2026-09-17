@@ -5,7 +5,7 @@ import { CalendarDays, Check, Landmark, Plus, ShieldCheck, Sparkles, WalletCards
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { FormattedNumberInput } from "@/components/formatted-number-input";
-import { money, numberValue, timelineFromOpenedDate, trackedInterestEstimate, verificationAgeDays } from "@/lib/plan-math";
+import { benefitDurationLabel, categoryLabel, money, numberValue, timelineFromOpenedDate, trackedInterestEstimate, verificationAgeDays } from "@/lib/plan-math";
 import type { Opportunity, PlanStartDetails } from "@/lib/types";
 
 function todayIso() {
@@ -51,7 +51,10 @@ export function AddToPlanButton({
   );
   const suggestedDirectDeposit = numberValue(opportunity.direct_deposit_required);
   const purchaseRule = purchaseRequirement(opportunity);
-  const needsCustomHysaHorizon = opportunity.category === "hysa" && !numberValue(opportunity.qualification_days || opportunity.direct_deposit_window_days);
+  const needsCustomHysaHorizon = opportunity.category === "hysa" && !numberValue(opportunity.benefit_duration_days || opportunity.qualification_days || opportunity.direct_deposit_window_days);
+  const benefitLabel = benefitDurationLabel(opportunity);
+  const showFundingDate = openedAlready && ["hysa", "savings_bonus"].includes(opportunity.category);
+  const showFirstDdDate = openedAlready && suggestedDirectDeposit > 0;
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -60,12 +63,16 @@ export function AddToPlanButton({
 
     const form = new FormData(event.currentTarget);
     const trackingDays = needsCustomHysaHorizon ? Math.max(30, Number(form.get("tracking_days") || 90)) : null;
+    const reminderMode = String(form.get("reminder_mode") || "default");
     const details: PlanStartDetails = {
       openedAlready,
       openedAt: openedAlready ? String(form.get("opened_at") || todayIso()) : null,
+      fundedAt: openedAlready && form.get("funded_at") ? String(form.get("funded_at")) : null,
+      firstDdAt: openedAlready && form.get("first_dd_at") ? String(form.get("first_dd_at")) : null,
       amountCommitted: Math.max(0, numberValue(String(form.get("amount_committed") || 0))),
       plannedDirectDeposit: Math.max(0, numberValue(String(form.get("planned_dd") || 0))),
       trackingDays,
+      reminderEnabled: reminderMode === "on" ? true : reminderMode === "off" ? false : null,
     };
 
     if (guestMode) {
@@ -100,11 +107,18 @@ export function AddToPlanButton({
       return;
     }
 
-    const timeline = details.openedAt ? timelineFromOpenedDate(opportunity, details.openedAt, details.trackingDays) : {
+    const benefitStartOverride = opportunity.benefit_start_trigger === "funded_at"
+      ? details.fundedAt
+      : opportunity.benefit_start_trigger === "first_dd_at"
+        ? details.firstDdAt
+        : details.openedAt;
+    const timeline = details.openedAt ? timelineFromOpenedDate(opportunity, details.openedAt, details.trackingDays, benefitStartOverride) : {
       qualificationDeadline: null,
       payoutDueDate: null,
       minimumAccountAgeDate: null,
       safeCloseReviewDate: null,
+      benefitStartDate: null,
+      benefitEndDate: null,
     };
     const expectedInterest = trackedInterestEstimate(opportunity, details.amountCommitted, details.trackingDays);
     const expectedTotalEarnings = numberValue(opportunity.bonus_amount) + expectedInterest;
@@ -136,6 +150,11 @@ export function AddToPlanButton({
         payout_due_date: timeline.payoutDueDate,
         minimum_account_age_date: timeline.minimumAccountAgeDate,
         safe_close_review_date: timeline.safeCloseReviewDate,
+        funded_at: details.fundedAt,
+        first_dd_at: details.firstDdAt,
+        benefit_start_date: timeline.benefitStartDate,
+        benefit_end_date: timeline.benefitEndDate,
+        email_reminders_enabled: details.reminderEnabled,
         status: details.openedAlready ? "active" : "planned",
         quick_access_url: opportunity.official_url,
         next_action: nextAction,
@@ -272,7 +291,7 @@ export function AddToPlanButton({
 
             <div className="plan-modal-offer">
               <span className="plan-modal-bank"><Landmark size={18} /></span>
-              <div><strong>{opportunity.product_name}</strong><small>{numberValue(opportunity.bonus_amount) > 0 ? `${money.format(numberValue(opportunity.bonus_amount))} potential reward` : `${numberValue(opportunity.apy).toFixed(2)}% APY`}</small></div>
+              <div><strong>{opportunity.product_name}</strong><small>{categoryLabel(opportunity)} · {numberValue(opportunity.bonus_amount) > 0 ? `${money.format(numberValue(opportunity.bonus_amount))} potential reward` : `${numberValue(opportunity.apy).toFixed(2)}% APY`}{benefitLabel ? ` · ${benefitLabel}` : ""}</small></div>
               <b>{numberValue(opportunity.evidence_confidence)}% research confidence</b>
             </div>
 
@@ -283,10 +302,13 @@ export function AddToPlanButton({
               </div>
 
               <div className="plan-modal-grid">
-                {openedAlready && <label className="modal-field"><span><CalendarDays size={15} /> Opening date</span><input name="opened_at" type="date" defaultValue={todayIso()} max={todayIso()} required /></label>}
+                {openedAlready && <label className="modal-field"><span><CalendarDays size={15} /> Opening date</span><input name="opened_at" type="date" defaultValue={todayIso()} max={todayIso()} required /><small>This starts the main account clock.</small></label>}
+                {showFundingDate && <label className="modal-field"><span><CalendarDays size={15} /> Funding date <em>optional</em></span><input name="funded_at" type="date" max={todayIso()} /><small>Add it only if the benefit starts when money is funded.</small></label>}
+                {showFirstDdDate && <label className="modal-field"><span><CalendarDays size={15} /> First qualifying DD <em>optional</em></span><input name="first_dd_at" type="date" max={todayIso()} /><small>Add it if the bank starts its measurement period from the first deposit.</small></label>}
                 <label className="modal-field"><span><WalletCards size={15} /> Cash committed</span><div className="money-input"><i>$</i><FormattedNumberInput name="amount_committed" defaultValue={suggestedCommitment} ariaLabel="Cash committed" /></div><small>{suggestedCommitment > 0 ? `Stored offer target: ${money.format(suggestedCommitment)}` : "Enter only cash you actually plan to commit."}</small></label>
                 {suggestedDirectDeposit > 0 && <label className="modal-field"><span><Landmark size={15} /> Qualifying DD completed so far</span><div className="money-input"><i>$</i><FormattedNumberInput name="planned_dd" defaultValue={0} ariaLabel="Qualifying direct deposit completed so far" /></div><small>Stored target: {money.format(suggestedDirectDeposit)}. Update only deposits that actually posted.</small></label>}
                 {needsCustomHysaHorizon && <label className="modal-field"><span><CalendarDays size={15} /> Tracking horizon</span><select name="tracking_days" defaultValue="90"><option value="90">90 days</option><option value="180">180 days</option><option value="365">1 year</option></select><small>This is your review horizon for an ongoing rate, not a bank lockup requirement.</small></label>}
+                <label className="modal-field"><span><CalendarDays size={15} /> Email reminders</span><select name="reminder_mode" defaultValue="default"><option value="default">Use my dashboard setting</option><option value="on">On for this offer</option><option value="off">Off for this offer</option></select><small>You can change this later from My Plan.</small></label>
               </div>
 
               {purchaseRule && <div className="plan-modal-requirement"><strong>Stored spending requirement</strong><span>{purchaseRule}. You will confirm completion manually from your actual account activity.</span></div>}
