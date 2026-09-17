@@ -1,4 +1,4 @@
-.reward-tracker-shell { margin:22px 0; border:1px solid var(--line); border-radius:22px; overflow:hidden; background:rgba(8,12,18,.78); box-shadow:0 26px 80px rgba(0,0,0,.18); }
+.reward-tracker-shell { margin:22px 0; border:1px solid var(--line); border-radius:22px; overflow:hidden; background:rgba(38,53,44,.94); box-shadow:0 26px 80px rgba(0,0,0,.18); }
 .reward-tracker-head { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:24px; align-items:end; padding:29px 30px 25px; background:radial-gradient(circle at 100% 0,rgba(129,116,255,.13),transparent 28rem),linear-gradient(145deg,rgba(20,27,38,.98),rgba(9,13,19,.98)); border-bottom:1px solid var(--line); }
 .reward-tracker-head h2 { margin:8px 0 7px; font-size:clamp(28px,3vw,40px); line-height:1.03; letter-spacing:-.045em; }
 .reward-tracker-head p { max-width:760px; margin:0; color:var(--muted); font-size:13px; line-height:1.6; }
@@ -8,7 +8,7 @@
 .reward-head-stats small { display:block; color:var(--muted); font-size:8px; text-transform:uppercase; letter-spacing:.06em; }
 .reward-head-stats strong { display:block; margin-top:3px; font-size:20px; letter-spacing:-.035em; }
 .reward-head-stats .positive strong { color:var(--green); }
-.reward-tabs { display:flex; gap:7px; padding:11px 15px; background:rgba(12,16,23,.88); border-bottom:1px solid var(--line); }
+.reward-tabs { display:flex; gap:7px; padding:11px 15px; background:rgba(34,48,40,.92); border-bottom:1px solid var(--line); }
 .reward-tabs button { display:inline-flex; gap:8px; align-items:center; min-height:37px; padding:0 12px; border:1px solid transparent; border-radius:9px; background:transparent; color:var(--muted); cursor:pointer; font-size:11px; font-weight:760; }
 .reward-tabs button:hover { color:var(--ink); background:rgba(255,255,255,.03); }
 .reward-tabs button.active { color:var(--green-ink); background:var(--green); }
@@ -62,7 +62,7 @@
 .reward-expand:hover { background:rgba(255,255,255,.03); }
 .reward-expand svg { transition:transform 160ms ease; }
 .reward-expand svg.rotated { transform:rotate(180deg); }
-.reward-details { display:grid; grid-template-columns:1.08fr .92fr; gap:15px; padding:18px 20px 21px; border-top:1px solid var(--line); background:rgba(7,9,13,.34); }
+.reward-details { display:grid; grid-template-columns:1.08fr .92fr; gap:15px; padding:18px 20px 21px; border-top:1px solid var(--line); background:rgba(34,48,40,.76); }
 .reward-section-title { display:flex; justify-content:space-between; margin-bottom:8px; color:var(--muted-strong); font-size:9px; font-weight:820; letter-spacing:.06em; text-transform:uppercase; }
 .reward-section-help { margin:0 0 7px; color:var(--muted); font-size:10px; line-height:1.5; }
 .reward-step-list { display:grid; align-content:start; }
@@ -125,8 +125,8 @@
 @media (max-width:620px) { .reward-safety-audit { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 
 /* Money-green / slightly lighter surface pass */
-.reward-tracker-head { background:radial-gradient(circle at 100% 0,rgba(59,178,115,.12),transparent 28rem),linear-gradient(145deg,rgba(26,36,30,.98),rgba(15,22,17,.98)); }
-.reward-card { background:linear-gradient(155deg,rgba(27,37,31,.98),rgba(16,23,18,.98)); }
+.reward-tracker-head { background:radial-gradient(circle at 100% 0,rgba(59,178,115,.12),transparent 28rem),linear-gradient(145deg,rgba(47,64,53,.98),rgba(32,47,38,.98)); }
+.reward-card { background:linear-gradient(155deg,rgba(48,65,54,.98),rgba(33,48,40,.98)); }
 
 .reward-do-not-warning, .reward-lifecycle-note {
   display: flex;
@@ -147,4 +147,4 @@
 .reward-start-form label { display:grid; gap:4px; min-width:120px; }
 .reward-start-form label small { color:var(--muted); font-size:8px; text-transform:uppercase; letter-spacing:.05em; }
 .reward-start-form label em { color:var(--muted); font-style:normal; font-weight:500; text-transform:none; letter-spacing:0; }
-.reward-start-form input { padding:0 9px; border:1px solid var(--line); border-radius:9px; background:rgba(7,11,8,.82); color:var(--ink); }
+.reward-start-form input { padding:0 9px; border:1px solid var(--line); border-radius:9px; background:rgba(32,47,38,.92); color:var(--ink); }
