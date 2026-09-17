@@ -14,6 +14,14 @@ function formatDate(value: string | null) {
   }).format(new Date(value));
 }
 
+
+function durationLabel(days: number | null) {
+  if (!days) return null;
+  const months = Math.round(days / 30.4375);
+  if (months >= 1 && Math.abs(days - months * 30.4375) <= 8) return `${months} month${months === 1 ? "" : "s"}`;
+  return `${days} days`;
+}
+
 function nextSweepDate(completedAt: string | null) {
   if (!completedAt) return "Runs as soon as search is configured";
   return formatDate(new Date(new Date(completedAt).getTime() + 14 * 86_400_000).toISOString());
@@ -70,10 +78,12 @@ export async function DiscoveryPanel() {
                   <span>{candidate.categoryGuess.replaceAll("_", " ")}</span>
                   <span>Source: <b>{candidate.officialSourceStatus.replaceAll("_", " ")}</b></span>
                   <span>Seen: {formatDate(candidate.lastSeenAt)}</span>
+                  {candidate.detectedBenefitDurationDays ? <span>Limited benefit signal: <b>{durationLabel(candidate.detectedBenefitDurationDays)}</b></span> : null}
                 </div>
               </div>
               <span className={styles.statusPill}>{candidate.candidateStatus.replaceAll("_", " ")}</span>
             </div>
+            {candidate.detectedBenefitDurationDays ? <p><strong>Time-limit flag:</strong> Search text suggests a {durationLabel(candidate.detectedBenefitDurationDays)} limited benefit. Confirm this on the official terms before publishing.</p> : null}
             {candidate.sourceSnippet ? <p>{candidate.sourceSnippet}</p> : null}
             <div className={styles.offerFoot}>
               <a href={candidate.officialUrl || candidate.sourceUrl} target="_blank" rel="noreferrer">Open discovered source <ArrowUpRight size={14} /></a>
