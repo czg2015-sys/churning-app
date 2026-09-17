@@ -3,7 +3,7 @@
   overflow: hidden;
   border: 1px solid rgba(59,178,115,.16);
   border-radius: 22px;
-  background: radial-gradient(circle at 82% 0, rgba(59,178,115,.09), transparent 30rem), linear-gradient(145deg, rgba(25,35,29,.98), rgba(13,19,15,.98));
+  background: radial-gradient(circle at 82% 0, rgba(59,178,115,.12), transparent 30rem), linear-gradient(145deg, rgba(48,65,54,.98), rgba(33,48,40,.98));
   box-shadow: 0 28px 90px rgba(0,0,0,.24);
 }
 .personal-dashboard-head {
@@ -27,7 +27,7 @@
   padding:0 10px;
   border:1px solid var(--line);
   border-radius:9px;
-  background:rgba(7,11,8,.82);
+  background:rgba(32,47,38,.92);
   color:var(--ink);
   font:inherit;
 }
@@ -78,7 +78,7 @@
 .tracking-reminder { display:grid; gap:4px; }
 .tracking-reminder small { color:var(--muted); font-size:7px; text-transform:uppercase; }
 
-.history-search-wrap { display:flex; align-items:center; gap:8px; max-width:560px; min-height:42px; padding:0 12px; border:1px solid var(--line); border-radius:11px; background:rgba(6,10,7,.72); }
+.history-search-wrap { display:flex; align-items:center; gap:8px; max-width:560px; min-height:42px; padding:0 12px; border:1px solid var(--line); border-radius:11px; background:rgba(31,46,38,.88); }
 .history-search-wrap svg { color:var(--muted); flex:0 0 auto; }
 .history-search-wrap input { width:100%; border:0; outline:0; background:transparent; color:var(--ink); font:inherit; font-size:11px; }
 .history-search-results { display:grid; max-width:700px; margin-top:8px; overflow:hidden; border:1px solid var(--line); border-radius:11px; }
