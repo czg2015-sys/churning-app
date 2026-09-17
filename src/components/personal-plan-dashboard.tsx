@@ -130,7 +130,7 @@ export function PersonalPlanDashboard({
   accountHistory: AccountHistory[];
   reminderPreference: ReminderPreference;
 }) {
-  const [globalReminder, setGlobalReminder] = useState<ReminderPreference>(reminderPreference || "important");
+  const [globalReminder, setGlobalReminder] = useState<ReminderPreference>(reminderPreference || "off");
   const [reminderSaving, setReminderSaving] = useState(false);
   const [missionReminderState, setMissionReminderState] = useState<Record<string, boolean | null>>(
     Object.fromEntries(missions.map((mission) => [mission.id, mission.email_reminders_enabled ?? null])),
@@ -217,6 +217,7 @@ export function PersonalPlanDashboard({
       opened_at: form.get("opened_at") ? String(form.get("opened_at")) : null,
       closed_at: form.get("closed_at") ? String(form.get("closed_at")) : null,
       bonus_received: bonusAnswer === "yes" ? true : bonusAnswer === "no" ? false : null,
+      bonus_amount: 0,
       outcome: "historical",
       notes: "Added from My Plan history search",
       updated_at: new Date().toISOString(),
