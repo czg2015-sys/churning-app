@@ -126,13 +126,16 @@ export function opportunityEconomics(opportunity: Opportunity, profile: Financia
     ? cashUsed * currentApy * (qualificationDays / 365)
     : 0;
 
+  const hysaComparisonDays = opportunity.category === "hysa"
+    ? Math.max(1, numberValue(opportunity.benefit_duration_days) || 365)
+    : 0;
   const offerInterest = opportunity.category === "hysa"
-    ? deployable * apy
+    ? deployable * apy * (hysaComparisonDays / 365)
     : cashUsed > 0 && qualificationDays > 0
       ? cashUsed * apy * (qualificationDays / 365)
       : 0;
   const baselineAnnualInterest = opportunity.category === "hysa"
-    ? deployable * currentApy
+    ? deployable * currentApy * (hysaComparisonDays / 365)
     : 0;
 
   const grossAdvantage = opportunity.category === "hysa"
@@ -161,7 +164,7 @@ export function opportunityEconomics(opportunity: Opportunity, profile: Financia
 
 export function opportunityFit(opportunity: Opportunity, profile: FinancialProfile, usedBanks: string[]) {
   const economics = opportunityEconomics(opportunity, profile);
-  const availablePayPerCycle = Math.max(0, numberValue(profile.biweekly_pay) - numberValue(profile.biweekly_essential_spend));
+  const availablePayPerCycle = Math.max(0, numberValue(profile.biweekly_pay));
   const requiredDD = numberValue(opportunity.direct_deposit_required);
   const ddWindowDays = Math.max(14, numberValue(opportunity.direct_deposit_window_days || opportunity.qualification_days || 14));
   const expectedAvailableDD = availablePayPerCycle * Math.max(1, ddWindowDays / 14);
@@ -325,7 +328,7 @@ export function selectFeasibleRecommendations(
   if (ranked.length <= 1) return ranked.slice(0, limit);
 
   const deployableCash = Math.max(0, numberValue(profile.total_cash) - numberValue(profile.emergency_reserve));
-  const monthlyDdCapacity = Math.max(0, numberValue(profile.biweekly_pay) - numberValue(profile.biweekly_essential_spend)) * (26 / 12);
+  const monthlyDdCapacity = Math.max(0, numberValue(profile.biweekly_pay)) * (26 / 12);
   const monthlySpendCapacity = Math.max(0, numberValue(profile.monthly_card_spend));
   const allowMultipleDd = profile.employer_multiple_dd === true;
 
