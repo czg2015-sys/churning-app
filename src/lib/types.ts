@@ -73,6 +73,7 @@ export type Opportunity = {
   benefit_duration_days?: number | null;
   benefit_label?: string | null;
   benefit_start_trigger?: string | null;
+  qualification_start_trigger?: string | null;
   standard_apy_after_benefit?: number | string | null;
   opportunity_reviews?: OpportunityReview[];
 };
@@ -106,6 +107,7 @@ export type Mission = {
   safe_close_review_date?: string | null;
   funded_at?: string | null;
   first_dd_at?: string | null;
+  qualification_start_date?: string | null;
   benefit_start_date?: string | null;
   benefit_end_date?: string | null;
   email_reminders_enabled?: boolean | null;
