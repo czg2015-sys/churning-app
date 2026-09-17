@@ -39,7 +39,7 @@ function daysBetween(start?: string | null, end?: string | null) {
 function timeProgress(mission: Mission) {
   if (mission.status === "completed" || mission.status === "closed") return { percent: 100, total: 0, elapsed: 0, remaining: 0 };
   if (!mission.opened_at) return { percent: 0, total: 0, elapsed: 0, remaining: null as number | null };
-  const end = mission.qualification_deadline || mission.payout_due_date || mission.safe_close_review_date;
+  const end = mission.benefit_end_date || mission.qualification_deadline || mission.payout_due_date || mission.safe_close_review_date;
   const total = daysBetween(mission.opened_at, end);
   const elapsedRaw = daysBetween(mission.opened_at, todayIso());
   if (!total || elapsedRaw === null) return { percent: 0, total: total || 0, elapsed: Math.max(0, elapsedRaw || 0), remaining: total || null };
@@ -103,7 +103,7 @@ function earnedValue(mission: Mission) {
 function inferredTrackingDays(mission: Mission) {
   const opportunity = mission.opportunity;
   if (!opportunity || opportunity.category !== "hysa") return null;
-  const storedDays = numberValue(opportunity.qualification_days || opportunity.direct_deposit_window_days);
+  const storedDays = numberValue(opportunity.benefit_duration_days || opportunity.qualification_days || opportunity.direct_deposit_window_days);
   if (storedDays > 0) return storedDays;
   const committed = numberValue(mission.amount_committed);
   const apy = numberValue(opportunity.apy) / 100;
@@ -266,6 +266,8 @@ function MissionCard({
       payout_due_date: nextTimeline.payoutDueDate,
       minimum_account_age_date: nextTimeline.minimumAccountAgeDate,
       safe_close_review_date: nextTimeline.safeCloseReviewDate,
+      benefit_start_date: nextTimeline.benefitStartDate,
+      benefit_end_date: nextTimeline.benefitEndDate,
       status: "active",
       next_action: numberValue(opportunity.direct_deposit_required) > 0
         ? `Complete ${money.format(numberValue(opportunity.direct_deposit_required))} in qualifying direct deposits.`
@@ -287,6 +289,8 @@ function MissionCard({
       payout_due_date: nextTimeline.payoutDueDate,
       minimum_account_age_date: nextTimeline.minimumAccountAgeDate,
       safe_close_review_date: nextTimeline.safeCloseReviewDate,
+      benefit_start_date: nextTimeline.benefitStartDate,
+      benefit_end_date: nextTimeline.benefitEndDate,
       status: "active",
       next_action: nextMission.next_action,
       updated_at: new Date().toISOString(),
@@ -322,7 +326,7 @@ function MissionCard({
       )}
 
       <div className="reward-quick-grid">
-        <div><Clock3 size={16} /><span><small>{opportunity?.category === "hysa" ? "Tracking period ends" : "Qualify by"}</small><b>{readableDate(mission.qualification_deadline)}</b></span></div>
+        <div><Clock3 size={16} /><span><small>{mission.benefit_end_date ? "Benefit ends" : opportunity?.category === "hysa" ? "Tracking period ends" : "Qualify by"}</small><b>{readableDate(mission.benefit_end_date || mission.qualification_deadline)}</b></span></div>
         <div><CircleDollarSign size={16} /><span><small>{opportunity?.category === "hysa" ? "Interest review" : "Expected payout"}</small><b>{readableDate(mission.payout_due_date)}</b></span></div>
         <div><TimerReset size={16} /><span><small>{opportunity?.category === "hysa" ? "Strategy review" : "Safe-close review"}</small><b>{readableDate(mission.safe_close_review_date)}</b></span></div>
         <div className={closeState.ready ? "ready" : ""}><BadgeCheck size={16} /><span><small>{opportunity?.category === "hysa" ? "Review status" : "Exit status"}</small><b>{closeState.text}</b></span></div>
