@@ -12,6 +12,7 @@ import {
   RefreshCw,
   ShieldAlert,
 } from "lucide-react";
+import { DiscoveryPanel } from "@/components/research/discovery-panel";
 import { ResearchActionButtons, RunResearchScanButton } from "@/components/research/research-controls";
 import { getResearchDashboardData } from "@/lib/research/dashboard";
 import { getResearchAdminSession, hasResearchServerConfig } from "@/lib/research/server";
@@ -78,7 +79,7 @@ export default async function ResearchCenterPage() {
           <div>
             <span className="kicker">PRIVATE OWNER WORKSPACE</span>
             <h1>Research Center</h1>
-            <p>Monitor official offer pages, catch changes, and keep questionable data out of recommendations.</p>
+            <p>Monitor official offer pages, discover new opportunities, catch changes, and keep questionable data out of recommendations.</p>
           </div>
           <RunResearchScanButton />
         </div>
@@ -86,8 +87,8 @@ export default async function ResearchCenterPage() {
         <section className={styles.guardrail}>
           <ShieldAlert size={18} />
           <div>
-            <strong>The agent can flag risk, but it cannot silently Safety Clear a changed offer.</strong>
-            <span>Official-page changes automatically move the offer to review/hold. A human approval only accepts the page baseline; credit, ChexSystems, EWS, tax, insurance and closing-rule reviews remain separate.</span>
+            <strong>The agent can flag risk, but it cannot silently Safety Clear a changed or newly discovered offer.</strong>
+            <span>New discoveries stay private. Official-page changes automatically move existing offers to review/hold. A human approval only accepts the page baseline; credit, ChexSystems, EWS, tax, insurance and closing-rule reviews remain separate.</span>
           </div>
         </section>
 
@@ -112,6 +113,8 @@ export default async function ResearchCenterPage() {
             </>
           ) : <span>No scan has run yet. Run the first baseline scan above.</span>}
         </section>
+
+        <DiscoveryPanel />
 
         <div className={styles.sectionHeading}>
           <div><span className="kicker">OFFICIAL SOURCE MONITOR</span><h2>Every live opportunity</h2></div>
