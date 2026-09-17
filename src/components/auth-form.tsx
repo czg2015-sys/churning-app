@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -26,7 +25,6 @@ function friendlySignInError(message: string) {
 }
 
 export function AuthForm() {
-  const router = useRouter();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,6 +32,20 @@ export function AuthForm() {
   const [resending, setResending] = useState(false);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const supabase = createClient();
+        const { data } = await withTimeout(supabase.auth.getClaims(), 5_000);
+        if (active && data?.claims?.sub) window.location.replace("/my-plan");
+      } catch {
+        // Stay on the auth page when no valid session can be confirmed.
+      }
+    })();
+    return () => { active = false; };
+  }, []);
 
   async function resendConfirmation() {
     if (!email) {
@@ -61,6 +73,7 @@ export function AuthForm() {
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (loading) return;
     setLoading(true);
     setMessage(null);
     setAwaitingConfirmation(false);
@@ -68,13 +81,18 @@ export function AuthForm() {
     try {
       const supabase = createClient();
       if (mode === "signin") {
-        const { error } = await withTimeout(supabase.auth.signInWithPassword({ email, password }));
+        const { data, error } = await withTimeout(supabase.auth.signInWithPassword({ email, password }));
         if (error) {
           setMessage({ type: "error", text: friendlySignInError(error.message) });
           return;
         }
-        router.push("/my-plan");
-        router.refresh();
+        if (!data.session) {
+          setMessage({ type: "error", text: "Sign-in completed without a usable session. Please try again." });
+          return;
+        }
+
+        // A full navigation makes sure the new auth cookies are read by the server header immediately.
+        window.location.assign("/my-plan");
         return;
       }
 
@@ -83,8 +101,7 @@ export function AuthForm() {
       if (error) {
         setMessage({ type: "error", text: error.message });
       } else if (data.session) {
-        router.push("/my-plan");
-        router.refresh();
+        window.location.assign("/my-plan");
       } else {
         setAwaitingConfirmation(true);
         setMessage({ type: "success", text: "Check your email for a confirmation link. If it doesn’t arrive, check spam or use Resend confirmation below. If you’ve used this email before, switch to Sign in instead." });
@@ -92,7 +109,7 @@ export function AuthForm() {
     } catch (error) {
       console.error("[auth] Sign-in unavailable", error);
       const timedOut = error instanceof Error && error.message === "AUTH_TIMEOUT";
-      setMessage({ type: "error", text: timedOut ? "The sign-in request timed out. The preview still cannot reach Supabase correctly." : "Sign-in is temporarily unavailable on this deployment. Please try again after the preview account settings are enabled." });
+      setMessage({ type: "error", text: timedOut ? "The sign-in request timed out. Churning could not reach the account service. Please try again." : "Sign-in is temporarily unavailable. Please try again." });
     } finally {
       setLoading(false);
     }
@@ -105,8 +122,16 @@ export function AuthForm() {
       <form className="form-stack" onSubmit={submit}>
         <div className="field"><label htmlFor="email">Email</label><input id="email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></div>
         <div className="field"><label htmlFor="password">Password</label><input id="password" type="password" minLength={8} autoComplete={mode === "signin" ? "current-password" : "new-password"} value={password} onChange={(event) => setPassword(event.target.value)} required />{mode === "signup" && <small>Use at least 8 characters.</small>}</div>
+
+        {mode === "signin" ? (
+          <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid var(--line)", borderRadius: 10, background: "rgba(255,255,255,.025)", cursor: "default" }}>
+            <input type="checkbox" checked readOnly aria-label="Keep me signed in" />
+            <span style={{ display: "grid", gap: 1 }}><strong style={{ fontSize: 14 }}>Keep me signed in</strong><small style={{ color: "var(--muted)" }}>Stays signed in on this device until you choose Sign out.</small></span>
+          </label>
+        ) : null}
+
         {message && <div className={message.type === "error" ? "form-error" : "form-success"}>{message.text}</div>}
-        <button className="button primary full" type="submit" disabled={loading}>{loading ? "One moment…" : mode === "signin" ? "Sign in" : "Create account"}</button>
+        <button className="button primary full" type="submit" disabled={loading}>{loading ? "Signing in…" : mode === "signin" ? "Sign in" : "Create account"}</button>
         {mode === "signup" && awaitingConfirmation && <button className="button full" type="button" onClick={resendConfirmation} disabled={resending}>{resending ? "Resending…" : "Resend confirmation email"}</button>}
       </form>
       <div className="auth-toggle">{mode === "signin" ? "New to Churning? " : "Already have an account? "}<button type="button" onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setMessage(null); setAwaitingConfirmation(false); }}>{mode === "signin" ? "Create an account" : "Sign in"}</button></div>
