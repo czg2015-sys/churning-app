@@ -192,15 +192,15 @@ export function RecommendedOpportunities({
     <section className={`recommendations-shell ${prominent ? "recommendations-prominent" : ""} ${resultsPage ? "recommendations-results-layout" : ""}`}>
       <div className="recommendations-head compact-recommendations-head">
         <div>
-          <span className="kicker">RECOMMENDED FOR YOU</span>
-          <h2>{resultsPage ? "Your strongest matches right now." : "Three strong options that can work together."}</h2>
-          <p>Built around your available cash, paycheck capacity, normal spending, and current research checks.</p>
+          <span className="kicker">YOUR 3 BEST-FIT OPTIONS</span>
+          <h2>{resultsPage ? "Start here: the three opportunities that fit your profile best." : "Here are the three options we think fit your situation best."}</h2>
+          <p>We check the three together against your cash, direct-deposit capacity, spending, and current offer requirements so the group is realistic—not just attractive one by one.</p>
         </div>
       </div>
 
       {planPicks.length ? (
         <>
-          <div className="top-match-label"><span>TOP {planPicks.length}</span><p>The group is checked together so overlapping cash and direct-deposit requirements stay realistic.</p></div>
+          <div className="top-match-label"><span>MOST RECOMMENDED FOR YOU</span><p>Start with these first. You can still open any category below to compare more options.</p></div>
           <div className="top-match-grid">
             {planPicks.map((result, index) => (
               <div className="recommendation-slot" key={`plan-${result.item.id}`}>
@@ -218,7 +218,7 @@ export function RecommendedOpportunities({
         </>
       ) : null}
 
-      <div className="top-match-label category-explore-label"><span>EXPLORE BY CATEGORY</span><p>Open a category to compare every current match.</p></div>
+      <div className="top-match-label category-explore-label"><span>MORE OPTIONS BY CATEGORY</span><p>Open a category when you want to compare beyond your three best-fit options.</p></div>
 
       <CategorySection
         title="High-yield savings"
