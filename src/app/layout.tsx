@@ -6,6 +6,7 @@ import "./globals.css";
 import "./reward-tracker.css";
 import "./recommendations.css";
 import "./workspace.css";
+import "./my-plan-dashboard.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
