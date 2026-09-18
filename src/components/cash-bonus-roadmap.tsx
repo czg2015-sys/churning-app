@@ -1,36 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   ArrowRight,
   BadgeDollarSign,
   CalendarClock,
   CircleDollarSign,
   Landmark,
-  RefreshCw,
   Route,
   ShieldAlert,
-  Sparkles,
   WalletCards,
 } from "lucide-react";
-import { AddToPlanButton } from "@/components/add-to-plan-button";
-import { createClient } from "@/lib/supabase/client";
-import { accountLifecycleGuidance, categoryLabel, money, numberValue, rankMatches } from "@/lib/plan-math";
-import { buildCashBonusRoadmap, planningDates, type RoadmapOverrides } from "@/lib/roadmap";
-import type { FinancialProfile, Mission, Opportunity } from "@/lib/types";
-
-function normalizeOverrides(raw: FinancialProfile["roadmap_selected_opportunity_ids"]): RoadmapOverrides {
-  if (!raw) return {};
-  if (Array.isArray(raw)) return { bonusIds: raw.filter((value): value is string => typeof value === "string") };
-  if (typeof raw === "object") {
-    return {
-      bonusIds: Array.isArray(raw.bonusIds) ? raw.bonusIds.filter((value): value is string => typeof value === "string") : [],
-      hysaId: typeof raw.hysaId === "string" ? raw.hysaId : null,
-      keepCurrentSavings: Boolean(raw.keepCurrentSavings),
-    };
-  }
-  return {};
-}
+import { money, numberValue } from "@/lib/plan-math";
+import { buildLiveCashBonusRoadmap } from "@/lib/roadmap";
+import type { FinancialProfile, Mission } from "@/lib/types";
 
 function formatMonth(value: string) {
   const date = new Date(`${value.slice(0, 10)}T12:00:00`);
@@ -42,327 +25,182 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
 }
 
-function compactOpportunity(item: Opportunity) {
-  const bonus = numberValue(item.bonus_amount);
-  if (bonus > 0) return `${money.format(bonus)} bonus`;
-  if (numberValue(item.apy) > 0) return `${numberValue(item.apy).toFixed(2)}% APY`;
-  return categoryLabel(item);
-}
-
-function roadmapAlternativeLabel(item: Opportunity) {
-  return `${categoryLabel(item)} · ${item.institution} · ${item.product_name}`;
-}
-
 function strategyCopy(name: "Simple" | "Balanced" | "Active") {
-  if (name === "Simple") return "Fewer moving parts: keep more cash liquid and work one bonus lane at a time.";
-  if (name === "Active") return "More moving parts: use more available cash and DD capacity when the requirements can realistically work together.";
-  return "Middle ground: capture strong bonuses while keeping a meaningful liquid-cash lane.";
+  if (name === "Simple") return "Fewer moving parts, more cash kept liquid, and one reward lane at a time.";
+  if (name === "Active") return "Use more of your available cash and DD capacity, but only where the selected requirements can realistically coexist.";
+  return "Capture strong bonuses while keeping a meaningful liquid-cash lane and manageable requirements.";
 }
 
-type TimelineItem = {
-  key: string;
-  date: string;
-  title: string;
-  detail: string;
-  kind: "planned" | "active";
-};
+function remainingCashLabel(profile: FinancialProfile) {
+  const apy = numberValue(profile.current_hysa_apy);
+  if (apy > 0) return `Keep unassigned cash liquid in your current savings / HYSA at the stored ${apy.toFixed(2)}% APY until you choose another move.`;
+  return "Keep unassigned cash liquid while you compare the savings and bonus options below.";
+}
 
 export function CashBonusRoadmap({
   profile,
-  opportunities,
   missions,
-  usedBanks,
-  stateCode,
-  addedOpportunityIds,
 }: {
   profile: FinancialProfile;
-  opportunities: Opportunity[];
   missions: Mission[];
-  usedBanks: string[];
-  stateCode?: string | null;
-  addedOpportunityIds: string[];
 }) {
-  const [overrides, setOverrides] = useState<RoadmapOverrides>(() => normalizeOverrides(profile.roadmap_selected_opportunity_ids));
-  const [savingChoice, setSavingChoice] = useState(false);
-  const [choiceMessage, setChoiceMessage] = useState("");
-
-  const roadmap = useMemo(
-    () => buildCashBonusRoadmap({ opportunities, profile, missions, usedBanks, stateCode, overrides }),
-    [opportunities, profile, missions, usedBanks, stateCode, overrides],
-  );
-
-  const ranked = useMemo(
-    () => rankMatches(opportunities, profile, usedBanks, stateCode),
-    [opportunities, profile, usedBanks, stateCode],
-  );
-
-  const activeIds = useMemo(
-    () => new Set(missions.filter((mission) => !["complete", "cancelled"].includes(mission.status)).map((mission) => mission.opportunity_id).filter(Boolean)),
-    [missions],
-  );
-
-  const bonusAlternatives = ranked.filter((result) => {
-    const item = result.item;
-    if (activeIds.has(item.id)) return false;
-    if (item.category === "hysa") return false;
-    if (["credit_card_bonus", "brokerage_bonus", "cd", "treasury"].includes(item.category)) return false;
-    if (item.category === "debit_spend" && !profile.card_helper_opt_in) return false;
-    return result.cashFit >= 95 && result.ddFit >= 90 && result.spendFit >= 75;
-  });
-
-  const hysaAlternatives = ranked.filter((result) => (
-    result.item.category === "hysa" &&
-    !activeIds.has(result.item.id) &&
-    Math.max(numberValue(result.item.required_balance), numberValue(result.item.min_opening_deposit)) <= roadmap.savingsSlot.amount + 0.01
-  ));
-
-  async function persist(next: RoadmapOverrides) {
-    setOverrides(next);
-    setSavingChoice(true);
-    setChoiceMessage("");
-    const supabase = createClient();
-    const { data: claimsData } = await supabase.auth.getClaims();
-    const userId = claimsData?.claims?.sub;
-    if (!userId) {
-      setSavingChoice(false);
-      return;
-    }
-    const { error } = await supabase
-      .from("financial_profiles")
-      .update({
-        roadmap_selected_opportunity_ids: next,
-        roadmap_updated_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("user_id", userId);
-    setChoiceMessage(error ? "Could not save that roadmap change yet." : "Roadmap updated.");
-    setSavingChoice(false);
-  }
-
-  function swapBonus(index: number, id: string) {
-    const currentIds = roadmap.bonusSlots.map((slot) => slot.opportunity.id);
-    currentIds[index] = id;
-    void persist({ ...overrides, bonusIds: currentIds });
-  }
-
-  function swapSavings(value: string) {
-    if (value === "current") {
-      void persist({ ...overrides, hysaId: null, keepCurrentSavings: true });
-      return;
-    }
-    void persist({ ...overrides, hysaId: value, keepCurrentSavings: false });
-  }
-
-  function resetRoadmap() {
-    void persist({});
-  }
-
-  const timeline = useMemo(() => {
-    const items: TimelineItem[] = [];
-
-    for (const mission of missions.filter((mission) => !["complete", "cancelled"].includes(mission.status))) {
-      if (mission.qualification_deadline) items.push({ key: `${mission.id}-q`, date: mission.qualification_deadline, title: `${mission.institution} qualification review`, detail: mission.next_action || "Check actual account activity against the stored requirements.", kind: "active" });
-      if (mission.payout_due_date) items.push({ key: `${mission.id}-p`, date: mission.payout_due_date, title: `${mission.institution} payout check`, detail: "Check whether the expected reward posted before marking it received.", kind: "active" });
-      if (mission.benefit_end_date) items.push({ key: `${mission.id}-b`, date: mission.benefit_end_date, title: `${mission.institution} benefit review`, detail: "Review the next move before the stored promotional benefit ends.", kind: "active" });
-    }
-
-    roadmap.bonusSlots.forEach((slot) => {
-      const dates = planningDates(slot.opportunity, roadmap.planningStartDate);
-      items.push({
-        key: `${slot.opportunity.id}-start`,
-        date: dates.start,
-        title: `Review ${slot.opportunity.institution}`,
-        detail: slot.monthlyDdAmount > 0
-          ? `Planned DD lane: about ${money.format(slot.monthlyDdAmount)}/month if you choose this offer.`
-          : slot.cashAmount > 0
-            ? `Planned cash lane: about ${money.format(slot.cashAmount)} if you choose this offer.`
-            : "Review the stored requirements before adding it.",
-        kind: "planned",
-      });
-      if (dates.qualification) items.push({ key: `${slot.opportunity.id}-qual`, date: dates.qualification, title: `${slot.opportunity.institution} qualification target`, detail: "Projected until you confirm the real opening or trigger date.", kind: "planned" });
-      if (dates.payout) items.push({ key: `${slot.opportunity.id}-pay`, date: dates.payout, title: `${slot.opportunity.institution} payout review`, detail: "Actual bank timing controls; confirm the real date after opening.", kind: "planned" });
-    });
-
-    if (roadmap.savingsSlot.opportunity?.benefit_duration_days) {
-      const dates = planningDates(roadmap.savingsSlot.opportunity, roadmap.planningStartDate);
-      if (dates.benefitEnd) items.push({ key: `${roadmap.savingsSlot.opportunity.id}-benefit`, date: dates.benefitEnd, title: `${roadmap.savingsSlot.opportunity.institution} promo-rate review`, detail: "Compare the next savings destination before the promotional period ends.", kind: "planned" });
-    }
-
-    return items
-      .filter((item) => new Date(item.date).getTime() >= Date.now() - 86_400_000)
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(0, 10);
-  }, [missions, roadmap]);
+  const roadmap = useMemo(() => buildLiveCashBonusRoadmap({ profile, missions }), [profile, missions]);
 
   const timelineGroups = useMemo(() => {
-    const groups = new Map<string, TimelineItem[]>();
-    for (const item of timeline) {
+    const groups = new Map<string, typeof roadmap.timeline>();
+    for (const item of roadmap.timeline) {
       const key = item.date.slice(0, 7);
       groups.set(key, [...(groups.get(key) || []), item]);
     }
     return Array.from(groups.entries()).map(([key, items]) => ({ key, label: formatMonth(items[0].date), items }));
-  }, [timeline]);
+  }, [roadmap.timeline]);
 
-  const plannedDdSlots = roadmap.bonusSlots.filter((slot) => slot.monthlyDdAmount > 0);
-  const unassignedDd = Math.max(0, roadmap.monthlyDdStream - roadmap.activeMonthlyDd - roadmap.ddUsed);
-  const accountedCash = roadmap.reserve + roadmap.activeCash + roadmap.bonusCashUsed + roadmap.savingsSlot.amount;
+  const hasSelectedOffers = roadmap.missions.length > 0;
 
   return (
-    <section className="cash-roadmap-shell">
+    <section className="cash-roadmap-shell" id="live-roadmap">
       <div className="cash-roadmap-head">
         <div>
-          <span className="kicker">YOUR CASH & BONUS ROADMAP</span>
-          <h2>See where the money goes, where the bonuses come from, and when each move matters.</h2>
-          <p>{strategyCopy(roadmap.strategyName)} This is the recommended route from your answers; every offer can be swapped and the map recalculates around your choice.</p>
+          <span className="kicker">YOUR LIVE CASH & BONUS ROADMAP</span>
+          <h2>Your selected offers become the map—not another recommendation list.</h2>
+          <p>{strategyCopy(roadmap.strategyName)} Add or change offers from the recommendation and category sections; this roadmap then recalculates from your real tracker progress.</p>
         </div>
-        <div className="roadmap-head-actions">
-          <span className="roadmap-strategy-pill"><Route size={14} /> {roadmap.strategyName} roadmap</span>
-          <button type="button" className="button ghost compact" onClick={resetRoadmap} disabled={savingChoice}><RefreshCw size={14} /> Reset recommendation</button>
-        </div>
+        <span className="roadmap-strategy-pill"><Route size={14} /> {roadmap.strategyName} roadmap</span>
       </div>
 
       <div className="roadmap-capacity-strip">
-        <div><small>AVAILABLE TO OPTIMIZE</small><strong>{money.format(roadmap.availableCash)}</strong><span>after reserve + active commitments</span></div>
-        <div><small>MONTHLY DD AVAILABLE</small><strong>{money.format(roadmap.availableMonthlyDd)}</strong><span>of {money.format(roadmap.monthlyDdStream)} entered</span></div>
-        <div><small>PLANNED BONUS VALUE</small><strong>{money.format(roadmap.projectedBonusValue)}</strong><span>before taxes where applicable</span></div>
-        <div><small>EST. INCREMENTAL VALUE</small><strong>{roadmap.projectedIncrementalValue >= 0 ? "+" : ""}{money.format(roadmap.projectedIncrementalValue)}</strong><span>vs your stored cash baseline</span></div>
+        <div><small>TOTAL LIQUID CASH</small><strong>{money.format(roadmap.totalCash)}</strong><span>from your profile</span></div>
+        <div><small>PROTECTED RESERVE</small><strong>{money.format(roadmap.reserve)}</strong><span>kept outside the plan</span></div>
+        <div><small>IN SELECTED ACCOUNTS</small><strong>{money.format(roadmap.selectedCash)}</strong><span>{roadmap.missions.length} tracked item{roadmap.missions.length === 1 ? "" : "s"}</span></div>
+        <div><small>POTENTIAL REWARDS</small><strong>{money.format(roadmap.potentialRewardValue)}</strong><span>{roadmap.potentialRewardCount} reward{roadmap.potentialRewardCount === 1 ? "" : "s"} still lined up</span></div>
       </div>
 
-      <div className="roadmap-map" aria-label="Cash and bonus allocation map">
-        <div className="roadmap-origin">
-          <span className="roadmap-origin-icon"><WalletCards size={20} /></span>
-          <div><small>YOUR MONEY</small><strong>{money.format(roadmap.totalCash)}</strong><p>{money.format(roadmap.availableCash)} available for the next moves · {money.format(roadmap.monthlyDdStream)}/mo DD stream</p></div>
+      {!hasSelectedOffers ? (
+        <div className="roadmap-empty-live">
+          <Route size={24} />
+          <div>
+            <strong>Your live roadmap is waiting for your selections.</strong>
+            <span>Choose from the three best-fit options above. Once an offer is added, Churning will place it here, track its cash/DD requirements, and build the next steps from the dates and progress you confirm.</span>
+          </div>
         </div>
-        <div className="roadmap-map-stem" />
-
-        <div className="roadmap-map-branches">
-          <article className="roadmap-lane protect">
-            <div className="roadmap-lane-heading"><span>01</span><div><small>PROTECT</small><strong>Keep your reserve untouched</strong></div></div>
-            <div className="roadmap-bubble reserve">
-              <span className="roadmap-bubble-icon"><ShieldAlert size={18} /></span>
-              <small>PROTECTED RESERVE</small>
-              <strong>{money.format(roadmap.reserve)}</strong>
-              <p>Excluded from bonus requirements and the opportunity budget.</p>
+      ) : (
+        <>
+          <div className="roadmap-map" aria-label="Live cash and bonus roadmap">
+            <div className="roadmap-origin">
+              <span className="roadmap-origin-icon"><WalletCards size={20} /></span>
+              <div><small>YOUR MONEY + PAYCHECK STREAM</small><strong>{money.format(roadmap.totalCash)}</strong><p>{money.format(roadmap.deployableCash)} outside reserve · {money.format(roadmap.monthlyDdStream)}/mo DD capacity from your profile</p></div>
             </div>
-          </article>
+            <div className="roadmap-map-stem" />
 
-          <section className="roadmap-lane earn">
-            <div className="roadmap-lane-heading"><span>02</span><div><small>EARN</small><strong>Use the strongest realistic bonus lanes</strong></div></div>
-
-            {roadmap.activeCash > 0 ? (
-              <div className="roadmap-existing">
-                <span>Already tracking</span><strong>{money.format(roadmap.activeCash)}</strong><small>kept in the map before new recommendations</small>
-              </div>
-            ) : null}
-
-            <div className="roadmap-bonus-stack">
-              {roadmap.bonusSlots.length ? roadmap.bonusSlots.map((slot, index) => {
-                const selectedIds = new Set(roadmap.bonusSlots.map((item) => item.opportunity.id));
-                const choices = bonusAlternatives.filter((result) => result.item.id === slot.opportunity.id || !selectedIds.has(result.item.id));
-                const userSelected = (overrides.bonusIds || [])[index] === slot.opportunity.id;
-                const lifecycle = accountLifecycleGuidance(slot.opportunity);
-                return (
-                  <article className="roadmap-bubble bonus" key={slot.opportunity.id}>
-                    <div className="roadmap-bubble-top">
-                      <span className="roadmap-bubble-icon"><BadgeDollarSign size={18} /></span>
-                      <span className="roadmap-choice-tag">{userSelected ? "Your choice" : `Plan #${index + 1}`}</span>
-                    </div>
-                    <div className="roadmap-bubble-tags">
-                      <span className={slot.researchReady ? "roadmap-review-state cleared" : "roadmap-review-state pending"}>{slot.researchReady ? "Research cleared" : "Research pending · review candidate"}</span>
-                      <span className={`roadmap-close-tag ${lifecycle.tone}`}>{lifecycle.label}</span>
-                    </div>
-                    <small>{categoryLabel(slot.opportunity).toUpperCase()}</small>
-                    <strong>{slot.opportunity.institution}</strong>
-                    <b>{slot.opportunity.product_name}</b>
-                    <div className="roadmap-bubble-metrics">
-                      {slot.cashAmount > 0 ? <span><small>Cash</small><b>{money.format(slot.cashAmount)}</b></span> : null}
-                      {slot.monthlyDdAmount > 0 ? <span><small>DD / month</small><b>{money.format(slot.monthlyDdAmount)}</b></span> : null}
-                      <span><small>Potential</small><b>{compactOpportunity(slot.opportunity)}</b></span>
-                    </div>
-                    <label className="roadmap-swap">
-                      <span>Swap this recommendation</span>
-                      <select value={slot.opportunity.id} onChange={(event) => swapBonus(index, event.target.value)} disabled={savingChoice}>
-                        {choices.map((result) => <option key={result.item.id} value={result.item.id}>{roadmapAlternativeLabel(result.item)}</option>)}
-                      </select>
-                    </label>
-                    <p className="roadmap-close-copy"><strong>After reward:</strong> {lifecycle.text}</p>
-                    <AddToPlanButton opportunity={slot.opportunity} alreadyAdded={addedOpportunityIds.includes(slot.opportunity.id)} allowPlanningOnHold />
-                  </article>
-                );
-              }) : (
-                <div className="roadmap-no-bonus"><BadgeDollarSign size={19} /><div><strong>No research-cleared bonus fits the current limits yet.</strong><span>Use More Options below to review candidates, or update your cash/DD inputs.</span></div></div>
-              )}
-            </div>
-          </section>
-
-          <article className="roadmap-lane liquid">
-            <div className="roadmap-lane-heading"><span>03</span><div><small>STAY LIQUID</small><strong>Put the remaining cash somewhere useful</strong></div></div>
-            <div className="roadmap-bubble savings">
-              <span className="roadmap-bubble-icon"><Landmark size={18} /></span>
-              {roadmap.savingsSlot.opportunity ? <span className={`roadmap-close-tag ${accountLifecycleGuidance(roadmap.savingsSlot.opportunity).tone}`}>{accountLifecycleGuidance(roadmap.savingsSlot.opportunity).label}</span> : null}
-              <small>LIQUID SAVINGS LANE</small>
-              <strong>{money.format(roadmap.savingsSlot.amount)}</strong>
-              <b>{roadmap.savingsSlot.label}</b>
-              <div className="roadmap-bubble-metrics">
-                <span><small>Stored APY</small><b>{roadmap.savingsSlot.apy.toFixed(2)}%</b></span>
-                <span><small>Role</small><b>Flexible cash</b></span>
-              </div>
-              <label className="roadmap-swap">
-                <span>Change savings destination</span>
-                <select value={roadmap.savingsSlot.isCurrentSavings ? "current" : roadmap.savingsSlot.opportunity?.id || "current"} onChange={(event) => swapSavings(event.target.value)} disabled={savingChoice}>
-                  <option value="current">Current savings / keep liquid</option>
-                  {hysaAlternatives.map((result) => <option key={result.item.id} value={result.item.id}>{result.item.institution} · {result.item.product_name} · {numberValue(result.item.apy).toFixed(2)}%</option>)}
-                </select>
-              </label>
-              {roadmap.savingsSlot.opportunity ? <p className="roadmap-close-copy"><strong>After the rate / benefit:</strong> {accountLifecycleGuidance(roadmap.savingsSlot.opportunity).text}</p> : null}
-              {roadmap.savingsSlot.opportunity ? <AddToPlanButton opportunity={roadmap.savingsSlot.opportunity} alreadyAdded={addedOpportunityIds.includes(roadmap.savingsSlot.opportunity.id)} allowPlanningOnHold /> : null}
-            </div>
-          </article>
-        </div>
-      </div>
-
-      <div className="roadmap-dd-route">
-        <div className="roadmap-dd-head">
-          <div><span className="kicker">PAYCHECK ROUTING</span><h3>See where your monthly direct deposit can go.</h3></div>
-          <p>This lane uses the paycheck amount you entered. We never stack DD offers beyond the amount your roadmap can support.</p>
-        </div>
-        <div className="roadmap-dd-track">
-          <div className="roadmap-dd-node source"><small>MONTHLY DD STREAM</small><strong>{money.format(roadmap.monthlyDdStream)}</strong></div>
-          {roadmap.activeMonthlyDd > 0 ? <><ArrowRight size={17} /><div className="roadmap-dd-node active"><small>ALREADY ROUTED</small><strong>{money.format(roadmap.activeMonthlyDd)}</strong></div></> : null}
-          {plannedDdSlots.map((slot) => <div className="roadmap-dd-piece" key={`dd-${slot.opportunity.id}`}><ArrowRight size={17} /><div className="roadmap-dd-node"><small>{slot.opportunity.institution.toUpperCase()}</small><strong>{money.format(slot.monthlyDdAmount)}/mo</strong><span>{slot.opportunity.product_name}</span></div></div>)}
-          <div className="roadmap-dd-piece"><ArrowRight size={17} /><div className="roadmap-dd-node remainder"><small>UNASSIGNED / FLEXIBLE</small><strong>{money.format(unassignedDd)}/mo</strong><span>available for bills, checking, or a future lane</span></div></div>
-        </div>
-      </div>
-
-      <div className="roadmap-allocation-check">
-        <CircleDollarSign size={17} />
-        <span><strong>{money.format(accountedCash)} of {money.format(roadmap.totalCash)} accounted for.</strong><small>Reserve + active commitments + planned bonus cash + liquid savings.</small></span>
-        <b>{roadmap.bonusSlots.length ? `${roadmap.bonusSlots.length} recommended bonus lane${roadmap.bonusSlots.length === 1 ? "" : "s"}` : "No bonus lane activated yet"}</b>
-      </div>
-
-      <div className="roadmap-timeline">
-        <div className="roadmap-timeline-head">
-          <div><span className="kicker">ROADMAP TIMELINE</span><h3>What the next months could look like.</h3></div>
-          <p>Purple = projected from the roadmap. Green = a real tracker date from an offer you actually added.</p>
-        </div>
-        {timelineGroups.length ? (
-          <div className="roadmap-month-track">
-            {timelineGroups.map((group) => (
-              <article className="roadmap-month" key={group.key}>
-                <div className="roadmap-month-label">{group.label}</div>
-                <span className="roadmap-month-dot" />
-                <div className="roadmap-month-events">
-                  {group.items.map((item) => <div className={`roadmap-month-event ${item.kind}`} key={item.key}><small>{formatDate(item.date)} · {item.kind === "active" ? "TRACKING" : "PROJECTED"}</small><strong>{item.title}</strong><span>{item.detail}</span></div>)}
+            <div className="roadmap-map-branches live-branches">
+              <article className="roadmap-lane protect">
+                <div className="roadmap-lane-heading"><span>01</span><div><small>PROTECT</small><strong>Reserve stays outside bonus requirements</strong></div></div>
+                <div className="roadmap-bubble reserve">
+                  <span className="roadmap-bubble-icon"><ShieldAlert size={18} /></span>
+                  <small>PROTECTED RESERVE</small>
+                  <strong>{money.format(roadmap.reserve)}</strong>
+                  <p>This money is not assigned to an offer.</p>
                 </div>
               </article>
-            ))}
-          </div>
-        ) : (
-          <div className="roadmap-empty-timeline"><CalendarClock size={18} /><span><strong>No dated milestones yet.</strong><small>Add an offer and its real dates will appear here.</small></span></div>
-        )}
-      </div>
 
-      {choiceMessage ? <div className="roadmap-save-message"><Sparkles size={14} /> {choiceMessage}</div> : null}
+              <section className="roadmap-lane earn">
+                <div className="roadmap-lane-heading"><span>02</span><div><small>TRACK</small><strong>Every offer you actually added</strong></div></div>
+                <div className="roadmap-bonus-stack">
+                  {roadmap.missions.map((item) => (
+                    <article className={`roadmap-bubble bonus live-mission ${item.action.tone}`} key={item.mission.id}>
+                      <div className="roadmap-bubble-top">
+                        <span className="roadmap-bubble-icon"><BadgeDollarSign size={18} /></span>
+                        <span className="roadmap-choice-tag">{item.mission.status === "planned" ? "Not started" : item.mission.status === "complete" ? "Reward recorded" : "Live"}</span>
+                      </div>
+                      <div className="roadmap-bubble-tags">
+                        <span className="roadmap-review-state cleared">{item.requirementPercent}% requirements</span>
+                        {item.lifecycle ? <span className={`roadmap-close-tag ${item.lifecycle.tone}`}>{item.lifecycle.label}</span> : null}
+                      </div>
+                      <small>{item.mission.institution.toUpperCase()}</small>
+                      <strong>{item.mission.title}</strong>
+                      <div className="roadmap-bubble-metrics">
+                        <span><small>Cash tracked</small><b>{money.format(item.cashAmount)}</b></span>
+                        <span><small>Expected value</small><b>{money.format(item.expectedValue)}</b></span>
+                        {item.ddTarget > 0 ? <span><small>DD recorded</small><b>{money.format(item.ddRecorded)} / {money.format(item.ddTarget)}</b></span> : null}
+                        {item.ddTarget > 0 ? <span><small>DD remaining</small><b>{money.format(item.ddRemaining)}</b></span> : null}
+                      </div>
+                      <div className="roadmap-live-action">
+                        <span>NEXT MOVE</span>
+                        <strong>{item.action.label}</strong>
+                        <p>{item.action.detail}</p>
+                      </div>
+                      {item.lifecycle ? <p className="roadmap-close-copy"><strong>After the reward:</strong> {item.lifecycle.text}</p> : null}
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <article className="roadmap-lane liquid">
+                <div className="roadmap-lane-heading"><span>03</span><div><small>KEEP FLEXIBLE</small><strong>Account for every remaining dollar</strong></div></div>
+                <div className="roadmap-bubble savings">
+                  <span className="roadmap-bubble-icon"><Landmark size={18} /></span>
+                  <small>UNASSIGNED CASH</small>
+                  <strong>{money.format(roadmap.remainingCash)}</strong>
+                  <b>{numberValue(profile.current_hysa_apy) > 0 ? "Current savings / HYSA lane" : "Liquid-cash lane"}</b>
+                  <p>{remainingCashLabel(profile)}</p>
+                </div>
+              </article>
+            </div>
+          </div>
+
+          <div className="roadmap-dd-route">
+            <div className="roadmap-dd-head">
+              <div><span className="kicker">DIRECT-DEPOSIT ROUTE</span><h3>See how much paycheck capacity is already spoken for.</h3></div>
+              <p>The route only counts unfinished DD requirements. Once a qualifying DD step is confirmed complete, that capacity becomes available for another move.</p>
+            </div>
+            <div className="roadmap-dd-track">
+              <div className="roadmap-dd-node source"><small>MONTHLY DD STREAM</small><strong>{money.format(roadmap.monthlyDdStream)}</strong><span>from your biweekly pay input</span></div>
+              {roadmap.missions.filter((item) => item.monthlyDdNeeded > 0).map((item) => (
+                <div className="roadmap-dd-piece" key={`dd-${item.mission.id}`}>
+                  <ArrowRight size={14} />
+                  <div className="roadmap-dd-node active"><small>{item.mission.institution.toUpperCase()}</small><strong>{money.format(item.monthlyDdNeeded)}/mo pace</strong><span>{money.format(item.ddRemaining)} remaining to target</span></div>
+                </div>
+              ))}
+              <ArrowRight size={14} />
+              <div className="roadmap-dd-node remainder"><small>UNASSIGNED DD</small><strong>{money.format(roadmap.monthlyDdRemaining)}/mo</strong><span>available for future offers</span></div>
+            </div>
+          </div>
+
+          <div className="roadmap-allocation-check">
+            <CircleDollarSign size={17} />
+            <span><strong>Your selected plan accounts for the full cash picture.</strong><small>{money.format(roadmap.reserve)} protected + {money.format(roadmap.selectedCash)} tracked + {money.format(roadmap.remainingCash)} left liquid.</small></span>
+            <b>{money.format(roadmap.totalCash)} total</b>
+          </div>
+
+          <div className="roadmap-timeline">
+            <div className="roadmap-timeline-head">
+              <div><span className="kicker">MONTH-BY-MONTH ROADMAP</span><h3>What should happen next—and when.</h3></div>
+              <p>Real opening dates and tracker progress drive these dates. Change a real date or update DD/balance progress below and the roadmap recalculates.</p>
+            </div>
+            {timelineGroups.length ? (
+              <div className="roadmap-month-track">
+                {timelineGroups.map((group) => (
+                  <section className="roadmap-month" key={group.key}>
+                    <div className="roadmap-month-label">{group.label}</div>
+                    <span className="roadmap-month-dot" />
+                    <div className="roadmap-month-events">
+                      {group.items.map((event) => (
+                        <article className={`roadmap-month-event ${event.tone}`} key={event.key}>
+                          <small>{formatDate(event.date)}</small>
+                          <strong>{event.title}</strong>
+                          <span>{event.detail}</span>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            ) : (
+              <div className="roadmap-empty-timeline"><CalendarClock size={18} /><div><strong>No dated events yet.</strong><small>Confirm a real opening date in Live Tracking and the timeline will populate.</small></div></div>
+            )}
+          </div>
+        </>
+      )}
     </section>
   );
 }
