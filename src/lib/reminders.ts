@@ -16,6 +16,13 @@ type MissionRow = {
   safe_close_review_date: string | null;
   email_reminders_enabled: boolean | null;
   mission_steps?: Array<{ step_type: string; label: string; is_complete: boolean }> | null;
+  opportunity?: {
+    category?: string | null;
+    monthly_fee?: number | string | null;
+    annual_fee?: number | string | null;
+    fee_waiver_summary?: string | null;
+    keep_guidance?: string | null;
+  } | null;
 };
 
 type ReminderRule = {
@@ -58,6 +65,28 @@ function formatDays(days: number) {
   if (days === 0) return "today";
   if (days === 1) return "tomorrow";
   return `in ${days} days`;
+}
+
+function closeReviewMessage(mission: MissionRow, days: number) {
+  const opportunity = mission.opportunity;
+  const monthlyFee = Number(opportunity?.monthly_fee || 0);
+  const annualFee = Number(opportunity?.annual_fee || 0);
+  const waiver = (opportunity?.fee_waiver_summary || "").trim();
+  const when = formatDays(days);
+
+  if (opportunity?.category === "credit_card_bonus" && annualFee > 0) {
+    return `Your account review date is ${when}. A stored ${annualFee.toFixed(0)} annual fee applies. Review whether the ongoing value still justifies keeping the card before the next fee posts; re-check current issuer terms before downgrading or closing.`;
+  }
+  if (monthlyFee > 0 && waiver) {
+    return `Your account review date is ${when}. A stored ${monthlyFee.toFixed(0)}/month fee applies unless this waiver is met: ${waiver} If you do not plan to keep meeting the waiver, review the account for closure only after confirming the reward posted and current close/clawback terms.`;
+  }
+  if (monthlyFee > 0) {
+    return `Your account review date is ${when}. A stored ${monthlyFee.toFixed(0)}/month fee applies and no verified waiver is stored. Confirm the reward has posted and re-check current terms, then review whether closing the account avoids unnecessary fees.`;
+  }
+  if (opportunity?.category === "hysa") {
+    return `Your savings-account review date is ${when}. No stored monthly fee requires an automatic close; compare the current rate and alternatives before moving money.`;
+  }
+  return `Your account review date is ${when}. No stored recurring fee requires an automatic close. Review the account's usefulness, future eligibility rules, and current terms before deciding whether to keep or close it.`;
 }
 
 function rulesForMission(mission: MissionRow, level: ReminderLevel, today: string): ReminderRule[] {
@@ -110,7 +139,7 @@ function rulesForMission(mission: MissionRow, level: ReminderLevel, today: strin
     "account_review",
     mission.safe_close_review_date,
     `${mission.institution} account review`,
-    (days) => `Your earliest Churning review date is ${formatDays(days)}. Re-check current terms before moving money, downgrading, or closing anything.`,
+    (days) => closeReviewMessage(mission, days),
   );
 
   return rules;
@@ -148,8 +177,8 @@ export async function runReminderSweep() {
   const [{ data: missions, error: missionError }, { data: profiles, error: profileError }] = await Promise.all([
     supabase
       .from("missions")
-      .select("id,user_id,institution,title,status,qualification_deadline,benefit_end_date,payout_due_date,safe_close_review_date,email_reminders_enabled,mission_steps(step_type,label,is_complete)")
-      .in("status", ["planned", "active", "waiting_bonus", "bonus_received", "safe_to_close"]),
+      .select("id,user_id,institution,title,status,qualification_deadline,benefit_end_date,payout_due_date,safe_close_review_date,email_reminders_enabled,mission_steps(step_type,label,is_complete),opportunity:opportunities(category,monthly_fee,annual_fee,fee_waiver_summary,keep_guidance)")
+      .in("status", ["planned", "active", "waiting_bonus", "bonus_received", "safe_to_close", "complete"]),
     supabase
       .from("financial_profiles")
       .select("user_id,reminder_preference"),
