@@ -654,3 +654,13 @@
 
 .live-branches .roadmap-lane.earn { min-width:0; }
 .live-branches .roadmap-bonus-stack { max-height:none; }
+
+
+.roadmap-capacity-warning strong,
+.roadmap-capacity-warning span { color:var(--amber); }
+.roadmap-dd-node.warning { border-color:rgba(255,211,122,.28); background:rgba(255,211,122,.055); }
+.roadmap-dd-node.warning small,
+.roadmap-dd-node.warning strong { color:var(--amber); }
+.roadmap-allocation-check.warning { border-color:rgba(255,211,122,.24); background:rgba(255,211,122,.055); }
+.roadmap-allocation-check.warning svg,
+.roadmap-allocation-check.warning span strong { color:var(--amber); }
