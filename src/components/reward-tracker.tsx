@@ -17,11 +17,7 @@ import {
 import type { Mission, MissionStep } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { FormattedNumberInput } from "@/components/formatted-number-input";
-import { accountLifecycleGuidance, latestReview, money, numberValue, reviewStatusLabel, timelineFromOpenedDate } from "@/lib/plan-math";
-
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
+import { accountLifecycleGuidance, latestReview, localTodayIso, money, numberValue, reviewStatusLabel, timelineFromOpenedDate } from "@/lib/plan-math";
 
 function dateValue(value?: string | null) {
   if (!value) return null;
@@ -41,7 +37,7 @@ function timeProgress(mission: Mission) {
   if (!mission.opened_at) return { percent: 0, total: 0, elapsed: 0, remaining: null as number | null };
   const end = mission.benefit_end_date || mission.qualification_deadline || mission.payout_due_date || mission.safe_close_review_date;
   const total = daysBetween(mission.opened_at, end);
-  const elapsedRaw = daysBetween(mission.opened_at, todayIso());
+  const elapsedRaw = daysBetween(mission.opened_at, localTodayIso());
   if (!total || elapsedRaw === null) return { percent: 0, total: total || 0, elapsed: Math.max(0, elapsedRaw || 0), remaining: total || null };
   const elapsed = Math.min(total, Math.max(0, elapsedRaw));
   return { percent: Math.min(100, Math.round((elapsed / total) * 100)), total, elapsed, remaining: Math.max(0, total - elapsed) };
@@ -62,7 +58,7 @@ function safetyLabel(mission: Mission) {
 
 function safeCloseState(mission: Mission) {
   if (!mission.safe_close_review_date) return { ready: false, text: "No close-review date stored" };
-  const remaining = daysBetween(todayIso(), mission.safe_close_review_date);
+  const remaining = daysBetween(localTodayIso(), mission.safe_close_review_date);
   if (remaining === null) return { ready: false, text: "Review date unavailable" };
   if (remaining <= 0) return { ready: true, text: "Close review is due now" };
   return { ready: false, text: `${remaining} days until close review` };
@@ -160,11 +156,11 @@ function MissionCard({
   const [expanded, setExpanded] = useState(false);
   const [steps, setSteps] = useState(mission.mission_steps || []);
   const [starting, setStarting] = useState(false);
-  const [startDate, setStartDate] = useState(todayIso());
+  const [startDate, setStartDate] = useState(localTodayIso());
   const [fundedDate, setFundedDate] = useState("");
   const [firstDdDate, setFirstDdDate] = useState("");
   const [editingDates, setEditingDates] = useState(false);
-  const [editOpenedDate, setEditOpenedDate] = useState(mission.opened_at || todayIso());
+  const [editOpenedDate, setEditOpenedDate] = useState(mission.opened_at || localTodayIso());
   const [editFundedDate, setEditFundedDate] = useState(mission.funded_at || "");
   const [editFirstDdDate, setEditFirstDdDate] = useState(mission.first_dd_at || "");
   const timeline = timeProgress(mission);
@@ -182,7 +178,7 @@ function MissionCard({
 
   useEffect(() => setSteps(mission.mission_steps || []), [mission.mission_steps]);
   useEffect(() => {
-    setEditOpenedDate(mission.opened_at || todayIso());
+    setEditOpenedDate(mission.opened_at || localTodayIso());
     setEditFundedDate(mission.funded_at || "");
     setEditFirstDdDate(mission.first_dd_at || "");
   }, [mission.opened_at, mission.funded_at, mission.first_dd_at]);
@@ -207,7 +203,7 @@ function MissionCard({
 
     const allComplete = nextSteps.length > 0 && nextSteps.every((item) => item.is_complete);
     if (allComplete && mission.status !== "complete") {
-      const completedDate = todayIso();
+      const completedDate = localTodayIso();
       await supabase.from("missions").update({
         status: "complete",
         next_action: lifecycle
@@ -275,7 +271,7 @@ function MissionCard({
       !mission.first_dd_at &&
       mission.opened_at
     ) {
-      const firstDd = todayIso();
+      const firstDd = localTodayIso();
       const benefitStartOverride = opportunity.benefit_start_trigger === "first_dd_at"
         ? firstDd
         : opportunity.benefit_start_trigger === "funded_at"
@@ -444,9 +440,9 @@ function MissionCard({
         <div className="reward-start-panel">
           <div><span className="reward-start-icon"><Landmark size={19} /></span><div><b>Added to your queue — clock not started</b><p>We will not guess an opening date. Confirm it only after the account is actually open.</p></div></div>
           {starting ? <div className="reward-start-form">
-            <label><small>Opened</small><input type="date" value={startDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setStartDate(event.target.value)} /></label>
-            {opportunity?.benefit_start_trigger === "funded_at" ? <label><small>Funded <em>optional</em></small><input type="date" value={fundedDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setFundedDate(event.target.value)} /></label> : null}
-            {opportunity?.qualification_start_trigger === "first_dd_at" || opportunity?.benefit_start_trigger === "first_dd_at" ? <label><small>First DD <em>optional</em></small><input type="date" value={firstDdDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setFirstDdDate(event.target.value)} /></label> : null}
+            <label><small>Opened</small><input type="date" value={startDate} max={localTodayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setStartDate(event.target.value)} /></label>
+            {opportunity?.benefit_start_trigger === "funded_at" ? <label><small>Funded <em>optional</em></small><input type="date" value={fundedDate} max={localTodayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setFundedDate(event.target.value)} /></label> : null}
+            {opportunity?.qualification_start_trigger === "first_dd_at" || opportunity?.benefit_start_trigger === "first_dd_at" ? <label><small>First DD <em>optional</em></small><input type="date" value={firstDdDate} max={localTodayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setFirstDdDate(event.target.value)} /></label> : null}
             <button type="button" className="button primary compact" onClick={startTracker}>Start tracker</button><button type="button" className="button ghost compact" onClick={() => setStarting(false)}>Cancel</button>
           </div> : <button type="button" className="button primary compact" onClick={() => setStarting(true)}>I opened this account</button>}
         </div>
@@ -474,9 +470,9 @@ function MissionCard({
         <div className="reward-date-edit">
           {editingDates ? (
             <div className="reward-start-form reward-edit-form">
-              <label><small>Opened</small><input type="date" value={editOpenedDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setEditOpenedDate(event.target.value)} /></label>
-              {(opportunity?.benefit_start_trigger === "funded_at" || mission.funded_at) ? <label><small>Funded <em>optional</em></small><input type="date" value={editFundedDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setEditFundedDate(event.target.value)} /></label> : null}
-              {(opportunity?.qualification_start_trigger === "first_dd_at" || opportunity?.benefit_start_trigger === "first_dd_at" || mission.first_dd_at) ? <label><small>First DD <em>optional</em></small><input type="date" value={editFirstDdDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setEditFirstDdDate(event.target.value)} /></label> : null}
+              <label><small>Opened</small><input type="date" value={editOpenedDate} max={localTodayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setEditOpenedDate(event.target.value)} /></label>
+              {(opportunity?.benefit_start_trigger === "funded_at" || mission.funded_at) ? <label><small>Funded <em>optional</em></small><input type="date" value={editFundedDate} max={localTodayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setEditFundedDate(event.target.value)} /></label> : null}
+              {(opportunity?.qualification_start_trigger === "first_dd_at" || opportunity?.benefit_start_trigger === "first_dd_at" || mission.first_dd_at) ? <label><small>First DD <em>optional</em></small><input type="date" value={editFirstDdDate} max={localTodayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setEditFirstDdDate(event.target.value)} /></label> : null}
               <button type="button" className="button primary compact" onClick={saveTrackerDates}>Save real dates</button>
               <button type="button" className="button ghost compact" onClick={() => setEditingDates(false)}>Cancel</button>
             </div>
