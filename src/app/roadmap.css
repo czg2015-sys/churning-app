@@ -616,3 +616,41 @@
   line-height:1.5 !important;
 }
 .roadmap-close-copy strong { color:var(--muted-strong); }
+
+
+.roadmap-empty-live {
+  display:flex;
+  gap:12px;
+  align-items:flex-start;
+  margin:22px;
+  padding:18px;
+  border:1px dashed rgba(59,178,115,.22);
+  border-radius:14px;
+  background:rgba(59,178,115,.035);
+}
+.roadmap-empty-live svg { color:var(--green); flex:0 0 auto; }
+.roadmap-empty-live strong,.roadmap-empty-live span { display:block; }
+.roadmap-empty-live strong { font-size:11px; }
+.roadmap-empty-live span { margin-top:4px; max-width:760px; color:var(--muted); font-size:9px; line-height:1.55; }
+
+.roadmap-live-action {
+  margin-top:10px;
+  padding:10px;
+  border:1px solid rgba(59,178,115,.15);
+  border-radius:10px;
+  background:rgba(59,178,115,.045);
+}
+.roadmap-live-action span,.roadmap-live-action strong,.roadmap-live-action p { display:block; }
+.roadmap-live-action span { color:var(--green); font-size:6px; font-weight:850; letter-spacing:.08em; }
+.roadmap-live-action strong { margin-top:3px; font-size:9px; line-height:1.35; }
+.roadmap-live-action p { margin:3px 0 0; color:var(--muted); font-size:7px; line-height:1.45; }
+.live-mission.start { border-color:rgba(129,116,255,.24); }
+.live-mission.reward { border-color:rgba(59,178,115,.30); }
+.live-mission.review { border-color:rgba(255,211,122,.23); }
+.roadmap-month-event.action { border-color:rgba(59,178,115,.20); }
+.roadmap-month-event.deadline { border-color:rgba(129,116,255,.18); }
+.roadmap-month-event.reward { border-color:rgba(59,178,115,.25); }
+.roadmap-month-event.review { border-color:rgba(255,211,122,.18); }
+
+.live-branches .roadmap-lane.earn { min-width:0; }
+.live-branches .roadmap-bonus-stack { max-height:none; }
