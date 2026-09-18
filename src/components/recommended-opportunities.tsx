@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { ArrowUpRight, ChevronDown, ChevronUp, CircleAlert, ShieldCheck } from "lucide-react";
 import { AddToPlanButton } from "@/components/add-to-plan-button";
-import { benefitDurationLabel, categoryLabel, money, numberValue, rankMatches, selectFeasibleRecommendations } from "@/lib/plan-math";
+import { accountLifecycleGuidance, benefitDurationLabel, categoryLabel, money, numberValue, rankMatches, selectFeasibleRecommendations } from "@/lib/plan-math";
 import type { FinancialProfile, Opportunity, PlanStartDetails } from "@/lib/types";
 
 type RankedMatch = ReturnType<typeof rankMatches>[number];
@@ -78,6 +78,7 @@ function RecommendationCard({
   const verified = result.safetyPassed;
   const notes = fitNote(result);
   const benefitLabel = benefitDurationLabel(item);
+  const lifecycle = accountLifecycleGuidance(item);
   return (
     <article className={`top-match-card ${verified ? "cleared" : "pending"}`}>
       <div className="top-match-card-head">
@@ -87,8 +88,12 @@ function RecommendationCard({
         </span>
       </div>
       <h3>{item.product_name}</h3>
-      {benefitLabel ? <div className="match-promo-note">{benefitLabel}</div> : null}
+      <div className="match-secondary-tags">
+        {benefitLabel ? <div className="match-promo-note">{benefitLabel}</div> : null}
+        <div className={`match-lifecycle-note ${lifecycle.tone}`}>{lifecycle.label}</div>
+      </div>
       <p className="match-fit-copy">{shortDescription(item)}</p>
+      <p className="match-fit-copy lifecycle-copy"><b>After the reward:</b> {lifecycle.text}</p>
       {item.category === "hysa" ? <HysaComparison item={item} profile={profile} /> : null}
       {notes.length ? <p className="match-fit-copy"><b>Fit note:</b> {notes.join("; ")}.</p> : null}
       <div className="match-value-row">
