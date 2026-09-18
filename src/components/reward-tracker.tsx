@@ -37,7 +37,7 @@ function daysBetween(start?: string | null, end?: string | null) {
 }
 
 function timeProgress(mission: Mission) {
-  if (mission.status === "completed" || mission.status === "closed") return { percent: 100, total: 0, elapsed: 0, remaining: 0 };
+  if (mission.status === "complete" || mission.status === "cancelled") return { percent: 100, total: 0, elapsed: 0, remaining: 0 };
   if (!mission.opened_at) return { percent: 0, total: 0, elapsed: 0, remaining: null as number | null };
   const end = mission.benefit_end_date || mission.qualification_deadline || mission.payout_due_date || mission.safe_close_review_date;
   const total = daysBetween(mission.opened_at, end);
@@ -78,7 +78,7 @@ function addDaysIso(value: string | null | undefined, days: number | null | unde
 
 function doNotDoWarning(mission: Mission, steps: MissionStep[]) {
   const opportunity = mission.opportunity;
-  if (!opportunity || mission.status === "completed" || mission.status === "closed") return null;
+  if (!opportunity || mission.status === "complete" || mission.status === "cancelled") return null;
   const requiredBalance = numberValue(opportunity.required_balance);
   const ddRequired = numberValue(opportunity.direct_deposit_required);
   const safeClose = mission.safe_close_review_date;
@@ -95,9 +95,9 @@ function doNotDoWarning(mission: Mission, steps: MissionStep[]) {
 
 
 function earnedValue(mission: Mission) {
-  const rewardStep = (mission.mission_steps || []).find((step) => step.step_type === "reward_received");
+  const rewardStep = (mission.mission_steps || []).find((step) => step.step_type === "bonus_received");
   const actual = numberValue(rewardStep?.current_amount);
-  return mission.status === "completed" ? actual : numberValue(mission.expected_bonus) + numberValue(mission.expected_interest);
+  return mission.status === "complete" ? actual : numberValue(mission.expected_bonus) + numberValue(mission.expected_interest);
 }
 
 function inferredTrackingDays(mission: Mission) {
@@ -125,7 +125,7 @@ function StepEditor({ step, onToggle, onAmount }: {
   const target = numberValue(step.target_amount);
   const current = numberValue(step.current_amount);
   const [amount, setAmount] = useState(current);
-  const rewardNeedsAmount = step.step_type === "reward_received" && target > 0 && current <= 0;
+  const rewardNeedsAmount = step.step_type === "bonus_received" && target > 0 && current <= 0;
 
   useEffect(() => setAmount(current), [current]);
 
@@ -134,7 +134,7 @@ function StepEditor({ step, onToggle, onAmount }: {
       <label className="reward-step-check">
         <input type="checkbox" checked={step.is_complete} disabled={rewardNeedsAmount} onChange={(event: React.ChangeEvent<HTMLInputElement>) => onToggle(step, event.target.checked)} />
         <span>{step.is_complete ? <CheckCircle2 size={18} /> : <span className="step-circle" />}</span>
-        <span className="reward-step-copy"><b>{step.label}</b>{target > 0 && <small>{step.step_type === "reward_received" ? (current > 0 ? `${money.format(current)} actual payout recorded` : `Record the actual payout before confirming`) : `${money.format(current)} recorded of ${money.format(target)} target`}</small>}</span>
+        <span className="reward-step-copy"><b>{step.label}</b>{target > 0 && <small>{step.step_type === "bonus_received" ? (current > 0 ? `${money.format(current)} actual payout recorded` : `Record the actual payout before confirming`) : `${money.format(current)} recorded of ${money.format(target)} target`}</small>}</span>
       </label>
       {target > 0 && !step.is_complete && (
         <div className="step-amount-editor">
@@ -188,7 +188,7 @@ function MissionCard({
 
     if (guestMode) {
       const allComplete = nextSteps.length > 0 && nextSteps.every((item) => item.is_complete);
-      emitGuest({ ...mission, status: allComplete ? "completed" : mission.status === "completed" ? "active" : mission.status, mission_steps: nextSteps });
+      emitGuest({ ...mission, status: allComplete ? "complete" : mission.status === "complete" ? "active" : mission.status, mission_steps: nextSteps });
       return;
     }
 
@@ -197,10 +197,10 @@ function MissionCard({
     if (error) return;
 
     const allComplete = nextSteps.length > 0 && nextSteps.every((item) => item.is_complete);
-    if (allComplete && mission.status !== "completed") {
+    if (allComplete && mission.status !== "complete") {
       const completedDate = todayIso();
       await supabase.from("missions").update({
-        status: "completed",
+        status: "complete",
         next_action: mission.safe_close_review_date
           ? `Reward received. Review whether to keep or close the account on ${readableDate(mission.safe_close_review_date)}.`
           : "Reward received. Review whether this account is still worth keeping.",
@@ -208,7 +208,7 @@ function MissionCard({
       }).eq("id", mission.id);
 
       const historyNote = `Completed through Churning reward tracker · mission:${mission.id}`;
-      const actualEarned = nextSteps.find((item) => item.step_type === "reward_received")?.current_amount;
+      const actualEarned = nextSteps.find((item) => item.step_type === "bonus_received")?.current_amount;
       const earnedAmount = numberValue(actualEarned);
       const { data: existingHistory } = await supabase.from("account_history")
         .select("id")
@@ -222,7 +222,8 @@ function MissionCard({
         opened_at: mission.opened_at,
         bonus_received_at: completedDate,
         bonus_amount: earnedAmount,
-        outcome: "completed",
+        bonus_received: true,
+        outcome: "open",
         eligible_again_at: null,
         notes: historyNote,
         updated_at: new Date().toISOString(),
@@ -233,7 +234,7 @@ function MissionCard({
         await supabase.from("account_history").insert({ user_id: mission.user_id, ...historyPayload });
       }
       router.refresh();
-    } else if (!allComplete && mission.status === "completed") {
+    } else if (!allComplete && mission.status === "complete") {
       const historyNote = `Completed through Churning reward tracker · mission:${mission.id}`;
       await supabase.from("missions").update({ status: "active", updated_at: new Date().toISOString() }).eq("id", mission.id);
       await supabase.from("account_history").delete().eq("user_id", mission.user_id).eq("notes", historyNote);
@@ -324,8 +325,8 @@ function MissionCard({
       benefitStartOverride,
       qualificationStartOverride,
     );
-    const openedStep = steps.find((step) => step.step_type === "opened");
-    const nextSteps = steps.map((step) => step.step_type === "opened" ? { ...step, is_complete: true, completed_at: new Date().toISOString() } : step);
+    const openedStep = steps.find((step) => step.step_type === "open_account");
+    const nextSteps = steps.map((step) => step.step_type === "open_account" ? { ...step, is_complete: true, completed_at: new Date().toISOString() } : step);
     const nextMission: Mission = {
       ...mission,
       opened_at: startDate,
@@ -377,7 +378,7 @@ function MissionCard({
     <article className={`reward-card ${mission.status === "planned" ? "planned" : ""}`}>
       <div className="reward-card-top">
         <div className="reward-title-group"><span className="reward-bank">{mission.institution}</span><h3>{mission.title}</h3><span className={`reward-safety ${safety.tone}`}><ShieldCheck size={13} /> {safety.label}</span></div>
-        <div className="reward-value"><small>{mission.status === "completed" ? "Reward earned" : "Expected reward"}</small><strong>{money.format(reward)}</strong>{numberValue(mission.amount_committed) > 0 && <span>{money.format(numberValue(mission.amount_committed))} committed</span>}</div>
+        <div className="reward-value"><small>{mission.status === "complete" ? "Reward earned" : "Expected reward"}</small><strong>{money.format(reward)}</strong>{numberValue(mission.amount_committed) > 0 && <span>{money.format(numberValue(mission.amount_committed))} committed</span>}</div>
       </div>
 
       {mission.status === "planned" && !mission.opened_at ? (
@@ -459,8 +460,8 @@ export function RewardTracker({
   }, [guestMode, missions]);
 
   const source = guestMode ? guestMissions : missions;
-  const active = useMemo(() => source.filter((mission) => mission.status !== "completed" && mission.status !== "closed"), [source]);
-  const completed = useMemo(() => source.filter((mission) => mission.status === "completed" || mission.status === "closed"), [source]);
+  const active = useMemo(() => source.filter((mission) => mission.status !== "complete" && mission.status !== "closed"), [source]);
+  const completed = useMemo(() => source.filter((mission) => ["complete", "cancelled"].includes(mission.status)), [source]);
   const lifetime = completed.reduce((sum, mission) => sum + earnedValue(mission), 0);
   const expected = active.reduce((sum, mission) => sum + numberValue(mission.expected_bonus) + numberValue(mission.expected_interest), 0);
   const committed = active.reduce((sum, mission) => sum + numberValue(mission.amount_committed), 0);
