@@ -5,12 +5,8 @@ import { CalendarDays, Check, Landmark, Plus, ShieldCheck, Sparkles, WalletCards
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { FormattedNumberInput } from "@/components/formatted-number-input";
-import { benefitDurationLabel, categoryLabel, money, numberValue, timelineFromOpenedDate, trackedInterestEstimate, verificationAgeDays } from "@/lib/plan-math";
+import { benefitDurationLabel, categoryLabel, localTodayIso, money, numberValue, timelineFromOpenedDate, trackedInterestEstimate, verificationAgeDays } from "@/lib/plan-math";
 import type { Opportunity, PlanStartDetails } from "@/lib/types";
-
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function purchaseRequirement(opportunity: Opportunity) {
   const count = Math.max(0, Number(opportunity.purchase_count || 0));
@@ -66,7 +62,7 @@ export function AddToPlanButton({
     const reminderMode = String(form.get("reminder_mode") || "default");
     const details: PlanStartDetails = {
       openedAlready,
-      openedAt: openedAlready ? String(form.get("opened_at") || todayIso()) : null,
+      openedAt: openedAlready ? String(form.get("opened_at") || localTodayIso()) : null,
       fundedAt: openedAlready && form.get("funded_at") ? String(form.get("funded_at")) : null,
       firstDdAt: openedAlready && form.get("first_dd_at") ? String(form.get("first_dd_at")) : null,
       amountCommitted: Math.max(0, numberValue(String(form.get("amount_committed") || 0))),
@@ -309,9 +305,9 @@ export function AddToPlanButton({
               </div>
 
               <div className="plan-modal-grid">
-                {openedAlready && <label className="modal-field"><span><CalendarDays size={15} /> Opening date</span><input name="opened_at" type="date" defaultValue={todayIso()} max={todayIso()} required /><small>This starts the main account clock.</small></label>}
-                {showFundingDate && <label className="modal-field"><span><CalendarDays size={15} /> Funding date <em>optional</em></span><input name="funded_at" type="date" max={todayIso()} /><small>Add it only if the benefit starts when money is funded.</small></label>}
-                {showFirstDdDate && <label className="modal-field"><span><CalendarDays size={15} /> First qualifying DD <em>optional</em></span><input name="first_dd_at" type="date" max={todayIso()} /><small>Add it if the bank starts its measurement period from the first deposit.</small></label>}
+                {openedAlready && <label className="modal-field"><span><CalendarDays size={15} /> Opening date</span><input name="opened_at" type="date" defaultValue={localTodayIso()} max={localTodayIso()} required /><small>This starts the main account clock.</small></label>}
+                {showFundingDate && <label className="modal-field"><span><CalendarDays size={15} /> Funding date <em>optional</em></span><input name="funded_at" type="date" max={localTodayIso()} /><small>Add it only if the benefit starts when money is funded.</small></label>}
+                {showFirstDdDate && <label className="modal-field"><span><CalendarDays size={15} /> First qualifying DD <em>optional</em></span><input name="first_dd_at" type="date" max={localTodayIso()} /><small>Add it if the bank starts its measurement period from the first deposit.</small></label>}
                 <label className="modal-field"><span><WalletCards size={15} /> Cash committed</span><div className="money-input"><i>$</i><FormattedNumberInput name="amount_committed" defaultValue={suggestedCommitment} ariaLabel="Cash committed" /></div><small>{suggestedCommitment > 0 ? `Stored offer target: ${money.format(suggestedCommitment)}` : "Enter only cash you actually plan to commit."}</small></label>
                 {suggestedDirectDeposit > 0 && <label className="modal-field"><span><Landmark size={15} /> Qualifying DD completed so far</span><div className="money-input"><i>$</i><FormattedNumberInput name="planned_dd" defaultValue={0} ariaLabel="Qualifying direct deposit completed so far" /></div><small>Stored target: {money.format(suggestedDirectDeposit)}. Update only deposits that actually posted.</small></label>}
                 {needsCustomHysaHorizon && <label className="modal-field"><span><CalendarDays size={15} /> Tracking horizon</span><select name="tracking_days" defaultValue="90"><option value="90">90 days</option><option value="180">180 days</option><option value="365">1 year</option></select><small>This is your review horizon for an ongoing rate, not a bank lockup requirement.</small></label>}
