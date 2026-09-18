@@ -38,6 +38,9 @@ type LiveOpportunity = {
   direct_deposit_required: number | string | null;
   monthly_fee: number | string | null;
   annual_fee?: number | string | null;
+  fee_waiver_summary?: string | null;
+  fee_starts_after_days?: number | null;
+  keep_guidance?: string | null;
   purchase_required_spend?: number | string | null;
   qualification_days?: number | null;
   payout_days?: number | null;
@@ -154,10 +157,13 @@ function detectSignals(text: string) {
     mentionsLimitedBenefit: /promo(?:tional)?|boost|introductory|limited[- ]time|special rate|reward period|bonus period/i.test(text),
     mentionsDirectDeposit: /direct\s+deposit/i.test(text),
     mentionsMonthlyFee: /monthly\s+(?:service\s+)?fee/i.test(text),
+    mentionsFeeWaiver: /waiv(?:e|ed|er)|avoid(?:ing)?\s+(?:the\s+)?monthly\s+(?:service\s+)?fee|no\s+monthly\s+(?:service\s+)?fee\s+(?:when|if)/i.test(text),
     mentionsAnnualFee: /annual\s+fee/i.test(text),
     mentionsApy: /\bapy\b|annual percentage yield/i.test(text),
     mentionsBonus: /\bbonus\b|cash offer|welcome offer/i.test(text),
     mentionsEarlyClosure: /early\s+clos|close(?:d|r)?\s+(?:the\s+)?account|clawback|forfeit|recoup/i.test(text),
+    mentionsCloseRestriction: /must\s+remain\s+open|keep\s+(?:the\s+)?account\s+open|early\s+closure|close.*(?:within|before)|account.*(?:within|before).*close/i.test(text),
+    mentionsBonusClawback: /clawback|recoup|reclaim|forfeit.*bonus|bonus.*forfeit|deduct.*bonus/i.test(text),
     mentionsFDIC: /member\s+fdic|fdic[- ]insured/i.test(text),
     mentionsNCUA: /ncua|federally insured by the ncua/i.test(text),
     mentionsEligibility: /new customer|existing customer|eligible|ineligible|not eligible/i.test(text),
@@ -284,6 +290,15 @@ function buildMismatchFlags(opportunity: LiveOpportunity, text: string) {
   if (!expectedValueAppears(text, numberVariants(opportunity.direct_deposit_required, "money"))) flags.push("stored_dd_requirement_not_found_on_page");
   if (!expectedValueAppears(text, numberVariants(opportunity.monthly_fee, "money"))) flags.push("stored_monthly_fee_not_found_on_page");
   if (!expectedValueAppears(text, numberVariants(opportunity.annual_fee, "money"))) flags.push("stored_annual_fee_not_found_on_page");
+
+  const hasStoredFeeWaiver = Boolean(opportunity.fee_waiver_summary?.trim());
+  const pageMentionsFeeWaiver = /waiv(?:e|ed|er)|avoid(?:ing)?\s+(?:the\s+)?monthly\s+(?:service\s+)?fee|no\s+monthly\s+(?:service\s+)?fee\s+(?:when|if)/i.test(text);
+  if (hasStoredFeeWaiver && !pageMentionsFeeWaiver) flags.push("stored_fee_waiver_not_found_on_page");
+
+  const hasStoredCloseRule = Number(opportunity.min_account_age_days || 0) > 0 || Boolean(opportunity.keep_guidance?.trim());
+  const pageMentionsCloseRule = /must\s+remain\s+open|keep\s+(?:the\s+)?account\s+open|early\s+clos|clawback|recoup|forfeit.*bonus|close.*(?:within|before)/i.test(text);
+  if (hasStoredCloseRule && !pageMentionsCloseRule) flags.push("stored_close_rule_not_found_on_page");
+
   return flags;
 }
 
@@ -512,7 +527,7 @@ export async function runResearchScan({
 
   try {
     let opportunityQuery = supabase.from("opportunities").select(
-      "id,institution,product_name,category,official_url,safety_gate,bonus_amount,apy,direct_deposit_required,monthly_fee,annual_fee,purchase_required_spend,qualification_days,payout_days,min_account_age_days,required_balance,purchase_count,purchase_min_amount,reward_rate,benefit_duration_days,expires_at,last_verified_at",
+      "id,institution,product_name,category,official_url,safety_gate,bonus_amount,apy,direct_deposit_required,monthly_fee,annual_fee,fee_waiver_summary,fee_starts_after_days,keep_guidance,purchase_required_spend,qualification_days,payout_days,min_account_age_days,required_balance,purchase_count,purchase_min_amount,reward_rate,benefit_duration_days,expires_at,last_verified_at",
     ).eq("offer_status", "live").order("institution");
 
     if (scope === "expiring") {
