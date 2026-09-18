@@ -96,7 +96,7 @@ export function AddToPlanButton({
       .select("id")
       .eq("user_id", userId)
       .eq("opportunity_id", opportunity.id)
-      .in("status", ["planned", "active", "qualified", "payout_pending"])
+      .in("status", ["planned", "active", "waiting_bonus", "bonus_received", "safe_to_close"])
       .maybeSingle();
 
     if (existing) {
@@ -182,7 +182,7 @@ export function AddToPlanButton({
         mission_id: mission.id,
         user_id: userId,
         label: "Account opened and opening date confirmed",
-        step_type: "opened",
+        step_type: "open_account",
         step_order: stepOrder++,
         is_complete: details.openedAlready,
         completed_at: details.openedAlready ? now : null,
@@ -213,7 +213,7 @@ export function AddToPlanButton({
         mission_id: mission.id,
         user_id: userId,
         label: purchaseRule,
-        step_type: "purchase_requirement",
+        step_type: "spend",
         step_order: stepOrder++,
         is_complete: false,
         completed_at: null,
@@ -226,7 +226,7 @@ export function AddToPlanButton({
         mission_id: mission.id,
         user_id: userId,
         label: `Required balance (${money.format(target)} target)`,
-        step_type: "balance_hold",
+        step_type: "hold",
         step_order: stepOrder++,
         target_amount: target,
         current_amount: details.amountCommitted,
@@ -239,7 +239,7 @@ export function AddToPlanButton({
       mission_id: mission.id,
       user_id: userId,
       label: opportunity.category === "hysa" && numberValue(opportunity.bonus_amount) <= 0 ? "Actual interest earned during tracked period" : expectedInterest > 0 ? "Actual reward + interest received" : "Reward received",
-      step_type: "reward_received",
+      step_type: "bonus_received",
       step_order: stepOrder,
       target_amount: expectedTotalEarnings,
       current_amount: 0,
