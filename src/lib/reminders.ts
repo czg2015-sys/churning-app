@@ -149,7 +149,7 @@ export async function runReminderSweep() {
     supabase
       .from("missions")
       .select("id,user_id,institution,title,status,qualification_deadline,benefit_end_date,payout_due_date,safe_close_review_date,email_reminders_enabled,mission_steps(step_type,label,is_complete)")
-      .in("status", ["planned", "active", "qualified", "payout_pending"]),
+      .in("status", ["planned", "active", "waiting_bonus", "bonus_received", "safe_to_close"]),
     supabase
       .from("financial_profiles")
       .select("user_id,reminder_preference"),
