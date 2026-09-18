@@ -214,3 +214,21 @@
 .before-open-box p { margin: 9px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .before-open-box p strong { color: var(--muted-strong); }
 @media (max-width: 560px) { .before-open-grid { grid-template-columns: 1fr; } }
+
+
+.match-secondary-tags { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:-5px 0 7px; }
+.match-secondary-tags .match-promo-note { margin:0; }
+.match-lifecycle-note {
+  width:fit-content;
+  padding:5px 7px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:rgba(255,255,255,.025);
+  color:var(--muted-strong);
+  font-size:8px;
+  font-weight:820;
+  letter-spacing:.03em;
+}
+.match-lifecycle-note.review { color:#ffe3aa; border-color:rgba(255,211,122,.18); background:rgba(255,211,122,.07); }
+.match-lifecycle-note.neutral { color:#d8eee1; border-color:rgba(59,178,115,.16); background:rgba(59,178,115,.06); }
+.lifecycle-copy { padding-top:8px; border-top:1px solid var(--line); }
