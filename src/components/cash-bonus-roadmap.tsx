@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { AddToPlanButton } from "@/components/add-to-plan-button";
 import { createClient } from "@/lib/supabase/client";
-import { categoryLabel, money, numberValue, rankMatches } from "@/lib/plan-math";
+import { accountLifecycleGuidance, categoryLabel, money, numberValue, rankMatches } from "@/lib/plan-math";
 import { buildCashBonusRoadmap, planningDates, type RoadmapOverrides } from "@/lib/roadmap";
 import type { FinancialProfile, Mission, Opportunity } from "@/lib/types";
 
@@ -260,13 +260,17 @@ export function CashBonusRoadmap({
                 const selectedIds = new Set(roadmap.bonusSlots.map((item) => item.opportunity.id));
                 const choices = bonusAlternatives.filter((result) => result.item.id === slot.opportunity.id || !selectedIds.has(result.item.id));
                 const userSelected = (overrides.bonusIds || [])[index] === slot.opportunity.id;
+                const lifecycle = accountLifecycleGuidance(slot.opportunity);
                 return (
                   <article className="roadmap-bubble bonus" key={slot.opportunity.id}>
                     <div className="roadmap-bubble-top">
                       <span className="roadmap-bubble-icon"><BadgeDollarSign size={18} /></span>
                       <span className="roadmap-choice-tag">{userSelected ? "Your choice" : `Plan #${index + 1}`}</span>
                     </div>
-                    <span className={slot.researchReady ? "roadmap-review-state cleared" : "roadmap-review-state pending"}>{slot.researchReady ? "Research cleared" : "Research pending · review candidate"}</span>
+                    <div className="roadmap-bubble-tags">
+                      <span className={slot.researchReady ? "roadmap-review-state cleared" : "roadmap-review-state pending"}>{slot.researchReady ? "Research cleared" : "Research pending · review candidate"}</span>
+                      <span className={`roadmap-close-tag ${lifecycle.tone}`}>{lifecycle.label}</span>
+                    </div>
                     <small>{categoryLabel(slot.opportunity).toUpperCase()}</small>
                     <strong>{slot.opportunity.institution}</strong>
                     <b>{slot.opportunity.product_name}</b>
@@ -281,6 +285,7 @@ export function CashBonusRoadmap({
                         {choices.map((result) => <option key={result.item.id} value={result.item.id}>{roadmapAlternativeLabel(result.item)}</option>)}
                       </select>
                     </label>
+                    <p className="roadmap-close-copy"><strong>After reward:</strong> {lifecycle.text}</p>
                     <AddToPlanButton opportunity={slot.opportunity} alreadyAdded={addedOpportunityIds.includes(slot.opportunity.id)} allowPlanningOnHold />
                   </article>
                 );
@@ -294,6 +299,7 @@ export function CashBonusRoadmap({
             <div className="roadmap-lane-heading"><span>03</span><div><small>STAY LIQUID</small><strong>Put the remaining cash somewhere useful</strong></div></div>
             <div className="roadmap-bubble savings">
               <span className="roadmap-bubble-icon"><Landmark size={18} /></span>
+              {roadmap.savingsSlot.opportunity ? <span className={`roadmap-close-tag ${accountLifecycleGuidance(roadmap.savingsSlot.opportunity).tone}`}>{accountLifecycleGuidance(roadmap.savingsSlot.opportunity).label}</span> : null}
               <small>LIQUID SAVINGS LANE</small>
               <strong>{money.format(roadmap.savingsSlot.amount)}</strong>
               <b>{roadmap.savingsSlot.label}</b>
@@ -308,6 +314,7 @@ export function CashBonusRoadmap({
                   {hysaAlternatives.map((result) => <option key={result.item.id} value={result.item.id}>{result.item.institution} · {result.item.product_name} · {numberValue(result.item.apy).toFixed(2)}%</option>)}
                 </select>
               </label>
+              {roadmap.savingsSlot.opportunity ? <p className="roadmap-close-copy"><strong>After the rate / benefit:</strong> {accountLifecycleGuidance(roadmap.savingsSlot.opportunity).text}</p> : null}
               {roadmap.savingsSlot.opportunity ? <AddToPlanButton opportunity={roadmap.savingsSlot.opportunity} alreadyAdded={addedOpportunityIds.includes(roadmap.savingsSlot.opportunity.id)} allowPlanningOnHold /> : null}
             </div>
           </article>
