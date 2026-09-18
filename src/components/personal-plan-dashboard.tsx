@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { categoryLabel, money, numberValue } from "@/lib/plan-math";
-import type { AccountHistory, Mission, Opportunity } from "@/lib/types";
+import type { AccountHistory, FinancialProfile, Mission, Opportunity } from "@/lib/types";
 
 type ReminderPreference = "all" | "important" | "off";
 
@@ -124,11 +124,13 @@ export function PersonalPlanDashboard({
   opportunities,
   accountHistory,
   reminderPreference,
+  profile,
 }: {
   missions: Mission[];
   opportunities: Opportunity[];
   accountHistory: AccountHistory[];
   reminderPreference: ReminderPreference;
+  profile: FinancialProfile;
 }) {
   const [globalReminder, setGlobalReminder] = useState<ReminderPreference>(reminderPreference || "off");
   const [reminderSaving, setReminderSaving] = useState(false);
@@ -148,6 +150,10 @@ export function PersonalPlanDashboard({
   );
   const trackedCash = active.reduce((sum, mission) => sum + numberValue(mission.amount_committed), 0);
   const potentialRewards = active.reduce((sum, mission) => sum + numberValue(mission.expected_bonus) + numberValue(mission.expected_interest), 0);
+  const totalCash = Math.max(0, numberValue(profile.total_cash));
+  const protectedReserve = Math.min(totalCash, Math.max(0, numberValue(profile.emergency_reserve)));
+  const availableToOptimize = Math.max(0, totalCash - protectedReserve);
+  const monthlyDdStream = Math.max(0, numberValue(profile.biweekly_pay)) * (26 / 12);
   const endingSoon = active.filter((mission) => {
     const left = daysUntil(mission.benefit_end_date || mission.qualification_deadline);
     return left !== null && left >= 0 && left <= 30;
@@ -242,8 +248,8 @@ export function PersonalPlanDashboard({
       <div className="personal-dashboard-head">
         <div>
           <span className="kicker">YOUR DASHBOARD</span>
-          <h1>Your cash reward command center.</h1>
-          <p>See what is active, what is ending, and what needs attention next.</p>
+          <h1>Your Cash & Bonus Command Center.</h1>
+          <p>See your money, bonus opportunities, active requirements, and what needs attention next.</p>
         </div>
         <label className="dashboard-reminder-setting">
           <span><BellRing size={14} /> Email reminders</span>
@@ -260,6 +266,13 @@ export function PersonalPlanDashboard({
         <article><Target size={18} /><span><small>Active rewards</small><strong>{active.length}</strong></span></article>
         <article><CircleDollarSign size={18} /><span><small>Potential rewards</small><strong>{money.format(potentialRewards)}</strong></span></article>
         <article className={endingSoon ? "attention" : ""}><Clock3 size={18} /><span><small>Ending in 30 days</small><strong>{endingSoon}</strong></span></article>
+      </div>
+
+      <div className="dashboard-money-picture">
+        <div><small>Total liquid cash</small><strong>{money.format(totalCash)}</strong></div>
+        <div><small>Protected reserve</small><strong>{money.format(protectedReserve)}</strong></div>
+        <div><small>Available to optimize</small><strong>{money.format(availableToOptimize)}</strong></div>
+        <div><small>Monthly DD stream</small><strong>{money.format(monthlyDdStream)}</strong><span>from your paycheck input</span></div>
       </div>
 
       <div className="dashboard-next-actions">
