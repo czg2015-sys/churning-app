@@ -142,6 +142,12 @@ export type FinancialProfile = {
   credit_score_band?: string | null;
   no_credit_card?: boolean;
   credit_cards_pay_in_full?: boolean;
+  roadmap_selected_opportunity_ids?: {
+    bonusIds?: string[];
+    hysaId?: string | null;
+    keepCurrentSavings?: boolean;
+  } | string[] | null;
+  roadmap_updated_at?: string | null;
 };
 
 export type PlanStartDetails = {
