@@ -87,6 +87,19 @@ function bonusCandidate(result: Ranked, profile: FinancialProfile) {
   return result.cashFit >= 95 && result.ddFit >= 90 && result.spendFit >= 75;
 }
 
+function roadmapRankValue(result: Ranked, profile: FinancialProfile) {
+  const preference = (profile.ranking_preference || "balanced").toLowerCase();
+  const advantage = Math.max(-500, Math.min(1500, profile.tax_rate_known ? result.estimatedAfterTaxAdvantage : result.grossAdvantage));
+  const cashNeed = opportunityCashNeed(result.item);
+  const deployable = Math.max(1, numberValue(profile.total_cash) - numberValue(profile.emergency_reserve));
+  const cashShare = Math.min(1, cashNeed / deployable);
+
+  if (preference === "profit") return result.score + advantage * 0.11;
+  if (preference === "ease") return result.score - (Math.max(1, result.effort) - 1) * 24 + result.liquidity * 0.04;
+  if (preference === "liquidity") return result.score + result.liquidity * 0.12 - cashShare * 36;
+  return result.score + advantage * 0.035 + result.liquidity * 0.025;
+}
+
 function canAddBonus(
   result: Ranked,
   selected: RoadmapBonusSlot[],
@@ -196,7 +209,9 @@ export function buildCashBonusRoadmap({
   );
   const ranked = rankMatches(opportunities, profile, usedBanks, stateCode)
     .filter((result) => !activeIds.has(result.item.id));
-  const candidates = ranked.filter((result) => bonusCandidate(result, profile));
+  const candidates = ranked
+    .filter((result) => bonusCandidate(result, profile))
+    .sort((a, b) => roadmapRankValue(b, profile) - roadmapRankValue(a, profile));
 
   const selected: RoadmapBonusSlot[] = [];
   const selectedIds = new Set<string>();
