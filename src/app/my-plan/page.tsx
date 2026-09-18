@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowUpRight, CreditCard, Settings2 } from "lucide-react";
 import { CardsOptInPrompt } from "@/components/cards-opt-in-prompt";
+import { CashBonusRoadmap } from "@/components/cash-bonus-roadmap";
 import { PersonalPlanDashboard } from "@/components/personal-plan-dashboard";
 import { RecommendedOpportunities } from "@/components/recommended-opportunities";
 import { RewardTracker } from "@/components/reward-tracker";
@@ -55,6 +56,16 @@ export default async function MyPlanPage() {
           opportunities={typedOpportunities}
           accountHistory={typedHistory}
           reminderPreference={typedProfile.reminder_preference || "off"}
+          profile={typedProfile}
+        />
+
+        <CashBonusRoadmap
+          profile={typedProfile}
+          opportunities={typedOpportunities}
+          missions={typedMissions}
+          usedBanks={usedBanks}
+          stateCode={stateCode}
+          addedOpportunityIds={addedOpportunityIds}
         />
 
         <RecommendedOpportunities
@@ -64,6 +75,7 @@ export default async function MyPlanPage() {
           addedOpportunityIds={addedOpportunityIds}
           stateCode={stateCode}
           prominent
+          categoriesOnly
         />
 
         <CardsOptInPrompt
