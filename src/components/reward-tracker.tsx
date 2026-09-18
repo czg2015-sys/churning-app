@@ -162,6 +162,7 @@ function MissionCard({
   const [editingDates, setEditingDates] = useState(false);
   const [savingDates, setSavingDates] = useState(false);
   const [dateError, setDateError] = useState("");
+  const [cancelling, setCancelling] = useState(false);
   const [editOpenedDate, setEditOpenedDate] = useState(mission.opened_at || localTodayIso());
   const [editFundedDate, setEditFundedDate] = useState(mission.funded_at || "");
   const [editFirstDdDate, setEditFirstDdDate] = useState(mission.first_dd_at || "");
@@ -374,6 +375,28 @@ function MissionCard({
     router.refresh();
   }
 
+  async function cancelMissionTracking() {
+    const ok = window.confirm("Remove this item from My Plan? This only stops Churning tracking. It does not close or change the real bank account.");
+    if (!ok) return;
+    setCancelling(true);
+
+    if (guestMode) {
+      emitGuest({ ...mission, status: "cancelled", next_action: "Removed from My Plan tracking." });
+      setCancelling(false);
+      return;
+    }
+
+    const supabase = createClient();
+    const { error } = await supabase.from("missions").update({
+      status: "cancelled",
+      next_action: "Removed from My Plan tracking.",
+      updated_at: new Date().toISOString(),
+    }).eq("id", mission.id);
+
+    setCancelling(false);
+    if (!error) router.refresh();
+  }
+
   async function startTracker() {
     if (!opportunity || !startDate) return;
     const benefitStartOverride = opportunity.benefit_start_trigger === "funded_at"
@@ -519,6 +542,8 @@ function MissionCard({
             {opportunity?.eligibility_notes && <p><strong>Eligibility note:</strong> {opportunity.eligibility_notes}</p>}
             {opportunity?.terms_summary && <p><strong>Stored terms:</strong> {opportunity.terms_summary}</p>}
             {mission.quick_access_url && <a className="card-link" href={mission.quick_access_url} target="_blank" rel="noreferrer">Open official terms</a>}
+            <button type="button" className="reward-remove-plan" onClick={cancelMissionTracking} disabled={cancelling}>{cancelling ? "Removing…" : "Remove from My Plan"}</button>
+            <small className="reward-remove-help">Stops Churning tracking only. It does not close the bank account.</small>
           </div>
         </div>
       )}
