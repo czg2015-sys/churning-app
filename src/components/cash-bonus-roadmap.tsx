@@ -103,7 +103,7 @@ export function CashBonusRoadmap({
 
   const bonusAlternatives = ranked.filter((result) => {
     const item = result.item;
-    if (!result.safetyPassed || activeIds.has(item.id)) return false;
+    if (activeIds.has(item.id)) return false;
     if (item.category === "hysa") return false;
     if (["credit_card_bonus", "brokerage_bonus", "cd", "treasury"].includes(item.category)) return false;
     if (item.category === "debit_spend" && !profile.card_helper_opt_in) return false;
@@ -111,7 +111,6 @@ export function CashBonusRoadmap({
   });
 
   const hysaAlternatives = ranked.filter((result) => (
-    result.safetyPassed &&
     result.item.category === "hysa" &&
     !activeIds.has(result.item.id) &&
     Math.max(numberValue(result.item.required_balance), numberValue(result.item.min_opening_deposit)) <= roadmap.savingsSlot.amount + 0.01
@@ -265,8 +264,9 @@ export function CashBonusRoadmap({
                   <article className="roadmap-bubble bonus" key={slot.opportunity.id}>
                     <div className="roadmap-bubble-top">
                       <span className="roadmap-bubble-icon"><BadgeDollarSign size={18} /></span>
-                      <span className="roadmap-choice-tag">{userSelected ? "Your choice" : `Recommended #${index + 1}`}</span>
+                      <span className="roadmap-choice-tag">{userSelected ? "Your choice" : `Plan #${index + 1}`}</span>
                     </div>
+                    <span className={slot.researchReady ? "roadmap-review-state cleared" : "roadmap-review-state pending"}>{slot.researchReady ? "Research cleared" : "Research pending · review candidate"}</span>
                     <small>{categoryLabel(slot.opportunity).toUpperCase()}</small>
                     <strong>{slot.opportunity.institution}</strong>
                     <b>{slot.opportunity.product_name}</b>
@@ -281,7 +281,7 @@ export function CashBonusRoadmap({
                         {choices.map((result) => <option key={result.item.id} value={result.item.id}>{roadmapAlternativeLabel(result.item)}</option>)}
                       </select>
                     </label>
-                    <AddToPlanButton opportunity={slot.opportunity} alreadyAdded={addedOpportunityIds.includes(slot.opportunity.id)} />
+                    <AddToPlanButton opportunity={slot.opportunity} alreadyAdded={addedOpportunityIds.includes(slot.opportunity.id)} allowPlanningOnHold />
                   </article>
                 );
               }) : (
@@ -308,7 +308,7 @@ export function CashBonusRoadmap({
                   {hysaAlternatives.map((result) => <option key={result.item.id} value={result.item.id}>{result.item.institution} · {result.item.product_name} · {numberValue(result.item.apy).toFixed(2)}%</option>)}
                 </select>
               </label>
-              {roadmap.savingsSlot.opportunity ? <AddToPlanButton opportunity={roadmap.savingsSlot.opportunity} alreadyAdded={addedOpportunityIds.includes(roadmap.savingsSlot.opportunity.id)} /> : null}
+              {roadmap.savingsSlot.opportunity ? <AddToPlanButton opportunity={roadmap.savingsSlot.opportunity} alreadyAdded={addedOpportunityIds.includes(roadmap.savingsSlot.opportunity.id)} allowPlanningOnHold /> : null}
             </div>
           </article>
         </div>
