@@ -38,6 +38,8 @@ type LiveOpportunity = {
   direct_deposit_required: number | string | null;
   monthly_fee: number | string | null;
   annual_fee?: number | string | null;
+  early_close_fee?: number | string | null;
+  fee_starts_after_days?: number | null;
   purchase_required_spend?: number | string | null;
   qualification_days?: number | null;
   payout_days?: number | null;
@@ -57,6 +59,8 @@ type ExtractedTerms = {
   directDepositRequired?: number;
   monthlyFee?: number;
   annualFee?: number;
+  earlyCloseFee?: number;
+  feeStartsAfterDays?: number;
   spendRequirement?: number;
   qualificationDays?: number;
   payoutDays?: number;
@@ -158,6 +162,10 @@ function detectSignals(text: string) {
     mentionsApy: /\bapy\b|annual percentage yield/i.test(text),
     mentionsBonus: /\bbonus\b|cash offer|welcome offer/i.test(text),
     mentionsEarlyClosure: /early\s+clos|close(?:d|r)?\s+(?:the\s+)?account|clawback|forfeit|recoup/i.test(text),
+    mentionsClawback: /clawback|recoup|forfeit|reverse(?:d|al)?\s+(?:the\s+)?bonus|bonus\s+reversal/i.test(text),
+    mentionsFeeWaiver: /waive(?:d|r)?\s+(?:the\s+)?(?:monthly\s+)?fee|fee\s+waiver|avoid\s+(?:the\s+)?monthly\s+(?:service\s+)?fee/i.test(text),
+    mentionsNoMonthlyFee: /no\s+monthly\s+(?:maintenance|service)?\s*fee|\$0\s+monthly\s+(?:maintenance|service)?\s*fee/i.test(text),
+    mentionsKeepOpenRule: /keep\s+(?:the\s+)?account\s+open|remain\s+open|must\s+be\s+open|open\s+and\s+in\s+good\s+standing/i.test(text),
     mentionsFDIC: /member\s+fdic|fdic[- ]insured/i.test(text),
     mentionsNCUA: /ncua|federally insured by the ncua/i.test(text),
     mentionsEligibility: /new customer|existing customer|eligible|ineligible|not eligible/i.test(text),
@@ -236,6 +244,8 @@ function extractTerms(text: string): ExtractedTerms {
   const directDepositRequired = parseMoney(closestMatch(text, /direct\s+deposit/i, money));
   const monthlyFee = parseMoney(closestMatch(text, /monthly\s+(?:service\s+)?fee/i, money));
   const annualFee = parseMoney(closestMatch(text, /annual\s+fee/i, money));
+  const earlyCloseFee = parseMoney(closestMatch(text, /early\s+(?:account\s+)?clos(?:e|ure)|closing\s+fee/i, money));
+  const feeStartsRaw = closestMatch(text, /(?:fee\s+(?:starts|begins)|monthly\s+fee\s+after|waived\s+for)/i, days);
   const spendRequirement = parseMoney(closestMatch(text, /(?:spend|purchases?|purchase requirement)/i, money));
   const cashBackRate = parsePercent(closestMatch(text, /(?:cash\s*back|cashback|rewards? rate)/i, percent));
   const benefitDurationDays = extractLimitedBenefitDurationDays(text);
@@ -250,6 +260,8 @@ function extractTerms(text: string): ExtractedTerms {
     ...(directDepositRequired !== undefined ? { directDepositRequired } : {}),
     ...(monthlyFee !== undefined ? { monthlyFee } : {}),
     ...(annualFee !== undefined ? { annualFee } : {}),
+    ...(earlyCloseFee !== undefined ? { earlyCloseFee } : {}),
+    ...(feeStartsRaw ? { feeStartsAfterDays: Number(feeStartsRaw.match(/\d+/)?.[0] || 0) } : {}),
     ...(spendRequirement !== undefined ? { spendRequirement } : {}),
     ...(cashBackRate !== undefined ? { cashBackRate } : {}),
     ...(qualificationRaw ? { qualificationDays: Number(qualificationRaw.match(/\d+/)?.[0] || 0) } : {}),
@@ -284,6 +296,7 @@ function buildMismatchFlags(opportunity: LiveOpportunity, text: string) {
   if (!expectedValueAppears(text, numberVariants(opportunity.direct_deposit_required, "money"))) flags.push("stored_dd_requirement_not_found_on_page");
   if (!expectedValueAppears(text, numberVariants(opportunity.monthly_fee, "money"))) flags.push("stored_monthly_fee_not_found_on_page");
   if (!expectedValueAppears(text, numberVariants(opportunity.annual_fee, "money"))) flags.push("stored_annual_fee_not_found_on_page");
+  if (!expectedValueAppears(text, numberVariants(opportunity.early_close_fee, "money"))) flags.push("stored_early_close_fee_not_found_on_page");
   return flags;
 }
 
@@ -305,6 +318,8 @@ function buildTermDiffs(opportunity: LiveOpportunity, previous: ExtractedTerms |
     ["directDepositRequired", "Direct deposit requirement"],
     ["monthlyFee", "Monthly fee"],
     ["annualFee", "Annual fee"],
+    ["earlyCloseFee", "Early-close fee"],
+    ["feeStartsAfterDays", "Fee start window"],
     ["spendRequirement", "Spend requirement"],
     ["qualificationDays", "Qualification window"],
     ["payoutDays", "Payout window"],
@@ -325,6 +340,8 @@ function buildTermDiffs(opportunity: LiveOpportunity, previous: ExtractedTerms |
     ["Direct deposit requirement", opportunity.direct_deposit_required, current.directDepositRequired],
     ["Monthly fee", opportunity.monthly_fee, current.monthlyFee],
     ["Annual fee", opportunity.annual_fee, current.annualFee],
+    ["Early-close fee", opportunity.early_close_fee, current.earlyCloseFee],
+    ["Fee start window", opportunity.fee_starts_after_days, current.feeStartsAfterDays],
     ["Spend requirement", opportunity.purchase_required_spend, current.spendRequirement],
     ["Qualification window", opportunity.qualification_days, current.qualificationDays],
     ["Payout window", opportunity.payout_days, current.payoutDays],
@@ -512,7 +529,7 @@ export async function runResearchScan({
 
   try {
     let opportunityQuery = supabase.from("opportunities").select(
-      "id,institution,product_name,category,official_url,safety_gate,bonus_amount,apy,direct_deposit_required,monthly_fee,annual_fee,purchase_required_spend,qualification_days,payout_days,min_account_age_days,required_balance,purchase_count,purchase_min_amount,reward_rate,benefit_duration_days,expires_at,last_verified_at",
+      "id,institution,product_name,category,official_url,safety_gate,bonus_amount,apy,direct_deposit_required,monthly_fee,annual_fee,early_close_fee,fee_starts_after_days,purchase_required_spend,qualification_days,payout_days,min_account_age_days,required_balance,purchase_count,purchase_min_amount,reward_rate,benefit_duration_days,expires_at,last_verified_at",
     ).eq("offer_status", "live").order("institution");
 
     if (scope === "expiring") {
