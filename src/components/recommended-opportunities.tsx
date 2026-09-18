@@ -174,6 +174,7 @@ export function RecommendedOpportunities({
   stateCode,
   resultsPage = false,
   categoriesOnly = false,
+  topOnly = false,
 }: {
   profile: FinancialProfile;
   opportunities: Opportunity[];
@@ -185,6 +186,7 @@ export function RecommendedOpportunities({
   stateCode?: string | null;
   resultsPage?: boolean;
   categoriesOnly?: boolean;
+  topOnly?: boolean;
 }) {
   const ranked = useMemo(() => rankMatches(opportunities, profile, usedBanks, stateCode), [opportunities, profile, usedBanks, stateCode]);
 
@@ -229,7 +231,8 @@ export function RecommendedOpportunities({
         </>
       ) : null}
 
-      <div className="top-match-label category-explore-label"><span>MORE OPTIONS BY CATEGORY</span><p>{categoriesOnly ? "Your roadmap is the recommended path. Open a category only when you want to compare or swap in another option." : "Open a category when you want to compare beyond your three best-fit options."}</p></div>
+      {!topOnly ? <>
+      <div className="top-match-label category-explore-label" id="more-options"><span>MORE OPTIONS BY CATEGORY</span><p>{categoriesOnly ? "Your live roadmap reflects the offers you actually added. Open a category when you want to compare or change what is in your plan." : "Open a category when you want to compare beyond your three best-fit options."}</p></div>
 
       <CategorySection
         title="High-yield savings"
@@ -273,6 +276,7 @@ export function RecommendedOpportunities({
       {!ranked.length ? (
         <div className="recommendation-empty"><ShieldCheck size={30} /><div><h3>No current matches are available for your state.</h3><p>Update the questionnaire or check again after the opportunity library refreshes.</p></div></div>
       ) : null}
+      </> : null}
     </section>
   );
 }
