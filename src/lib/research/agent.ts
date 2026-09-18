@@ -295,7 +295,7 @@ function buildMismatchFlags(opportunity: LiveOpportunity, text: string) {
   const pageMentionsFeeWaiver = /waiv(?:e|ed|er)|avoid(?:ing)?\s+(?:the\s+)?monthly\s+(?:service\s+)?fee|no\s+monthly\s+(?:service\s+)?fee\s+(?:when|if)/i.test(text);
   if (hasStoredFeeWaiver && !pageMentionsFeeWaiver) flags.push("stored_fee_waiver_not_found_on_page");
 
-  const hasStoredCloseRule = Number(opportunity.min_account_age_days || 0) > 0 || Boolean(opportunity.keep_guidance?.trim());
+  const hasStoredCloseRule = Number(opportunity.min_account_age_days || 0) > 0;
   const pageMentionsCloseRule = /must\s+remain\s+open|keep\s+(?:the\s+)?account\s+open|early\s+clos|clawback|recoup|forfeit.*bonus|close.*(?:within|before)/i.test(text);
   if (hasStoredCloseRule && !pageMentionsCloseRule) flags.push("stored_close_rule_not_found_on_page");
 
