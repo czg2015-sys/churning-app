@@ -163,10 +163,6 @@ function MissionCard({
   const [startDate, setStartDate] = useState(todayIso());
   const [fundedDate, setFundedDate] = useState("");
   const [firstDdDate, setFirstDdDate] = useState("");
-  const [editingDates, setEditingDates] = useState(false);
-  const [editOpenedDate, setEditOpenedDate] = useState(mission.opened_at || todayIso());
-  const [editFundedDate, setEditFundedDate] = useState(mission.funded_at || "");
-  const [editFirstDdDate, setEditFirstDdDate] = useState(mission.first_dd_at || "");
   const timeline = timeProgress(mission);
   const requirements = requirementPercent(steps);
   const opportunity = mission.opportunity;
@@ -181,11 +177,6 @@ function MissionCard({
   const feeStartDate = addDaysIso(mission.opened_at, opportunity?.fee_starts_after_days);
 
   useEffect(() => setSteps(mission.mission_steps || []), [mission.mission_steps]);
-  useEffect(() => {
-    setEditOpenedDate(mission.opened_at || todayIso());
-    setEditFundedDate(mission.funded_at || "");
-    setEditFirstDdDate(mission.first_dd_at || "");
-  }, [mission.opened_at, mission.funded_at, mission.first_dd_at]);
 
   function emitGuest(nextMission: Mission) {
     onGuestUpdate?.(nextMission);
@@ -210,11 +201,9 @@ function MissionCard({
       const completedDate = todayIso();
       await supabase.from("missions").update({
         status: "complete",
-        next_action: lifecycle
-          ? `Reward received. ${lifecycle.label}: ${mission.safe_close_review_date ? `review again on ${readableDate(mission.safe_close_review_date)}.` : "review current terms before your next move."}`
-          : mission.safe_close_review_date
-            ? `Reward received. Review whether to keep or close the account on ${readableDate(mission.safe_close_review_date)}.`
-            : "Reward received. Review whether this account is still worth keeping.",
+        next_action: mission.safe_close_review_date
+          ? `Reward received. Review whether to keep or close the account on ${readableDate(mission.safe_close_review_date)}.`
+          : "Reward received. Review whether this account is still worth keeping.",
         updated_at: new Date().toISOString(),
       }).eq("id", mission.id);
 
@@ -317,54 +306,6 @@ function MissionCard({
     }
   }
 
-  async function saveTrackerDates() {
-    if (!opportunity || !editOpenedDate) return;
-    const benefitStartOverride = opportunity.benefit_start_trigger === "funded_at"
-      ? editFundedDate || editOpenedDate
-      : opportunity.benefit_start_trigger === "first_dd_at"
-        ? editFirstDdDate || null
-        : editOpenedDate;
-    const qualificationStartOverride = opportunity.qualification_start_trigger === "funded_at"
-      ? editFundedDate || null
-      : opportunity.qualification_start_trigger === "first_dd_at"
-        ? editFirstDdDate || null
-        : editOpenedDate;
-    const nextTimeline = timelineFromOpenedDate(
-      opportunity,
-      editOpenedDate,
-      inferredTrackingDays(mission),
-      benefitStartOverride,
-      qualificationStartOverride,
-    );
-
-    const patch = {
-      opened_at: editOpenedDate,
-      funded_at: editFundedDate || null,
-      first_dd_at: editFirstDdDate || null,
-      qualification_start_date: nextTimeline.qualificationStartDate,
-      qualification_deadline: nextTimeline.qualificationDeadline,
-      payout_due_date: nextTimeline.payoutDueDate,
-      minimum_account_age_date: nextTimeline.minimumAccountAgeDate,
-      safe_close_review_date: nextTimeline.safeCloseReviewDate,
-      benefit_start_date: nextTimeline.benefitStartDate,
-      benefit_end_date: nextTimeline.benefitEndDate,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (guestMode) {
-      emitGuest({ ...mission, ...patch });
-      setEditingDates(false);
-      return;
-    }
-
-    const supabase = createClient();
-    const { error } = await supabase.from("missions").update(patch).eq("id", mission.id);
-    if (!error) {
-      setEditingDates(false);
-      router.refresh();
-    }
-  }
-
   async function startTracker() {
     if (!opportunity || !startDate) return;
     const benefitStartOverride = opportunity.benefit_start_trigger === "funded_at"
@@ -436,7 +377,7 @@ function MissionCard({
   return (
     <article className={`reward-card ${mission.status === "planned" ? "planned" : ""}`}>
       <div className="reward-card-top">
-        <div className="reward-title-group"><span className="reward-bank">{mission.institution}</span><h3>{mission.title}</h3><div className="reward-title-tags"><span className={`reward-safety ${safety.tone}`}><ShieldCheck size={13} /> {safety.label}</span>{lifecycle ? <span className={`reward-lifecycle-tag ${lifecycle.tone}`}>{lifecycle.label}</span> : null}</div></div>
+        <div className="reward-title-group"><span className="reward-bank">{mission.institution}</span><h3>{mission.title}</h3><span className={`reward-safety ${safety.tone}`}><ShieldCheck size={13} /> {safety.label}</span></div>
         <div className="reward-value"><small>{mission.status === "complete" ? "Reward earned" : "Expected reward"}</small><strong>{money.format(reward)}</strong>{numberValue(mission.amount_committed) > 0 && <span>{money.format(numberValue(mission.amount_committed))} committed</span>}</div>
       </div>
 
@@ -469,22 +410,6 @@ function MissionCard({
         <div><TimerReset size={16} /><span><small>{opportunity?.category === "hysa" ? "Strategy review" : "Safe-close review"}</small><b>{readableDate(mission.safe_close_review_date)}</b></span></div>
         <div className={closeState.ready ? "ready" : ""}><BadgeCheck size={16} /><span><small>{opportunity?.category === "hysa" ? "Review status" : "Exit status"}</small><b>{closeState.text}</b></span></div>
       </div>
-
-      {mission.opened_at ? (
-        <div className="reward-date-edit">
-          {editingDates ? (
-            <div className="reward-start-form reward-edit-form">
-              <label><small>Opened</small><input type="date" value={editOpenedDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setEditOpenedDate(event.target.value)} /></label>
-              {(opportunity?.benefit_start_trigger === "funded_at" || mission.funded_at) ? <label><small>Funded <em>optional</em></small><input type="date" value={editFundedDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setEditFundedDate(event.target.value)} /></label> : null}
-              {(opportunity?.qualification_start_trigger === "first_dd_at" || opportunity?.benefit_start_trigger === "first_dd_at" || mission.first_dd_at) ? <label><small>First DD <em>optional</em></small><input type="date" value={editFirstDdDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setEditFirstDdDate(event.target.value)} /></label> : null}
-              <button type="button" className="button primary compact" onClick={saveTrackerDates}>Save real dates</button>
-              <button type="button" className="button ghost compact" onClick={() => setEditingDates(false)}>Cancel</button>
-            </div>
-          ) : (
-            <button type="button" className="reward-edit-dates-button" onClick={() => setEditingDates(true)}><CalendarDays size={14} /> Edit opening / tracker dates</button>
-          )}
-        </div>
-      ) : null}
 
       <div className="reward-next-action"><span>NEXT ACTION</span><strong>{mission.next_action || "Review the official offer requirements."}</strong></div>
 
