@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { FinancialProfile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Build My Plan" };
+export const metadata: Metadata = { title: "Create My Roadmap" };
 
 export default async function QuestionnairePage() {
   const supabase = await createClient();
@@ -23,7 +23,7 @@ export default async function QuestionnairePage() {
     <main className="page-shell">
       <div className="shell questionnaire-wrap">
         <div className="page-heading">
-          <div><span className="kicker">BUILD YOUR PROFILE</span><h1>A few answers. Better recommendations.</h1><p>Use estimates when you need to. The more accurate the inputs, the better Churning can compare offers against your real cash flow.</p></div>
+          <div><span className="kicker">CREATE YOUR ROADMAP</span><h1>A few answers. One complete cash & bonus plan.</h1><p>Use estimates when you need to. Churning uses your cash, reserve, direct-deposit stream, spending, and strategy style to map out a realistic path—not just rank individual offers.</p></div>
         </div>
         <QuestionnaireForm initial={(profile as FinancialProfile | null) || null} initialBanks={((bankHistory || []) as Array<{ institution: string }>).map((row) => row.institution)} initialState={userProfile?.state_code || "CA"} />
       </div>
