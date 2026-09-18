@@ -169,7 +169,7 @@ export function QuestionnaireForm({
       return;
     }
 
-    router.push("/recommendations");
+    router.push("/my-plan");
     router.refresh();
   }
 
@@ -268,7 +268,7 @@ export function QuestionnaireForm({
       </div>
 
       {error && <div className="form-error" style={{ marginTop: 18 }}>{error}</div>}
-      <div className="form-actions">{guestMode && <Link className="text-link back-link" href="/"><ArrowLeft size={16} /> Back home</Link>}<button className="button primary" type="submit" disabled={saving}>{saving ? "Building your matches…" : <><Sparkles size={17} /> See my recommendations <ArrowRight size={18} /></>}</button></div>
+      <div className="form-actions">{guestMode && <Link className="text-link back-link" href="/"><ArrowLeft size={16} /> Back home</Link>}<button className="button primary" type="submit" disabled={saving}>{saving ? "Building your roadmap…" : <><Sparkles size={17} /> Create my roadmap <ArrowRight size={18} /></>}</button></div>
     </form>
   );
 }
