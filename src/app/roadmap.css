@@ -250,6 +250,19 @@
   font-weight:800;
   white-space:nowrap;
 }
+.roadmap-review-state {
+  width:fit-content;
+  display:block;
+  margin-top:7px;
+  padding:4px 6px;
+  border-radius:999px;
+  font-size:6px;
+  font-weight:850;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+}
+.roadmap-review-state.cleared { color:#ccebd9; background:rgba(59,178,115,.11); }
+.roadmap-review-state.pending { color:#ffe2a7; background:rgba(255,211,122,.10); }
 .roadmap-bubble-metrics {
   display:grid;
   grid-template-columns:repeat(2,minmax(0,1fr));
