@@ -99,7 +99,11 @@
 .history-mini-form em { color:var(--muted); font-style:normal; font-weight:400; }
 .history-message { display:block; margin-top:8px; color:var(--green); font-size:9px; }
 .history-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
-.history-chips span { max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:6px 8px; border:1px solid var(--line); border-radius:999px; color:var(--muted); font-size:8px; }
+.history-chip { max-width:310px; display:inline-flex; align-items:center; gap:5px; padding:5px 6px 5px 8px; border:1px solid var(--line); border-radius:999px; color:var(--muted); font-size:8px; }
+.history-chip > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.history-chip button { width:20px; height:20px; flex:0 0 auto; display:grid; place-items:center; padding:0; border:0; border-radius:50%; background:rgba(255,255,255,.045); color:var(--muted); cursor:pointer; }
+.history-chip button:hover { background:rgba(255,141,130,.12); color:var(--danger); }
+.history-chip button:disabled { opacity:.45; cursor:wait; }
 
 .recommendation-slot { min-width:0; display:grid; gap:6px; }
 .recommendation-slot .top-match-card { height:100%; }
