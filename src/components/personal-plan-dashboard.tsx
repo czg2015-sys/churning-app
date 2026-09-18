@@ -271,7 +271,7 @@ export function PersonalPlanDashboard({
       <div className="dashboard-money-picture">
         <div><small>Total liquid cash</small><strong>{money.format(totalCash)}</strong></div>
         <div><small>Protected reserve</small><strong>{money.format(protectedReserve)}</strong></div>
-        <div><small>Available to optimize</small><strong>{money.format(availableToOptimize)}</strong></div>
+        <div><small>Cash after reserve</small><strong>{money.format(availableToOptimize)}</strong></div>
         <div><small>Monthly DD stream</small><strong>{money.format(monthlyDdStream)}</strong><span>from your paycheck input</span></div>
       </div>
 
