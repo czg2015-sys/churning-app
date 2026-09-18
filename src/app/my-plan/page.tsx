@@ -59,13 +59,19 @@ export default async function MyPlanPage() {
           profile={typedProfile}
         />
 
-        <CashBonusRoadmap
+        <RecommendedOpportunities
           profile={typedProfile}
           opportunities={typedOpportunities}
-          missions={typedMissions}
           usedBanks={usedBanks}
-          stateCode={stateCode}
           addedOpportunityIds={addedOpportunityIds}
+          stateCode={stateCode}
+          prominent
+          topOnly
+        />
+
+        <CashBonusRoadmap
+          profile={typedProfile}
+          missions={typedMissions}
         />
 
         <RecommendedOpportunities
