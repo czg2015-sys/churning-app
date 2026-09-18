@@ -72,7 +72,7 @@ export function opportunityCashNeed(item: Opportunity) {
 
 function activeResourceUse(missions: Mission[]) {
   return missions
-    .filter((mission) => !["completed", "closed"].includes(mission.status))
+    .filter((mission) => !["complete", "cancelled"].includes(mission.status))
     .reduce((acc, mission) => {
       acc.cash += Math.max(0, numberValue(mission.amount_committed));
       if (mission.opportunity) acc.dd += monthlyDdNeed(mission.opportunity);
@@ -81,6 +81,7 @@ function activeResourceUse(missions: Mission[]) {
 }
 
 function bonusCandidate(result: Ranked, profile: FinancialProfile) {
+  if (!result.safetyPassed) return false;
   if (result.item.category === "hysa") return false;
   if (["credit_card_bonus", "brokerage_bonus", "cd", "treasury"].includes(result.item.category)) return false;
   if (result.item.category === "debit_spend" && !profile.card_helper_opt_in) return false;
@@ -139,7 +140,7 @@ function bestSavingsSlot(
 ): RoadmapSavingsSlot {
   const currentApy = Math.max(0, numberValue(profile.current_hysa_apy));
   const hysaCandidates = ranked
-    .filter((result) => result.item.category === "hysa")
+    .filter((result) => result.item.category === "hysa" && result.safetyPassed)
     .filter((result) => opportunityCashNeed(result.item) <= amount + 0.01)
     .sort((a, b) => numberValue(b.item.apy) - numberValue(a.item.apy) || b.score - a.score);
 
@@ -203,7 +204,7 @@ export function buildCashBonusRoadmap({
 
   const activeIds = new Set(
     missions
-      .filter((mission) => !["completed", "closed"].includes(mission.status))
+      .filter((mission) => !["complete", "cancelled"].includes(mission.status))
       .map((mission) => mission.opportunity_id)
       .filter((id): id is string => Boolean(id)),
   );
