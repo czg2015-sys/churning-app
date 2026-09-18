@@ -40,7 +40,7 @@ function makeGuestMission(opportunity: Opportunity, details: PlanStartDetails): 
       mission_id: missionId,
       user_id: "guest",
       label: "Account opened and opening date confirmed",
-      step_type: "opened",
+      step_type: "open_account",
       step_order: stepOrder++,
       is_complete: details.openedAlready,
       completed_at: details.openedAlready ? now : null,
@@ -75,7 +75,7 @@ function makeGuestMission(opportunity: Opportunity, details: PlanStartDetails): 
       mission_id: missionId,
       user_id: "guest",
       label: purchaseRule,
-      step_type: "purchase_requirement",
+      step_type: "spend",
       step_order: stepOrder++,
       is_complete: false,
       completed_at: null,
@@ -89,7 +89,7 @@ function makeGuestMission(opportunity: Opportunity, details: PlanStartDetails): 
       mission_id: missionId,
       user_id: "guest",
       label: `Required balance (${money.format(balanceTarget)} target)`,
-      step_type: "balance_hold",
+      step_type: "hold",
       step_order: stepOrder++,
       target_amount: balanceTarget,
       current_amount: details.amountCommitted,
@@ -103,7 +103,7 @@ function makeGuestMission(opportunity: Opportunity, details: PlanStartDetails): 
     mission_id: missionId,
     user_id: "guest",
     label: opportunity.category === "hysa" && numberValue(opportunity.bonus_amount) <= 0 ? "Actual interest earned during tracked period" : expectedInterest > 0 ? "Actual reward + interest received" : "Reward received",
-    step_type: "reward_received",
+    step_type: "bonus_received",
     step_order: stepOrder,
     target_amount: expectedTotalEarnings,
     current_amount: 0,
@@ -162,7 +162,7 @@ export function GuestWorkspace({
   const addedOpportunityIds = useMemo(() => missions.map((mission) => mission.opportunity_id).filter(Boolean) as string[], [missions]);
 
   function addGuestMission(opportunity: Opportunity, details: PlanStartDetails) {
-    setMissions((current) => current.some((mission) => mission.opportunity_id === opportunity.id && !["completed", "closed"].includes(mission.status))
+    setMissions((current) => current.some((mission) => mission.opportunity_id === opportunity.id && !["complete", "cancelled"].includes(mission.status))
       ? current
       : [makeGuestMission(opportunity, details), ...current]);
   }
