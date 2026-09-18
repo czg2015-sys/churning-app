@@ -71,7 +71,7 @@ export function CashBonusRoadmap({
       <div className="roadmap-capacity-strip">
         <div><small>TOTAL LIQUID CASH</small><strong>{money.format(roadmap.totalCash)}</strong><span>from your profile</span></div>
         <div><small>PROTECTED RESERVE</small><strong>{money.format(roadmap.reserve)}</strong><span>kept outside the plan</span></div>
-        <div><small>IN SELECTED ACCOUNTS</small><strong>{money.format(roadmap.selectedCash)}</strong><span>{roadmap.missions.length} tracked item{roadmap.missions.length === 1 ? "" : "s"}</span></div>
+        <div className={roadmap.cashOverage > 0 ? "roadmap-capacity-warning" : ""}><small>IN SELECTED ACCOUNTS</small><strong>{money.format(roadmap.selectedCash)}</strong><span>{roadmap.cashOverage > 0 ? `${money.format(roadmap.cashOverage)} over available cash` : `${roadmap.missions.length} tracked item${roadmap.missions.length === 1 ? "" : "s"}`}</span></div>
         <div><small>POTENTIAL REWARDS</small><strong>{money.format(roadmap.potentialRewardValue)}</strong><span>{roadmap.potentialRewardCount} reward{roadmap.potentialRewardCount === 1 ? "" : "s"} still lined up</span></div>
       </div>
 
@@ -162,13 +162,13 @@ export function CashBonusRoadmap({
                 </div>
               ))}
               <ArrowRight size={14} />
-              <div className="roadmap-dd-node remainder"><small>UNASSIGNED DD</small><strong>{money.format(roadmap.monthlyDdRemaining)}/mo</strong><span>available for future offers</span></div>
+              <div className={`roadmap-dd-node remainder ${roadmap.ddOverage > 0 ? "warning" : ""}`}><small>{roadmap.ddOverage > 0 ? "DD OVER CAPACITY" : "UNASSIGNED DD"}</small><strong>{roadmap.ddOverage > 0 ? money.format(roadmap.ddOverage) : money.format(roadmap.monthlyDdRemaining)}/mo</strong><span>{roadmap.ddOverage > 0 ? "Reduce or finish a DD lane before adding another." : "available for future offers"}</span></div>
             </div>
           </div>
 
-          <div className="roadmap-allocation-check">
+          <div className={`roadmap-allocation-check ${roadmap.cashOverage > 0 || roadmap.ddOverage > 0 ? "warning" : ""}`}>
             <CircleDollarSign size={17} />
-            <span><strong>Your selected plan accounts for the full cash picture.</strong><small>{money.format(roadmap.reserve)} protected + {money.format(roadmap.selectedCash)} tracked + {money.format(roadmap.remainingCash)} left liquid.</small></span>
+            <span><strong>{roadmap.cashOverage > 0 || roadmap.ddOverage > 0 ? "Your selected plan needs an adjustment." : "Your selected plan accounts for the full cash picture."}</strong><small>{roadmap.cashOverage > 0 ? `Selected accounts exceed available cash by ${money.format(roadmap.cashOverage)}. ` : ""}{roadmap.ddOverage > 0 ? `DD requirements exceed your entered monthly stream by about ${money.format(roadmap.ddOverage)}. ` : ""}{roadmap.cashOverage <= 0 && roadmap.ddOverage <= 0 ? `${money.format(roadmap.reserve)} protected + ${money.format(roadmap.selectedCash)} tracked + ${money.format(roadmap.remainingCash)} left liquid.` : "Use More Options or remove a tracked offer to bring the roadmap back inside your profile limits."}</small></span>
             <b>{money.format(roadmap.totalCash)} total</b>
           </div>
 
