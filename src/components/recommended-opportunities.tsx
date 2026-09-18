@@ -251,7 +251,7 @@ export function RecommendedOpportunities({
       />
       <CategorySection
         title="Checking & direct-deposit bonuses"
-        subtitle={Number(profile.strategy_mode || 2) === 3 && profile.employer_multiple_dd === true ? "Checking and DD offers that fit your paycheck capacity." : "Checking and DD offers; the Top 3 avoids stacking DD requirements your paycheck cannot support."}
+        subtitle={Number(profile.strategy_mode || 2) === 3 && profile.employer_multiple_dd === true ? "Checking and DD offers that fit your paycheck capacity." : "Checking and DD offers. Your roadmap avoids stacking requirements your paycheck cannot support."}
         items={checking}
         profile={profile}
         guestMode={guestMode}
