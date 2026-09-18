@@ -35,7 +35,7 @@ export default async function MyPlanPage() {
   const typedMissions = (missions || []) as Mission[];
   const typedHistory = (bankHistory || []) as AccountHistory[];
   const usedBanks: string[] = Array.from(new Set(typedHistory.map((row) => row.institution).filter((bank): bank is string => Boolean(bank))));
-  const addedOpportunityIds = typedMissions.filter((mission) => !["completed", "closed"].includes(mission.status)).map((mission) => mission.opportunity_id).filter((id): id is string => Boolean(id));
+  const addedOpportunityIds = typedMissions.filter((mission) => !["complete", "cancelled"].includes(mission.status)).map((mission) => mission.opportunity_id).filter((id): id is string => Boolean(id));
   const stateCode = userProfile?.state_code || "CA";
 
   return (
