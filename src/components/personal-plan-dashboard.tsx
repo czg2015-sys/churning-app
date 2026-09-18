@@ -14,7 +14,8 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { categoryLabel, money, numberValue } from "@/lib/plan-math";
+import { accountLifecycleGuidance, categoryLabel, money, numberValue } from "@/lib/plan-math";
+import { missionRoadmapAction, requirementProgress } from "@/lib/roadmap";
 import type { AccountHistory, FinancialProfile, Mission, Opportunity } from "@/lib/types";
 
 type ReminderPreference = "all" | "important" | "off";
@@ -235,7 +236,7 @@ export function PersonalPlanDashboard({
       <div className="personal-dashboard-stats">
         <article><WalletCards size={18} /><span><small>Cash tracked</small><strong>{money.format(trackedCash)}</strong></span></article>
         <article><Target size={18} /><span><small>Active rewards</small><strong>{active.length}</strong></span></article>
-        <article><CircleDollarSign size={18} /><span><small>Potential rewards</small><strong>{money.format(potentialRewards)}</strong></span></article>
+        <article><CircleDollarSign size={18} /><span><small>Potential rewards</small><strong>{money.format(potentialRewards)}</strong><em>{active.length} reward{active.length === 1 ? "" : "s"} lined up</em></span></article>
         <article className={endingSoon ? "attention" : ""}><Clock3 size={18} /><span><small>Ending in 30 days</small><strong>{endingSoon}</strong></span></article>
       </div>
 
@@ -252,22 +253,35 @@ export function PersonalPlanDashboard({
           <div className="dashboard-tracking-list">
             {active.slice(0, 4).map((mission) => {
               const progress = missionProgress(mission);
+              const requirement = requirementProgress(mission);
+              const action = missionRoadmapAction(mission);
+              const lifecycle = mission.opportunity ? accountLifecycleGuidance(mission.opportunity) : null;
               const reminder = missionReminderState[mission.id];
+              const expected = numberValue(mission.expected_bonus) + numberValue(mission.expected_interest);
               return (
                 <article key={mission.id}>
                   <div className="tracking-main">
-                    <div className="tracking-title"><span>{missionCategory(mission)}</span><strong>{mission.institution} · {mission.title}</strong></div>
+                    <div className="tracking-title">
+                      <span>{missionCategory(mission)}</span>
+                      <b>{money.format(expected)} potential</b>
+                    </div>
+                    <strong className="tracking-offer-name">{mission.institution} · {mission.title}</strong>
                     <div className="tracking-progress"><span style={{ width: `${progress.percent}%` }} /></div>
                     <div className="tracking-foot"><b>{progress.label}</b><span>{progress.sub}</span></div>
+                    <div className="tracking-compact-action"><span>NEXT</span><strong>{action.label}</strong></div>
+                    <div className="tracking-requirement-line"><span>Requirements {requirement}%</span><div><i style={{ width: `${requirement}%` }} /></div></div>
                   </div>
-                  <label className="tracking-reminder">
-                    <small>Reminder</small>
-                    <select value={reminder === true ? "on" : reminder === false ? "off" : "default"} onChange={(event) => setMissionReminder(mission.id, event.target.value as "default" | "on" | "off")}>
-                      <option value="default">Default</option>
-                      <option value="on">On</option>
-                      <option value="off">Off</option>
-                    </select>
-                  </label>
+                  <div className="tracking-side">
+                    {lifecycle ? <span className={`tracking-lifecycle ${lifecycle.tone}`}>{lifecycle.shortLabel}</span> : null}
+                    <label className="tracking-reminder">
+                      <small>Reminder</small>
+                      <select value={reminder === true ? "on" : reminder === false ? "off" : "default"} onChange={(event) => setMissionReminder(mission.id, event.target.value as "default" | "on" | "off")}>
+                        <option value="default">Default</option>
+                        <option value="on">On</option>
+                        <option value="off">Off</option>
+                      </select>
+                    </label>
+                  </div>
                 </article>
               );
             })}
