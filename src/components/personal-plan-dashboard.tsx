@@ -304,7 +304,10 @@ export function PersonalPlanDashboard({
           </form>
         ) : null}
         {historyMessage ? <small className="history-message">{historyMessage}</small> : null}
-        {historyRows.length ? <div className="history-chips">{historyRows.slice(0, 8).map((row) => <span className="history-chip" key={row.id}><span>{row.institution}{row.product_name ? ` · ${row.product_name}` : ""}</span><button type="button" onClick={() => removeHistory(row)} disabled={historyRemovingId === row.id} aria-label={`Remove ${row.institution} from previous offers`} title="Remove previous offer"><X size={12} /></button></span>)}</div> : null}
+        {historyRows.length ? <div className="history-chips">{historyRows.slice(0, 8).map((row) => {
+          const removable = row.notes === "Reported during onboarding" || row.notes === "Prior offer added from My Plan history search";
+          return <span className="history-chip" key={row.id}><span>{row.institution}{row.product_name ? ` · ${row.product_name}` : ""}</span>{removable ? <button type="button" onClick={() => removeHistory(row)} disabled={historyRemovingId === row.id} aria-label={`Remove ${row.institution} from previous offers`} title="Remove mistaken previous offer"><X size={12} /></button> : null}</span>;
+        })}</div> : null}
       </div>
     </section>
   );
