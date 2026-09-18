@@ -207,3 +207,20 @@
 }
 .reward-edit-dates-inline:hover { color:var(--ink); border-color:rgba(59,178,115,.34); }
 .reward-date-error { color:var(--danger); font-size:8px; }
+
+
+.reward-remove-plan {
+  width:100%;
+  min-height:34px;
+  margin-top:14px;
+  border:1px solid rgba(255,141,130,.18);
+  border-radius:8px;
+  background:rgba(255,141,130,.045);
+  color:var(--danger);
+  cursor:pointer;
+  font-size:8px;
+  font-weight:800;
+}
+.reward-remove-plan:hover { background:rgba(255,141,130,.08); }
+.reward-remove-plan:disabled { opacity:.5; cursor:wait; }
+.reward-remove-help { display:block; margin-top:5px; color:var(--muted); font-size:7px; }
