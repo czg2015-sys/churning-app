@@ -1,6 +1,8 @@
 import "server-only";
 
 import { createResearchAdminClient } from "@/lib/research/server";
+import { accountLifecycleGuidance } from "@/lib/plan-math";
+import type { Opportunity } from "@/lib/types";
 
 type ReminderLevel = "all" | "important" | "off";
 
@@ -15,6 +17,7 @@ type MissionRow = {
   payout_due_date: string | null;
   safe_close_review_date: string | null;
   email_reminders_enabled: boolean | null;
+  opportunity?: Opportunity | null;
   mission_steps?: Array<{ step_type: string; label: string; is_complete: boolean }> | null;
 };
 
@@ -105,12 +108,16 @@ function rulesForMission(mission: MissionRow, level: ReminderLevel, today: strin
     (days) => `Your stored payout review date is ${formatDays(days)}. Check whether the reward posted before marking it received.`,
   );
 
+  const lifecycle = mission.opportunity ? accountLifecycleGuidance(mission.opportunity) : null;
+  const closeFocused = lifecycle && /CLOSE|CLOSING|FEE/.test(lifecycle.label);
   addIfDue(
     "review",
     "account_review",
     mission.safe_close_review_date,
-    `${mission.institution} account review`,
-    (days) => `Your earliest Churning review date is ${formatDays(days)}. Re-check current terms before moving money, downgrading, or closing anything.`,
+    closeFocused ? `Review whether to close ${mission.institution}` : `${mission.institution} account review`,
+    (days) => lifecycle
+      ? `Your account review date is ${formatDays(days)}. ${lifecycle.label}: ${lifecycle.text} Re-check the current official terms before acting.`
+      : `Your earliest Churning review date is ${formatDays(days)}. Re-check current terms before moving money, downgrading, or closing anything.`,
   );
 
   return rules;
@@ -148,7 +155,7 @@ export async function runReminderSweep() {
   const [{ data: missions, error: missionError }, { data: profiles, error: profileError }] = await Promise.all([
     supabase
       .from("missions")
-      .select("id,user_id,institution,title,status,qualification_deadline,benefit_end_date,payout_due_date,safe_close_review_date,email_reminders_enabled,mission_steps(step_type,label,is_complete)")
+      .select("id,user_id,institution,title,status,qualification_deadline,benefit_end_date,payout_due_date,safe_close_review_date,email_reminders_enabled,opportunity:opportunities(*,opportunity_reviews(*)),mission_steps(step_type,label,is_complete)")
       .in("status", ["planned", "active", "waiting_bonus", "bonus_received", "safe_to_close"]),
     supabase
       .from("financial_profiles")
