@@ -258,6 +258,7 @@ export function accountLifecycleGuidance(opportunity: Opportunity) {
   const annualFee = numberValue(opportunity.annual_fee);
   const feeWaiver = (opportunity.fee_waiver_summary || "").trim();
   const researchedClose = latestReview(opportunity)?.safe_close_summary?.trim();
+  const storedKeepGuidance = opportunity.keep_guidance?.trim();
 
   if (opportunity.category === "credit_card_bonus") {
     if (annualFee > 0) {
@@ -316,7 +317,7 @@ export function accountLifecycleGuidance(opportunity: Opportunity) {
       shortLabel: "No automatic close",
       tone: "neutral",
       closeBias: "keep" as const,
-      text: researchedClose || "No recurring monthly fee is stored. There is no automatic reason to close after the reward; review future eligibility, account usefulness, and current terms before deciding.",
+      text: researchedClose || storedKeepGuidance || "No recurring monthly fee is stored. There is no automatic reason to close after the reward; review future eligibility, account usefulness, and current terms before deciding.",
     };
   }
 
@@ -325,7 +326,7 @@ export function accountLifecycleGuidance(opportunity: Opportunity) {
     shortLabel: "Review later",
     tone: "neutral",
     closeBias: "review" as const,
-    text: researchedClose || "After the benefit is complete, review the current official terms and ongoing value before deciding whether to keep or close the account.",
+    text: researchedClose || storedKeepGuidance || "After the benefit is complete, review the current official terms and ongoing value before deciding whether to keep or close the account.",
   };
 }
 
