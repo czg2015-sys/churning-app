@@ -160,3 +160,23 @@
   .dashboard-money-picture { grid-template-columns:1fr; }
   .dashboard-money-picture > div + div { border-left:0; border-top:1px solid var(--line); }
 }
+
+
+.personal-dashboard-stats em { display:block; margin-top:1px; color:var(--muted); font-size:7px; font-style:normal; }
+.tracking-title b { color:var(--green); font-size:8px; white-space:nowrap; }
+.tracking-offer-name { display:block; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px; }
+.tracking-compact-action { display:grid; grid-template-columns:auto 1fr; gap:7px; align-items:start; margin-top:8px; padding-top:7px; border-top:1px solid var(--line); }
+.tracking-compact-action span { color:var(--green); font-size:7px; font-weight:850; letter-spacing:.07em; }
+.tracking-compact-action strong { font-size:8px; line-height:1.35; }
+.tracking-requirement-line { display:grid; grid-template-columns:auto 1fr; gap:8px; align-items:center; margin-top:6px; }
+.tracking-requirement-line > span { color:var(--muted); font-size:7px; white-space:nowrap; }
+.tracking-requirement-line > div { height:3px; overflow:hidden; border-radius:999px; background:rgba(255,255,255,.06); }
+.tracking-requirement-line i { display:block; height:100%; border-radius:inherit; background:var(--green); }
+.tracking-side { display:grid; gap:8px; align-content:center; }
+.tracking-lifecycle { display:block; padding:5px 6px; border:1px solid var(--line); border-radius:8px; color:var(--muted-strong); background:rgba(255,255,255,.025); font-size:6px; font-weight:850; text-align:center; text-transform:uppercase; letter-spacing:.04em; }
+.tracking-lifecycle.review { color:#ffe3aa; border-color:rgba(255,211,122,.20); background:rgba(255,211,122,.07); }
+.tracking-lifecycle.neutral { color:#d7ecdf; border-color:rgba(59,178,115,.16); background:rgba(59,178,115,.05); }
+@media (max-width:680px) {
+  .tracking-offer-name { white-space:normal; }
+  .tracking-side { grid-template-columns:1fr 1fr; align-items:end; }
+}
