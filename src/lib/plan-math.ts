@@ -11,6 +11,13 @@ export function numberValue(value: number | string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+export function localTodayIso(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function addDaysIso(dateValue: string, days: number) {
   const date = new Date(`${dateValue}T12:00:00`);
   date.setDate(date.getDate() + Math.max(0, days));
@@ -249,61 +256,76 @@ export function opportunityFit(opportunity: Opportunity, profile: FinancialProfi
 export function accountLifecycleGuidance(opportunity: Opportunity) {
   const monthlyFee = numberValue(opportunity.monthly_fee);
   const annualFee = numberValue(opportunity.annual_fee);
-  const earlyCloseFee = numberValue(opportunity.early_close_fee);
-  const minimumAgeDays = Math.max(0, numberValue(opportunity.min_account_age_days));
   const feeWaiver = (opportunity.fee_waiver_summary || "").trim();
-  const review = latestReview(opportunity);
-  const researchedClose = review?.safe_close_summary?.trim();
-  const closeRuleVerified = review?.close_rule_status === "verified";
+  const researchedClose = latestReview(opportunity)?.safe_close_summary?.trim();
 
   if (opportunity.category === "credit_card_bonus") {
+    if (annualFee > 0) {
+      return {
+        label: "REVIEW BEFORE ANNUAL FEE",
+        shortLabel: "Annual-fee review",
+        tone: "review",
+        closeBias: "review" as const,
+        text: `A stored ${money.format(annualFee)} annual fee applies. After the welcome offer, review the ongoing value before the next fee posts; keeping, downgrading, or closing should depend on current issuer terms and your credit goals.`,
+      };
+    }
     return {
-      label: "DON’T AUTO-CLOSE",
-      tone: "review",
-      text: annualFee > 0
-        ? `This card has a stored ${money.format(annualFee)} annual fee. Review keep, downgrade, product-change, or closure options before renewal rather than closing only because the welcome bonus is complete.`
-        : "No annual fee is stored. Review ongoing rewards, utilization, and account age before any closure decision.",
+      label: "NO NEED TO CLOSE",
+      shortLabel: "No automatic close",
+      tone: "neutral",
+      closeBias: "keep" as const,
+      text: "No annual fee is stored. There is no automatic reason to close after the welcome offer; review the card’s ongoing value and your credit goals first.",
     };
   }
 
-  if (!closeRuleVerified) {
+  if (monthlyFee > 0 && feeWaiver) {
     return {
-      label: monthlyFee > 0 ? "FEE + CLOSE RULE REVIEW" : "CLOSE RULE NEEDS REVIEW",
+      label: "KEEP ONLY IF FEE IS WAIVED",
+      shortLabel: "Fee-waiver watch",
       tone: "review",
-      text: `${monthlyFee > 0 ? `Stored monthly fee: ${money.format(monthlyFee)}. ` : ""}The latest research does not yet verify the close/clawback rule. Do not treat the roadmap or tracker date as permission to close.`,
-    };
-  }
-
-  if (earlyCloseFee > 0 || minimumAgeDays > 0) {
-    return {
-      label: "WAIT BEFORE CLOSING",
-      tone: "review",
-      text: `${earlyCloseFee > 0 ? `Stored early-close fee: ${money.format(earlyCloseFee)}. ` : ""}${minimumAgeDays > 0 ? `Stored minimum account age: ${minimumAgeDays} days. ` : ""}${researchedClose || "Keep the account open through all stored timing requirements, then re-check current terms before closure."}`,
+      closeBias: "conditional" as const,
+      text: `A stored ${money.format(monthlyFee)}/month fee applies unless the waiver is met: ${feeWaiver} After the reward and minimum-open period, keep it only if you expect to keep meeting that waiver or the account still provides enough value; otherwise review it for closure after re-checking current terms.`,
     };
   }
 
   if (monthlyFee > 0) {
     return {
-      label: feeWaiver ? "REVIEW TO KEEP OR CLOSE" : "REVIEW TO CLOSE",
+      label: "REVIEW TO CLOSE",
+      shortLabel: "Close review",
       tone: "review",
-      text: feeWaiver
-        ? `Stored monthly fee: ${money.format(monthlyFee)}. Current waiver note: ${feeWaiver} After the reward and payout are complete, keep the account only if the waiver or ongoing benefit still makes sense; otherwise review closure after the researched close date.`
-        : `Stored monthly fee: ${money.format(monthlyFee)}. After the reward and payout are complete, review closure so an unused account does not keep generating fees. Re-check current terms first.`,
+      closeBias: "close_review" as const,
+      text: `A stored ${money.format(monthlyFee)}/month fee applies and no verified waiver is stored. After the reward is received and the minimum-open/clawback window is satisfied, review the account for closure so the fee does not erase the bonus. Re-check the current official terms before closing.`,
     };
   }
 
   if (opportunity.category === "hysa") {
     return {
-      label: "KEEP OPTIONAL",
+      label: "NO NEED TO CLOSE",
+      shortLabel: "Rate review",
       tone: "neutral",
-      text: researchedClose || "No recurring monthly fee is stored. Keep it while the rate and account fit remain useful; move the cash when a better option fits.",
+      closeBias: "keep" as const,
+      text: opportunity.benefit_duration_days
+        ? "No monthly fee is stored. When the promotional rate ends, compare the new rate with your alternatives; this is a move-money review, not an automatic account-close instruction."
+        : "No monthly fee is stored. Keep the account while the rate and access still fit; review the rate periodically rather than closing automatically.",
+    };
+  }
+
+  if (["savings_bonus", "checking_bonus", "debit_spend"].includes(opportunity.category)) {
+    return {
+      label: "NO NEED TO CLOSE",
+      shortLabel: "No automatic close",
+      tone: "neutral",
+      closeBias: "keep" as const,
+      text: researchedClose || "No recurring monthly fee is stored. There is no automatic reason to close after the reward; review future eligibility, account usefulness, and current terms before deciding.",
     };
   }
 
   return {
-    label: "CLOSE OPTIONAL AFTER PAYOUT",
+    label: "REVIEW AFTER COMPLETION",
+    shortLabel: "Review later",
     tone: "neutral",
-    text: researchedClose || "No recurring monthly fee or minimum-age restriction is stored. There is no automatic reason to close after the reward; if you no longer need the account, review current terms after payout before closing.",
+    closeBias: "review" as const,
+    text: researchedClose || "After the benefit is complete, review the current official terms and ongoing value before deciding whether to keep or close the account.",
   };
 }
 
