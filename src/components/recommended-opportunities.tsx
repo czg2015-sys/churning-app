@@ -168,6 +168,7 @@ export function RecommendedOpportunities({
   prominent = false,
   stateCode,
   resultsPage = false,
+  categoriesOnly = false,
 }: {
   profile: FinancialProfile;
   opportunities: Opportunity[];
@@ -178,6 +179,7 @@ export function RecommendedOpportunities({
   prominent?: boolean;
   stateCode?: string | null;
   resultsPage?: boolean;
+  categoriesOnly?: boolean;
 }) {
   const ranked = useMemo(() => rankMatches(opportunities, profile, usedBanks, stateCode), [opportunities, profile, usedBanks, stateCode]);
 
@@ -189,36 +191,40 @@ export function RecommendedOpportunities({
   const planPicks = selectFeasibleRecommendations(opportunities, profile, usedBanks, stateCode, 3);
 
   return (
-    <section className={`recommendations-shell ${prominent ? "recommendations-prominent" : ""} ${resultsPage ? "recommendations-results-layout" : ""}`}>
-      <div className="recommendations-head compact-recommendations-head">
-        <div>
-          <span className="kicker">YOUR 3 BEST-FIT OPTIONS</span>
-          <h2>{resultsPage ? "Start here: the three opportunities that fit your profile best." : "Here are the three options we think fit your situation best."}</h2>
-          <p>We check the three together against your cash, direct-deposit capacity, spending, and current offer requirements so the group is realistic—not just attractive one by one.</p>
-        </div>
-      </div>
-
-      {planPicks.length ? (
+    <section className={`recommendations-shell ${prominent ? "recommendations-prominent" : ""} ${resultsPage ? "recommendations-results-layout" : ""} ${categoriesOnly ? "categories-only" : ""}`}>
+      {!categoriesOnly ? (
         <>
-          <div className="top-match-label"><span>MOST RECOMMENDED FOR YOU</span><p>Start with these first. You can still open any category below to compare more options.</p></div>
-          <div className="top-match-grid">
-            {planPicks.map((result, index) => (
-              <div className="recommendation-slot" key={`plan-${result.item.id}`}>
-                <div className="recommendation-slot-label"><span>#{index + 1}</span>{categoryLabel(result.item)}</div>
-                <RecommendationCard
-                  result={result}
-                  profile={profile}
-                  guestMode={guestMode}
-                  onGuestAdd={onGuestAdd}
-                  addedOpportunityIds={addedOpportunityIds}
-                />
-              </div>
-            ))}
+          <div className="recommendations-head compact-recommendations-head">
+            <div>
+              <span className="kicker">YOUR 3 BEST-FIT OPTIONS</span>
+              <h2>{resultsPage ? "Start here: the three opportunities that fit your profile best." : "Here are the three options we think fit your situation best."}</h2>
+              <p>We check the three together against your cash, direct-deposit capacity, spending, and current offer requirements so the group is realistic—not just attractive one by one.</p>
+            </div>
           </div>
+
+          {planPicks.length ? (
+            <>
+              <div className="top-match-label"><span>MOST RECOMMENDED FOR YOU</span><p>Start with these first. You can still open any category below to compare more options.</p></div>
+              <div className="top-match-grid">
+                {planPicks.map((result, index) => (
+                  <div className="recommendation-slot" key={`plan-${result.item.id}`}>
+                    <div className="recommendation-slot-label"><span>#{index + 1}</span>{categoryLabel(result.item)}</div>
+                    <RecommendationCard
+                      result={result}
+                      profile={profile}
+                      guestMode={guestMode}
+                      onGuestAdd={onGuestAdd}
+                      addedOpportunityIds={addedOpportunityIds}
+                    />
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : null}
         </>
       ) : null}
 
-      <div className="top-match-label category-explore-label"><span>MORE OPTIONS BY CATEGORY</span><p>Open a category when you want to compare beyond your three best-fit options.</p></div>
+      <div className="top-match-label category-explore-label"><span>MORE OPTIONS BY CATEGORY</span><p>{categoriesOnly ? "Your roadmap is the recommended path. Open a category only when you want to compare or swap in another option." : "Open a category when you want to compare beyond your three best-fit options."}</p></div>
 
       <CategorySection
         title="High-yield savings"
