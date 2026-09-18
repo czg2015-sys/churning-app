@@ -1,10 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   BellRing,
-  CheckCircle2,
-  ChevronRight,
   CircleDollarSign,
   Clock3,
   History,
@@ -12,6 +11,7 @@ import {
   Search,
   Target,
   WalletCards,
+  X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { categoryLabel, money, numberValue } from "@/lib/plan-math";
@@ -85,40 +85,6 @@ function missionProgress(mission: Mission) {
   };
 }
 
-function nextActionCandidates(mission: Mission) {
-  if (!mission.opened_at) {
-    return [{
-      id: `${mission.id}-start`,
-      days: -1,
-      date: null as string | null,
-      label: "Start tracking",
-      title: mission.next_action || `Confirm when ${mission.institution} is opened.`,
-      mission,
-    }];
-  }
-
-  const events = [
-    { type: "Qualification", date: mission.qualification_deadline },
-    { type: "Benefit ends", date: mission.benefit_end_date },
-    { type: "Payout check", date: mission.payout_due_date },
-    { type: "Review", date: mission.safe_close_review_date },
-  ]
-    .filter((event) => event.date)
-    .map((event) => ({ ...event, days: daysUntil(event.date) }))
-    .filter((event) => event.days !== null && event.days! >= -1)
-    .sort((a, b) => (a.days || 0) - (b.days || 0));
-
-  const event = events[0];
-  return [{
-    id: `${mission.id}-${event?.type || "action"}`,
-    days: event?.days ?? 9999,
-    date: event?.date || null,
-    label: event?.type || "Next action",
-    title: mission.next_action || "Review the current offer requirements.",
-    mission,
-  }];
-}
-
 export function PersonalPlanDashboard({
   missions,
   opportunities,
@@ -132,6 +98,7 @@ export function PersonalPlanDashboard({
   reminderPreference: ReminderPreference;
   profile: FinancialProfile;
 }) {
+  const router = useRouter();
   const [globalReminder, setGlobalReminder] = useState<ReminderPreference>(reminderPreference || "off");
   const [reminderSaving, setReminderSaving] = useState(false);
   const [missionReminderState, setMissionReminderState] = useState<Record<string, boolean | null>>(
@@ -143,9 +110,10 @@ export function PersonalPlanDashboard({
   const [manualInstitution, setManualInstitution] = useState("");
   const [historySaving, setHistorySaving] = useState(false);
   const [historyMessage, setHistoryMessage] = useState("");
+  const [historyRemovingId, setHistoryRemovingId] = useState<string | null>(null);
 
   const active = useMemo(
-    () => missions.filter((mission) => !["completed", "closed"].includes(mission.status)),
+    () => missions.filter((mission) => !["complete", "cancelled"].includes(mission.status)),
     [missions],
   );
   const trackedCash = active.reduce((sum, mission) => sum + numberValue(mission.amount_committed), 0);
@@ -158,18 +126,6 @@ export function PersonalPlanDashboard({
     const left = daysUntil(mission.benefit_end_date || mission.qualification_deadline);
     return left !== null && left >= 0 && left <= 30;
   }).length;
-
-  const actions = useMemo(
-    () => active
-      .flatMap(nextActionCandidates)
-      .sort((a, b) => {
-        if (a.days === -1 && b.days !== -1) return -1;
-        if (b.days === -1 && a.days !== -1) return 1;
-        return a.days - b.days;
-      })
-      .slice(0, 3),
-    [active],
-  );
 
   const matches = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -243,6 +199,21 @@ export function PersonalPlanDashboard({
     setHistorySaving(false);
   }
 
+  async function removeHistory(row: AccountHistory) {
+    setHistoryRemovingId(row.id);
+    setHistoryMessage("");
+    const supabase = createClient();
+    const { error } = await supabase.from("account_history").delete().eq("id", row.id);
+    if (error) {
+      setHistoryMessage("Could not remove that previous offer yet.");
+    } else {
+      setHistoryRows((current) => current.filter((item) => item.id !== row.id));
+      setHistoryMessage(`${row.institution} removed from previous offers.`);
+      router.refresh();
+    }
+    setHistoryRemovingId(null);
+  }
+
   return (
     <section className="personal-plan-dashboard">
       <div className="personal-dashboard-head">
@@ -273,23 +244,6 @@ export function PersonalPlanDashboard({
         <div><small>Protected reserve</small><strong>{money.format(protectedReserve)}</strong></div>
         <div><small>Cash after reserve</small><strong>{money.format(availableToOptimize)}</strong></div>
         <div><small>Monthly DD stream</small><strong>{money.format(monthlyDdStream)}</strong><span>from your paycheck input</span></div>
-      </div>
-
-      <div className="dashboard-next-actions">
-        <div className="dashboard-section-title"><div><span>WHAT NEEDS YOUR ATTENTION</span><h2>Next actions</h2></div><b>{actions.length ? `${actions.length} priority item${actions.length === 1 ? "" : "s"}` : "You’re clear"}</b></div>
-        {actions.length ? (
-          <div className="next-action-list">
-            {actions.map((action, index) => (
-              <article key={action.id}>
-                <span className="next-action-rank">{index + 1}</span>
-                <div><small>{action.label} · {action.mission.institution}</small><strong>{action.title}</strong>{action.date ? <span>{compactDate(action.date)}{action.days >= 0 ? ` · ${action.days} day${action.days === 1 ? "" : "s"} away` : ""}</span> : <span>No countdown until you confirm the start date.</span>}</div>
-                <ChevronRight size={17} />
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div className="dashboard-empty-action"><CheckCircle2 size={20} /><div><strong>No urgent action right now.</strong><span>Add an opportunity below and its tracker will appear here.</span></div></div>
-        )}
       </div>
 
       <div className="dashboard-tracking-block">
@@ -350,7 +304,7 @@ export function PersonalPlanDashboard({
           </form>
         ) : null}
         {historyMessage ? <small className="history-message">{historyMessage}</small> : null}
-        {historyRows.length ? <div className="history-chips">{historyRows.slice(0, 5).map((row) => <span key={row.id}>{row.institution}{row.product_name ? ` · ${row.product_name}` : ""}</span>)}</div> : null}
+        {historyRows.length ? <div className="history-chips">{historyRows.slice(0, 8).map((row) => <span className="history-chip" key={row.id}><span>{row.institution}{row.product_name ? ` · ${row.product_name}` : ""}</span><button type="button" onClick={() => removeHistory(row)} disabled={historyRemovingId === row.id} aria-label={`Remove ${row.institution} from previous offers`} title="Remove previous offer"><X size={12} /></button></span>)}</div> : null}
       </div>
     </section>
   );
