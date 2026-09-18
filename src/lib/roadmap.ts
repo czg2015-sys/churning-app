@@ -37,9 +37,11 @@ export type LiveCashBonusRoadmap = {
   deployableCash: number;
   selectedCash: number;
   remainingCash: number;
+  cashOverage: number;
   monthlyDdStream: number;
   monthlyDdUsed: number;
   monthlyDdRemaining: number;
+  ddOverage: number;
   potentialRewardValue: number;
   potentialRewardCount: number;
   missions: LiveRoadmapMission[];
@@ -332,11 +334,13 @@ export function buildLiveCashBonusRoadmap({
     };
   });
 
-  const selectedCash = Math.min(deployableCash, missionStates.reduce((sum, item) => sum + item.cashAmount, 0));
+  const selectedCash = missionStates.reduce((sum, item) => sum + item.cashAmount, 0);
   const remainingCash = Math.max(0, deployableCash - selectedCash);
+  const cashOverage = Math.max(0, selectedCash - deployableCash);
   const monthlyDdStream = Math.max(0, numberValue(profile.biweekly_pay)) * (26 / 12);
-  const monthlyDdUsed = Math.min(monthlyDdStream, missionStates.reduce((sum, item) => sum + item.monthlyDdNeeded, 0));
+  const monthlyDdUsed = missionStates.reduce((sum, item) => sum + item.monthlyDdNeeded, 0);
   const monthlyDdRemaining = Math.max(0, monthlyDdStream - monthlyDdUsed);
+  const ddOverage = Math.max(0, monthlyDdUsed - monthlyDdStream);
 
   const potentialMissions = missionStates.filter((item) => item.mission.status !== "complete" && !stepOf(item.mission, "bonus_received")?.is_complete);
   const potentialRewardValue = potentialMissions.reduce((sum, item) => sum + item.expectedValue, 0);
@@ -358,9 +362,11 @@ export function buildLiveCashBonusRoadmap({
     deployableCash,
     selectedCash,
     remainingCash,
+    cashOverage,
     monthlyDdStream,
     monthlyDdUsed,
     monthlyDdRemaining,
+    ddOverage,
     potentialRewardValue,
     potentialRewardCount: potentialMissions.length,
     missions: missionStates,
