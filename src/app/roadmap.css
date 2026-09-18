@@ -586,3 +586,33 @@
   .roadmap-allocation-check { grid-template-columns:auto 1fr; margin-inline:15px; }
   .roadmap-allocation-check > b { grid-column:1/-1; text-align:left; }
 }
+
+
+.roadmap-bubble-tags { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:7px; }
+.roadmap-bubble-tags .roadmap-review-state { margin-top:0; }
+.roadmap-close-tag {
+  width:fit-content;
+  display:inline-flex;
+  align-items:center;
+  min-height:22px;
+  padding:0 7px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:rgba(255,255,255,.025);
+  color:var(--muted-strong);
+  font-size:6px;
+  font-weight:850;
+  letter-spacing:.045em;
+}
+.roadmap-close-tag.review { color:#ffe3aa; border-color:rgba(255,211,122,.20); background:rgba(255,211,122,.075); }
+.roadmap-close-tag.neutral { color:#d8eee1; border-color:rgba(59,178,115,.16); background:rgba(59,178,115,.06); }
+.roadmap-bubble.savings > .roadmap-close-tag { margin-top:8px; }
+.roadmap-close-copy {
+  margin:9px 0 0 !important;
+  padding-top:8px;
+  border-top:1px solid var(--line);
+  color:var(--muted) !important;
+  font-size:7px !important;
+  line-height:1.5 !important;
+}
+.roadmap-close-copy strong { color:var(--muted-strong); }
