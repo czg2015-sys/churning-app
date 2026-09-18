@@ -1,276 +1,369 @@
-import type { FinancialProfile, Mission, Opportunity } from "@/lib/types";
-import { addDaysIso, numberValue, opportunityEconomics, rankMatches } from "@/lib/plan-math";
+import type { FinancialProfile, Mission, MissionStep, Opportunity } from "@/lib/types";
+import { accountLifecycleGuidance, localTodayIso, money, numberValue } from "@/lib/plan-math";
 
-export type RoadmapOverrides = {
-  bonusIds?: string[];
-  hysaId?: string | null;
-  keepCurrentSavings?: boolean;
-};
-
-export type RoadmapBonusSlot = {
-  opportunity: Opportunity;
-  cashAmount: number;
-  monthlyDdAmount: number;
-  projectedAdvantage: number;
-  researchReady: boolean;
-};
-
-export type RoadmapSavingsSlot = {
-  opportunity: Opportunity | null;
-  amount: number;
-  apy: number;
+export type RoadmapAction = {
   label: string;
-  projectedAdvantage: number;
-  isCurrentSavings: boolean;
+  detail: string;
+  tone: "start" | "progress" | "wait" | "reward" | "review";
+  date: string | null;
 };
 
-export type CashBonusRoadmap = {
+export type RoadmapTimelineEvent = {
+  key: string;
+  missionId: string;
+  date: string;
+  title: string;
+  detail: string;
+  tone: "action" | "deadline" | "reward" | "review";
+};
+
+export type LiveRoadmapMission = {
+  mission: Mission;
+  action: RoadmapAction;
+  lifecycle: ReturnType<typeof accountLifecycleGuidance> | null;
+  requirementPercent: number;
+  ddTarget: number;
+  ddRecorded: number;
+  ddRemaining: number;
+  monthlyDdNeeded: number;
+  cashAmount: number;
+  expectedValue: number;
+};
+
+export type LiveCashBonusRoadmap = {
   strategyName: "Simple" | "Balanced" | "Active";
   totalCash: number;
   reserve: number;
-  activeCash: number;
-  availableCash: number;
+  deployableCash: number;
+  selectedCash: number;
+  remainingCash: number;
   monthlyDdStream: number;
-  activeMonthlyDd: number;
-  availableMonthlyDd: number;
-  bonusCashBudget: number;
-  bonusSlots: RoadmapBonusSlot[];
-  savingsSlot: RoadmapSavingsSlot;
-  bonusCashUsed: number;
-  ddUsed: number;
-  projectedBonusValue: number;
-  projectedIncrementalValue: number;
-  warningCount: number;
-  planningStartDate: string;
+  monthlyDdUsed: number;
+  monthlyDdRemaining: number;
+  potentialRewardValue: number;
+  potentialRewardCount: number;
+  missions: LiveRoadmapMission[];
+  timeline: RoadmapTimelineEvent[];
 };
 
-type Ranked = ReturnType<typeof rankMatches>[number];
-
-const strategyConfig = {
-  1: { name: "Simple" as const, maxBonusSlots: 1, bonusCashShare: 0.45, ddShare: 0.50 },
-  2: { name: "Balanced" as const, maxBonusSlots: 2, bonusCashShare: 0.70, ddShare: 0.75 },
-  3: { name: "Active" as const, maxBonusSlots: 3, bonusCashShare: 0.90, ddShare: 0.90 },
-};
-
-export function roadmapStrategy(profile: FinancialProfile) {
-  const mode = Math.max(1, Math.min(3, Number(profile.strategy_mode || 2))) as 1 | 2 | 3;
-  return strategyConfig[mode];
+function dateAtNoon(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(`${value.slice(0, 10)}T12:00:00`);
+  return Number.isFinite(date.getTime()) ? date : null;
 }
 
-export function monthlyDdNeed(item: Opportunity) {
-  const explicit = numberValue(item.reward_monthly_dd_threshold);
-  if (explicit > 0) return explicit;
-  const required = numberValue(item.direct_deposit_required);
-  if (required <= 0) return 0;
-  const days = Math.max(30, numberValue(item.direct_deposit_window_days || item.qualification_days || 30));
-  return required / Math.max(1, days / 30);
+function daysUntil(value?: string | null, today = localTodayIso()) {
+  const end = dateAtNoon(value);
+  const start = dateAtNoon(today);
+  if (!end || !start) return null;
+  return Math.ceil((end.getTime() - start.getTime()) / 86_400_000);
 }
 
-export function opportunityCashNeed(item: Opportunity) {
-  return Math.max(numberValue(item.required_balance), numberValue(item.min_opening_deposit));
+function formatDate(value?: string | null) {
+  const date = dateAtNoon(value);
+  if (!date) return "the stored deadline";
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
 }
 
-function activeResourceUse(missions: Mission[]) {
-  return missions
-    .filter((mission) => !["complete", "cancelled"].includes(mission.status))
-    .reduce((acc, mission) => {
-      acc.cash += Math.max(0, numberValue(mission.amount_committed));
-      if (mission.opportunity) acc.dd += monthlyDdNeed(mission.opportunity);
-      return acc;
-    }, { cash: 0, dd: 0 });
+function stepOf(mission: Mission, type: string) {
+  return (mission.mission_steps || []).find((step) => step.step_type === type);
 }
 
-function bonusCandidate(result: Ranked, profile: FinancialProfile) {
-  if (result.item.category === "hysa") return false;
-  if (["credit_card_bonus", "brokerage_bonus", "cd", "treasury"].includes(result.item.category)) return false;
-  if (result.item.category === "debit_spend" && !profile.card_helper_opt_in) return false;
-  return result.safetyPassed && result.cashFit >= 95 && result.ddFit >= 90 && result.spendFit >= 75;
+function qualificationSteps(mission: Mission) {
+  return (mission.mission_steps || []).filter((step) => step.step_type !== "bonus_received");
 }
 
-function roadmapRankValue(result: Ranked, profile: FinancialProfile) {
-  const preference = (profile.ranking_preference || "balanced").toLowerCase();
-  const advantage = Math.max(-500, Math.min(1500, profile.tax_rate_known ? result.estimatedAfterTaxAdvantage : result.grossAdvantage));
-  const cashNeed = opportunityCashNeed(result.item);
-  const deployable = Math.max(1, numberValue(profile.total_cash) - numberValue(profile.emergency_reserve));
-  const cashShare = Math.min(1, cashNeed / deployable);
-
-  if (preference === "profit") return result.score + advantage * 0.11;
-  if (preference === "ease") return result.score - (Math.max(1, result.effort) - 1) * 24 + result.liquidity * 0.04;
-  if (preference === "liquidity") return result.score + result.liquidity * 0.12 - cashShare * 36;
-  return result.score + advantage * 0.035 + result.liquidity * 0.025;
+export function requirementProgress(mission: Mission) {
+  const steps = qualificationSteps(mission);
+  if (!steps.length) return mission.opened_at ? 100 : 0;
+  return Math.round((steps.filter((step) => step.is_complete).length / steps.length) * 100);
 }
 
-function canAddBonus(
-  result: Ranked,
-  selected: RoadmapBonusSlot[],
-  cashBudget: number,
-  ddBudget: number,
-  profile: FinancialProfile,
-  strategyMode: number,
-) {
-  const cash = opportunityCashNeed(result.item);
-  const dd = monthlyDdNeed(result.item);
-  const usedCash = selected.reduce((sum, slot) => sum + slot.cashAmount, 0);
-  const usedDd = selected.reduce((sum, slot) => sum + slot.monthlyDdAmount, 0);
-  if (usedCash + cash > cashBudget + 0.01) return false;
-  if (usedDd + dd > ddBudget + 0.01) return false;
-
-  const ddLanes = selected.filter((slot) => slot.monthlyDdAmount > 0).length + (dd > 0 ? 1 : 0);
-  if (ddLanes > 1 && (strategyMode < 3 || profile.employer_multiple_dd !== true)) return false;
-  return true;
+export function remainingOnStep(step?: MissionStep | null) {
+  if (!step) return 0;
+  return Math.max(0, numberValue(step.target_amount) - numberValue(step.current_amount));
 }
 
-function toBonusSlot(result: Ranked, profile: FinancialProfile): RoadmapBonusSlot {
-  const economics = opportunityEconomics(result.item, profile);
-  return {
-    opportunity: result.item,
-    cashAmount: opportunityCashNeed(result.item),
-    monthlyDdAmount: monthlyDdNeed(result.item),
-    projectedAdvantage: profile.tax_rate_known ? economics.estimatedAfterTaxAdvantage : economics.grossAdvantage,
-    researchReady: result.safetyPassed,
-  };
+export function monthlyDdNeedForMission(mission: Mission, today = localTodayIso()) {
+  const opportunity = mission.opportunity;
+  const ddStep = stepOf(mission, "direct_deposit");
+  if (!opportunity || !ddStep || ddStep.is_complete) return 0;
+
+  const remaining = remainingOnStep(ddStep);
+  if (remaining <= 0) return 0;
+
+  const daysLeft = daysUntil(mission.qualification_deadline, today);
+  if (daysLeft !== null && daysLeft > 0) {
+    return remaining / Math.max(1, daysLeft / 30.4375);
+  }
+
+  const storedMonthly = numberValue(opportunity.reward_monthly_dd_threshold);
+  if (storedMonthly > 0) return storedMonthly;
+
+  const windowDays = Math.max(30, numberValue(opportunity.direct_deposit_window_days || opportunity.qualification_days || 30));
+  return remaining / Math.max(1, windowDays / 30.4375);
 }
 
-function bestSavingsSlot(
-  amount: number,
-  ranked: Ranked[],
-  profile: FinancialProfile,
-  overrides: RoadmapOverrides,
-): RoadmapSavingsSlot {
-  const currentApy = Math.max(0, numberValue(profile.current_hysa_apy));
-  const hysaCandidates = ranked
-    .filter((result) => result.item.category === "hysa" && result.safetyPassed)
-    .filter((result) => opportunityCashNeed(result.item) <= amount + 0.01)
-    .sort((a, b) => numberValue(b.item.apy) - numberValue(a.item.apy) || b.score - a.score);
+export function missionRoadmapAction(mission: Mission, today = localTodayIso()): RoadmapAction {
+  const opportunity = mission.opportunity;
+  const lifecycle = opportunity ? accountLifecycleGuidance(opportunity) : null;
+  const expected = numberValue(mission.expected_bonus) + numberValue(mission.expected_interest);
+  const openStep = stepOf(mission, "open_account");
+  const ddStep = stepOf(mission, "direct_deposit");
+  const holdStep = stepOf(mission, "hold");
+  const spendStep = stepOf(mission, "spend");
+  const rewardStep = stepOf(mission, "bonus_received");
 
-  const forced = overrides.hysaId
-    ? hysaCandidates.find((result) => result.item.id === overrides.hysaId)
-    : null;
-  const candidate = forced || hysaCandidates[0] || null;
+  if (mission.status === "cancelled") {
+    return { label: "Removed from roadmap", detail: "This item is no longer active.", tone: "review", date: null };
+  }
 
-  if (overrides.keepCurrentSavings || !candidate || currentApy >= numberValue(candidate.item.apy)) {
+  if (!mission.opened_at || openStep?.is_complete === false || mission.status === "planned") {
+    const ddTarget = numberValue(ddStep?.target_amount || opportunity?.direct_deposit_required);
+    const cashTarget = Math.max(numberValue(holdStep?.target_amount), numberValue(opportunity?.required_balance), numberValue(opportunity?.min_opening_deposit));
+    const next = ddTarget > 0
+      ? `Open the account, then set up qualifying DD toward ${money.format(ddTarget)}.`
+      : cashTarget > 0
+        ? `Open the account, then fund about ${money.format(cashTarget)}.`
+        : "Open the account and confirm the real opening date.";
     return {
-      opportunity: null,
-      amount,
-      apy: currentApy,
-      label: currentApy > 0 ? "Keep in your current savings / HYSA" : "Keep liquid while you compare savings options",
-      projectedAdvantage: 0,
-      isCurrentSavings: true,
+      label: "Start this account",
+      detail: next,
+      tone: "start",
+      date: null,
     };
   }
 
-  const apy = numberValue(candidate.item.apy);
-  const days = Math.max(1, numberValue(candidate.item.benefit_duration_days) || 365);
-  const projectedAdvantage = amount * Math.max(0, apy - currentApy) / 100 * (days / 365);
+  if (ddStep && !ddStep.is_complete) {
+    const remaining = remainingOnStep(ddStep);
+    const recorded = numberValue(ddStep.current_amount);
+    const target = numberValue(ddStep.target_amount);
+    return {
+      label: remaining > 0 ? `Send ${money.format(remaining)} more in qualifying DD` : "Confirm the DD requirement",
+      detail: `${money.format(recorded)} of ${money.format(target)} recorded${mission.qualification_deadline ? ` · target date ${formatDate(mission.qualification_deadline)}` : ""}.`,
+      tone: "progress",
+      date: mission.qualification_deadline || null,
+    };
+  }
+
+  if (holdStep && !holdStep.is_complete) {
+    const target = numberValue(holdStep.target_amount);
+    const current = numberValue(holdStep.current_amount);
+    const remaining = Math.max(0, target - current);
+    if (remaining > 0) {
+      return {
+        label: `Add ${money.format(remaining)} to reach the required balance`,
+        detail: `${money.format(current)} of ${money.format(target)} recorded.`,
+        tone: "progress",
+        date: mission.qualification_deadline || null,
+      };
+    }
+
+    const days = daysUntil(mission.qualification_deadline, today);
+    return {
+      label: days !== null && days <= 0 ? "Balance window reached — verify qualification" : `Keep ${money.format(target)} in place`,
+      detail: mission.qualification_deadline
+        ? `Maintain the tracked balance through ${formatDate(mission.qualification_deadline)} before treating the requirement as complete.`
+        : "Keep the stored balance in place until the offer requirement is confirmed.",
+      tone: "wait",
+      date: mission.qualification_deadline || null,
+    };
+  }
+
+  if (spendStep && !spendStep.is_complete) {
+    const remaining = remainingOnStep(spendStep);
+    return {
+      label: remaining > 0 ? `Complete ${money.format(remaining)} more in qualifying spend` : "Finish the purchase requirement",
+      detail: mission.qualification_deadline ? `Track only purchases that actually qualify · target date ${formatDate(mission.qualification_deadline)}.` : "Confirm the qualifying purchases in the tracker.",
+      tone: "progress",
+      date: mission.qualification_deadline || null,
+    };
+  }
+
+  const benefitDays = daysUntil(mission.benefit_end_date, today);
+  if (benefitDays !== null && benefitDays >= 0 && benefitDays <= 30) {
+    return {
+      label: benefitDays === 0 ? "Promotional benefit ends today" : `Promotional benefit ends in ${benefitDays} days`,
+      detail: "Compare the next savings or bonus move before the stored promotional period ends.",
+      tone: "review",
+      date: mission.benefit_end_date || null,
+    };
+  }
+
+  const nonRewardComplete = qualificationSteps(mission).every((step) => step.is_complete);
+  if (rewardStep && !rewardStep.is_complete && nonRewardComplete) {
+    const payoutDays = daysUntil(mission.payout_due_date, today);
+    if (payoutDays !== null && payoutDays <= 0) {
+      return {
+        label: `Check whether the ${money.format(expected)} reward posted`,
+        detail: "Only mark the reward received after you see the actual payout in the account.",
+        tone: "reward",
+        date: mission.payout_due_date || null,
+      };
+    }
+    return {
+      label: mission.payout_due_date ? `Watch for the reward by ${formatDate(mission.payout_due_date)}` : "Watch for the reward",
+      detail: `Requirements look complete. Expected tracked value: ${money.format(expected)}.`,
+      tone: "reward",
+      date: mission.payout_due_date || null,
+    };
+  }
+
+  if (mission.status === "complete" || rewardStep?.is_complete) {
+    const closeDays = daysUntil(mission.safe_close_review_date, today);
+    return {
+      label: lifecycle?.shortLabel || "Review what to do with the account",
+      detail: mission.safe_close_review_date && closeDays !== null && closeDays > 0
+        ? `Reward recorded. Keep the account unchanged until the review point on ${formatDate(mission.safe_close_review_date)}; then re-check current terms.`
+        : lifecycle?.text || "Reward recorded. Review current terms before keeping, moving money, or closing.",
+      tone: "review",
+      date: mission.safe_close_review_date || null,
+    };
+  }
+
   return {
-    opportunity: candidate.item,
-    amount,
-    apy,
-    label: `${candidate.item.institution} · ${candidate.item.product_name}`,
-    projectedAdvantage,
-    isCurrentSavings: false,
+    label: mission.next_action || "Review the current requirements",
+    detail: "Keep the tracker updated from actual account activity.",
+    tone: "progress",
+    date: mission.qualification_deadline || mission.payout_due_date || null,
   };
 }
 
-export function buildCashBonusRoadmap({
-  opportunities,
+function timelineForMission(mission: Mission, today = localTodayIso()): RoadmapTimelineEvent[] {
+  if (mission.status === "cancelled") return [];
+  const lifecycle = mission.opportunity ? accountLifecycleGuidance(mission.opportunity) : null;
+  const action = missionRoadmapAction(mission, today);
+  const events: RoadmapTimelineEvent[] = [{
+    key: `${mission.id}-now`,
+    missionId: mission.id,
+    date: today,
+    title: `${mission.institution}: ${action.label}`,
+    detail: action.detail,
+    tone: "action",
+  }];
+
+  if (mission.qualification_deadline) {
+    events.push({
+      key: `${mission.id}-qualify`,
+      missionId: mission.id,
+      date: mission.qualification_deadline,
+      title: `${mission.institution} qualification target`,
+      detail: "Check the tracker against actual DD, balance, or spend activity before treating the requirement as complete.",
+      tone: "deadline",
+    });
+  }
+
+  if (mission.payout_due_date) {
+    events.push({
+      key: `${mission.id}-payout`,
+      missionId: mission.id,
+      date: mission.payout_due_date,
+      title: `${mission.institution} reward check`,
+      detail: `Check for about ${money.format(numberValue(mission.expected_bonus) + numberValue(mission.expected_interest))}; record the actual amount only after it posts.`,
+      tone: "reward",
+    });
+  }
+
+  if (mission.benefit_end_date) {
+    events.push({
+      key: `${mission.id}-benefit`,
+      missionId: mission.id,
+      date: mission.benefit_end_date,
+      title: `${mission.institution} promotional benefit review`,
+      detail: "Compare the next destination before the stored promotional period ends.",
+      tone: "review",
+    });
+  }
+
+  if (mission.safe_close_review_date) {
+    events.push({
+      key: `${mission.id}-close`,
+      missionId: mission.id,
+      date: mission.safe_close_review_date,
+      title: `${mission.institution}: ${lifecycle?.shortLabel || "account review"}`,
+      detail: lifecycle?.text || "Re-check current terms before moving money or closing the account.",
+      tone: "review",
+    });
+  }
+
+  return events;
+}
+
+function strategyName(profile: FinancialProfile): LiveCashBonusRoadmap["strategyName"] {
+  const mode = Math.max(1, Math.min(3, Number(profile.strategy_mode || 2)));
+  return mode === 1 ? "Simple" : mode === 3 ? "Active" : "Balanced";
+}
+
+export function buildLiveCashBonusRoadmap({
   profile,
   missions,
-  usedBanks,
-  stateCode,
-  overrides = {},
+  today = localTodayIso(),
 }: {
-  opportunities: Opportunity[];
   profile: FinancialProfile;
   missions: Mission[];
-  usedBanks: string[];
-  stateCode?: string | null;
-  overrides?: RoadmapOverrides;
-}): CashBonusRoadmap {
-  const config = roadmapStrategy(profile);
-  const strategyMode = Math.max(1, Math.min(3, Number(profile.strategy_mode || 2)));
+  today?: string;
+}): LiveCashBonusRoadmap {
   const totalCash = Math.max(0, numberValue(profile.total_cash));
   const reserve = Math.min(totalCash, Math.max(0, numberValue(profile.emergency_reserve)));
-  const resources = activeResourceUse(missions);
-  const deployableBeforeActive = Math.max(0, totalCash - reserve);
-  const activeCash = Math.min(deployableBeforeActive, resources.cash);
-  const availableCash = Math.max(0, deployableBeforeActive - activeCash);
+  const deployableCash = Math.max(0, totalCash - reserve);
+
+  const liveMissions = missions.filter((mission) => !["cancelled", "closed"].includes(mission.status));
+  const futureOrActiveMissions = liveMissions.filter((mission) => {
+    if (mission.status !== "complete") return true;
+    const reviewDays = daysUntil(mission.safe_close_review_date, today);
+    return reviewDays === null || reviewDays >= 0;
+  });
+
+  const missionStates = futureOrActiveMissions.map((mission) => {
+    const ddStep = stepOf(mission, "direct_deposit");
+    const ddTarget = numberValue(ddStep?.target_amount);
+    const ddRecorded = numberValue(ddStep?.current_amount);
+    return {
+      mission,
+      action: missionRoadmapAction(mission, today),
+      lifecycle: mission.opportunity ? accountLifecycleGuidance(mission.opportunity) : null,
+      requirementPercent: requirementProgress(mission),
+      ddTarget,
+      ddRecorded,
+      ddRemaining: Math.max(0, ddTarget - ddRecorded),
+      monthlyDdNeeded: monthlyDdNeedForMission(mission, today),
+      cashAmount: Math.max(0, numberValue(mission.amount_committed)),
+      expectedValue: Math.max(0, numberValue(mission.expected_bonus) + numberValue(mission.expected_interest)),
+    };
+  });
+
+  const selectedCash = Math.min(deployableCash, missionStates.reduce((sum, item) => sum + item.cashAmount, 0));
+  const remainingCash = Math.max(0, deployableCash - selectedCash);
   const monthlyDdStream = Math.max(0, numberValue(profile.biweekly_pay)) * (26 / 12);
-  const activeMonthlyDd = Math.min(monthlyDdStream, resources.dd);
-  const availableMonthlyDd = Math.max(0, monthlyDdStream - activeMonthlyDd);
-  const bonusCashBudget = availableCash * config.bonusCashShare;
-  const ddBudget = availableMonthlyDd * config.ddShare;
+  const monthlyDdUsed = Math.min(monthlyDdStream, missionStates.reduce((sum, item) => sum + item.monthlyDdNeeded, 0));
+  const monthlyDdRemaining = Math.max(0, monthlyDdStream - monthlyDdUsed);
 
-  const activeIds = new Set(
-    missions
-      .filter((mission) => !["complete", "cancelled"].includes(mission.status))
-      .map((mission) => mission.opportunity_id)
-      .filter((id): id is string => Boolean(id)),
-  );
-  const ranked = rankMatches(opportunities, profile, usedBanks, stateCode)
-    .filter((result) => !activeIds.has(result.item.id));
-  const candidates = ranked
-    .filter((result) => bonusCandidate(result, profile))
-    .sort((a, b) => roadmapRankValue(b, profile) - roadmapRankValue(a, profile));
+  const potentialMissions = missionStates.filter((item) => item.mission.status !== "complete" && !stepOf(item.mission, "bonus_received")?.is_complete);
+  const potentialRewardValue = potentialMissions.reduce((sum, item) => sum + item.expectedValue, 0);
 
-  const selected: RoadmapBonusSlot[] = [];
-  const selectedIds = new Set<string>();
-
-  const overrideIds = Array.isArray(overrides.bonusIds) ? overrides.bonusIds : [];
-  for (const id of overrideIds) {
-    if (selected.length >= config.maxBonusSlots) break;
-    const result = candidates.find((candidate) => candidate.item.id === id);
-    if (!result || selectedIds.has(id)) continue;
-    if (!canAddBonus(result, selected, bonusCashBudget, ddBudget, profile, strategyMode)) continue;
-    selected.push(toBonusSlot(result, profile));
-    selectedIds.add(id);
-  }
-
-  for (const result of candidates) {
-    if (selected.length >= config.maxBonusSlots) break;
-    if (selectedIds.has(result.item.id)) continue;
-    if (!canAddBonus(result, selected, bonusCashBudget, ddBudget, profile, strategyMode)) continue;
-    selected.push(toBonusSlot(result, profile));
-    selectedIds.add(result.item.id);
-  }
-
-  const bonusCashUsed = selected.reduce((sum, slot) => sum + slot.cashAmount, 0);
-  const ddUsed = selected.reduce((sum, slot) => sum + slot.monthlyDdAmount, 0);
-  const savingsAmount = Math.max(0, availableCash - bonusCashUsed);
-  const savingsSlot = bestSavingsSlot(savingsAmount, ranked, profile, overrides);
-  const projectedBonusValue = selected.reduce((sum, slot) => sum + numberValue(slot.opportunity.bonus_amount), 0);
-  const projectedIncrementalValue = selected.reduce((sum, slot) => sum + slot.projectedAdvantage, 0) + savingsSlot.projectedAdvantage;
-  const warningCount = selected.filter((slot) => !slot.researchReady).length + (savingsSlot.opportunity && !["green", "pass"].includes((savingsSlot.opportunity.safety_gate || "").toLowerCase()) ? 1 : 0);
+  const timeline = missionStates
+    .flatMap((item) => timelineForMission(item.mission, today))
+    .filter((event, index, rows) => rows.findIndex((candidate) => candidate.key === event.key) === index)
+    .filter((event) => {
+      const d = daysUntil(event.date, today);
+      return d === null || d >= -2;
+    })
+    .sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title))
+    .slice(0, 18);
 
   return {
-    strategyName: config.name,
+    strategyName: strategyName(profile),
     totalCash,
     reserve,
-    activeCash,
-    availableCash,
+    deployableCash,
+    selectedCash,
+    remainingCash,
     monthlyDdStream,
-    activeMonthlyDd,
-    availableMonthlyDd,
-    bonusCashBudget,
-    bonusSlots: selected,
-    savingsSlot,
-    bonusCashUsed,
-    ddUsed,
-    projectedBonusValue,
-    projectedIncrementalValue,
-    warningCount,
-    planningStartDate: new Date().toISOString().slice(0, 10),
-  };
-}
-
-export function planningDates(opportunity: Opportunity, startDate: string) {
-  const qualificationDays = Math.max(0, numberValue(opportunity.qualification_days || opportunity.direct_deposit_window_days));
-  const payoutDays = Math.max(0, numberValue(opportunity.payout_days));
-  const benefitDays = Math.max(0, numberValue(opportunity.benefit_duration_days));
-  return {
-    start: startDate,
-    qualification: qualificationDays ? addDaysIso(startDate, qualificationDays) : null,
-    payout: qualificationDays || payoutDays ? addDaysIso(startDate, qualificationDays + payoutDays) : null,
-    benefitEnd: benefitDays ? addDaysIso(startDate, benefitDays) : null,
+    monthlyDdUsed,
+    monthlyDdRemaining,
+    potentialRewardValue,
+    potentialRewardCount: potentialMissions.length,
+    missions: missionStates,
+    timeline,
   };
 }
