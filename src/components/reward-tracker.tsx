@@ -160,6 +160,8 @@ function MissionCard({
   const [fundedDate, setFundedDate] = useState("");
   const [firstDdDate, setFirstDdDate] = useState("");
   const [editingDates, setEditingDates] = useState(false);
+  const [savingDates, setSavingDates] = useState(false);
+  const [dateError, setDateError] = useState("");
   const [editOpenedDate, setEditOpenedDate] = useState(mission.opened_at || localTodayIso());
   const [editFundedDate, setEditFundedDate] = useState(mission.funded_at || "");
   const [editFirstDdDate, setEditFirstDdDate] = useState(mission.first_dd_at || "");
@@ -246,7 +248,11 @@ function MissionCard({
       await supabase.from("missions").update({ status: "active", updated_at: new Date().toISOString() }).eq("id", mission.id);
       await supabase.from("account_history").delete().eq("user_id", mission.user_id).eq("notes", historyNote);
       router.refresh();
+      return;
     }
+
+    // Keep the compact dashboard and live roadmap synchronized with each confirmed tracker update.
+    router.refresh();
   }
 
   async function toggleStep(step: MissionStep, complete: boolean) {
@@ -315,6 +321,8 @@ function MissionCard({
 
   async function saveTrackerDates() {
     if (!opportunity || !editOpenedDate) return;
+    setSavingDates(true);
+    setDateError("");
     const benefitStartOverride = opportunity.benefit_start_trigger === "funded_at"
       ? editFundedDate || editOpenedDate
       : opportunity.benefit_start_trigger === "first_dd_at"
@@ -350,15 +358,20 @@ function MissionCard({
     if (guestMode) {
       emitGuest({ ...mission, ...patch });
       setEditingDates(false);
+      setSavingDates(false);
       return;
     }
 
     const supabase = createClient();
     const { error } = await supabase.from("missions").update(patch).eq("id", mission.id);
-    if (!error) {
-      setEditingDates(false);
-      router.refresh();
+    if (error) {
+      setDateError("Could not save those dates yet. Please try again.");
+      setSavingDates(false);
+      return;
     }
+    setEditingDates(false);
+    setSavingDates(false);
+    router.refresh();
   }
 
   async function startTracker() {
@@ -433,7 +446,7 @@ function MissionCard({
     <article className={`reward-card ${mission.status === "planned" ? "planned" : ""}`}>
       <div className="reward-card-top">
         <div className="reward-title-group"><span className="reward-bank">{mission.institution}</span><h3>{mission.title}</h3><div className="reward-title-tags"><span className={`reward-safety ${safety.tone}`}><ShieldCheck size={13} /> {safety.label}</span>{lifecycle ? <span className={`reward-lifecycle-tag ${lifecycle.tone}`}>{lifecycle.label}</span> : null}</div></div>
-        <div className="reward-value"><small>{mission.status === "complete" ? "Reward earned" : "Expected reward"}</small><strong>{money.format(reward)}</strong>{numberValue(mission.amount_committed) > 0 && <span>{money.format(numberValue(mission.amount_committed))} committed</span>}</div>
+        <div className="reward-value"><small>{mission.status === "complete" ? "Reward earned" : "Expected reward"}</small><strong>{money.format(reward)}</strong>{numberValue(mission.amount_committed) > 0 && <span>{money.format(numberValue(mission.amount_committed))} committed</span>}{mission.opened_at ? <button type="button" className="reward-edit-dates-inline" onClick={() => { setDateError(""); setEditingDates(true); }}><CalendarDays size={13} /> Edit real dates</button> : null}</div>
       </div>
 
       {mission.status === "planned" && !mission.opened_at ? (
@@ -473,12 +486,11 @@ function MissionCard({
               <label><small>Opened</small><input type="date" value={editOpenedDate} max={localTodayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setEditOpenedDate(event.target.value)} /></label>
               {(opportunity?.benefit_start_trigger === "funded_at" || mission.funded_at) ? <label><small>Funded <em>optional</em></small><input type="date" value={editFundedDate} max={localTodayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setEditFundedDate(event.target.value)} /></label> : null}
               {(opportunity?.qualification_start_trigger === "first_dd_at" || opportunity?.benefit_start_trigger === "first_dd_at" || mission.first_dd_at) ? <label><small>First DD <em>optional</em></small><input type="date" value={editFirstDdDate} max={localTodayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setEditFirstDdDate(event.target.value)} /></label> : null}
-              <button type="button" className="button primary compact" onClick={saveTrackerDates}>Save real dates</button>
-              <button type="button" className="button ghost compact" onClick={() => setEditingDates(false)}>Cancel</button>
+              <button type="button" className="button primary compact" onClick={saveTrackerDates} disabled={savingDates}>{savingDates ? "Saving…" : "Save real dates"}</button>
+              <button type="button" className="button ghost compact" onClick={() => { setDateError(""); setEditingDates(false); }} disabled={savingDates}>Cancel</button>
+              {dateError ? <small className="reward-date-error">{dateError}</small> : null}
             </div>
-          ) : (
-            <button type="button" className="reward-edit-dates-button" onClick={() => setEditingDates(true)}><CalendarDays size={14} /> Edit opening / tracker dates</button>
-          )}
+          ) : null}
         </div>
       ) : null}
 
