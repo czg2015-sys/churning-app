@@ -47,9 +47,9 @@ export type CashBonusRoadmap = {
 type Ranked = ReturnType<typeof rankMatches>[number];
 
 const strategyConfig = {
-  1: { name: "Simple" as const, maxBonusSlots: 1, bonusCashShare: 0.45, ddShare: 0.50 },
-  2: { name: "Balanced" as const, maxBonusSlots: 2, bonusCashShare: 0.70, ddShare: 0.75 },
-  3: { name: "Active" as const, maxBonusSlots: 3, bonusCashShare: 0.90, ddShare: 0.90 },
+  1: { name: "Simple" as const, maxBonusSlots: 1, maxDdSlots: 1, bonusCashShare: 0.45, ddShare: 0.50 },
+  2: { name: "Balanced" as const, maxBonusSlots: 2, maxDdSlots: 1, bonusCashShare: 0.72, ddShare: 0.80 },
+  3: { name: "Active" as const, maxBonusSlots: 4, maxDdSlots: 3, bonusCashShare: 0.95, ddShare: 1.00 },
 };
 
 export function roadmapStrategy(profile: FinancialProfile) {
@@ -80,11 +80,20 @@ function activeResourceUse(missions: Mission[]) {
     }, { cash: 0, dd: 0 });
 }
 
-function bonusCandidate(result: Ranked, profile: FinancialProfile) {
+function bonusCandidate(result: Ranked, profile: FinancialProfile, allowResearchPending = false) {
   if (result.item.category === "hysa") return false;
   if (["credit_card_bonus", "brokerage_bonus", "cd", "treasury"].includes(result.item.category)) return false;
   if (result.item.category === "debit_spend" && !profile.card_helper_opt_in) return false;
-  return result.safetyPassed && result.cashFit >= 95 && result.ddFit >= 90 && result.spendFit >= 75;
+  const fit = result.cashFit >= 95 && result.ddFit >= 90 && result.spendFit >= 75;
+  if (!fit) return false;
+  if (result.safetyPassed) return true;
+
+  // A pending candidate may appear only as a clearly labeled planning placeholder.
+  // It is not treated as action-ready and remains subject to the research gate.
+  if (!allowResearchPending) return false;
+  const confidence = numberValue(result.item.evidence_confidence);
+  const hasOfficialSource = /^https:///i.test(result.item.official_url || "");
+  return confidence >= 95 && hasOfficialSource;
 }
 
 function roadmapRankValue(result: Ranked, profile: FinancialProfile) {
@@ -93,11 +102,17 @@ function roadmapRankValue(result: Ranked, profile: FinancialProfile) {
   const cashNeed = opportunityCashNeed(result.item);
   const deployable = Math.max(1, numberValue(profile.total_cash) - numberValue(profile.emergency_reserve));
   const cashShare = Math.min(1, cashNeed / deployable);
+  const ddNeed = monthlyDdNeed(result.item);
+  const capitalEfficiency = advantage / Math.max(250, cashNeed || 250);
+  const checkingBonusBoost = result.item.category === "checking_bonus" && ddNeed > 0 ? 18 : 0;
+  const savingsBonusBoost = result.item.category === "savings_bonus" ? 7 : 0;
+  const researchPenalty = result.safetyPassed ? 0 : 55;
+  const efficiencyBoost = Math.max(-12, Math.min(28, capitalEfficiency * 18));
 
-  if (preference === "profit") return result.score + advantage * 0.11;
-  if (preference === "ease") return result.score - (Math.max(1, result.effort) - 1) * 24 + result.liquidity * 0.04;
-  if (preference === "liquidity") return result.score + result.liquidity * 0.12 - cashShare * 36;
-  return result.score + advantage * 0.035 + result.liquidity * 0.025;
+  if (preference === "profit") return result.score + advantage * 0.11 + efficiencyBoost + checkingBonusBoost - researchPenalty;
+  if (preference === "ease") return result.score - (Math.max(1, result.effort) - 1) * 24 + result.liquidity * 0.04 + checkingBonusBoost * 0.5 - researchPenalty;
+  if (preference === "liquidity") return result.score + result.liquidity * 0.12 - cashShare * 36 + checkingBonusBoost + efficiencyBoost - researchPenalty;
+  return result.score + advantage * 0.035 + result.liquidity * 0.025 + checkingBonusBoost + savingsBonusBoost + efficiencyBoost - researchPenalty;
 }
 
 function canAddBonus(
@@ -106,7 +121,7 @@ function canAddBonus(
   cashBudget: number,
   ddBudget: number,
   profile: FinancialProfile,
-  strategyMode: number,
+  maxDdSlots: number,
 ) {
   const cash = opportunityCashNeed(result.item);
   const dd = monthlyDdNeed(result.item);
@@ -116,7 +131,8 @@ function canAddBonus(
   if (usedDd + dd > ddBudget + 0.01) return false;
 
   const ddLanes = selected.filter((slot) => slot.monthlyDdAmount > 0).length + (dd > 0 ? 1 : 0);
-  if (ddLanes > 1 && (strategyMode < 3 || profile.employer_multiple_dd !== true)) return false;
+  if (ddLanes > maxDdSlots) return false;
+  if (ddLanes > 1 && profile.employer_multiple_dd !== true) return false;
   return true;
 }
 
@@ -188,7 +204,6 @@ export function buildCashBonusRoadmap({
   overrides?: RoadmapOverrides;
 }): CashBonusRoadmap {
   const config = roadmapStrategy(profile);
-  const strategyMode = Math.max(1, Math.min(3, Number(profile.strategy_mode || 2)));
   const totalCash = Math.max(0, numberValue(profile.total_cash));
   const reserve = Math.min(totalCash, Math.max(0, numberValue(profile.emergency_reserve)));
   const resources = activeResourceUse(missions);
@@ -209,9 +224,16 @@ export function buildCashBonusRoadmap({
   );
   const ranked = rankMatches(opportunities, profile, usedBanks, stateCode)
     .filter((result) => !activeIds.has(result.item.id));
-  const candidates = ranked
+  const clearedCandidates = ranked
     .filter((result) => bonusCandidate(result, profile))
     .sort((a, b) => roadmapRankValue(b, profile) - roadmapRankValue(a, profile));
+  const pendingCandidates = ranked
+    .filter((result) => !result.safetyPassed && bonusCandidate(result, profile, true))
+    .sort((a, b) => roadmapRankValue(b, profile) - roadmapRankValue(a, profile));
+
+  // Cleared offers always win. If the library is temporarily all on research hold,
+  // the roadmap can still show a planning structure using clearly marked review candidates.
+  const candidates = [...clearedCandidates, ...pendingCandidates];
 
   const selected: RoadmapBonusSlot[] = [];
   const selectedIds = new Set<string>();
@@ -221,7 +243,7 @@ export function buildCashBonusRoadmap({
     if (selected.length >= config.maxBonusSlots) break;
     const result = candidates.find((candidate) => candidate.item.id === id);
     if (!result || selectedIds.has(id)) continue;
-    if (!canAddBonus(result, selected, bonusCashBudget, ddBudget, profile, strategyMode)) continue;
+    if (!canAddBonus(result, selected, bonusCashBudget, ddBudget, profile, config.maxDdSlots)) continue;
     selected.push(toBonusSlot(result, profile));
     selectedIds.add(id);
   }
@@ -229,7 +251,7 @@ export function buildCashBonusRoadmap({
   for (const result of candidates) {
     if (selected.length >= config.maxBonusSlots) break;
     if (selectedIds.has(result.item.id)) continue;
-    if (!canAddBonus(result, selected, bonusCashBudget, ddBudget, profile, strategyMode)) continue;
+    if (!canAddBonus(result, selected, bonusCashBudget, ddBudget, profile, config.maxDdSlots)) continue;
     selected.push(toBonusSlot(result, profile));
     selectedIds.add(result.item.id);
   }
