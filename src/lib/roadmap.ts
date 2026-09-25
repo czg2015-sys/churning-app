@@ -22,6 +22,7 @@ export type RoadmapSavingsSlot = {
   label: string;
   projectedAdvantage: number;
   isCurrentSavings: boolean;
+  researchReady: boolean;
 };
 
 export type CashBonusRoadmap = {
@@ -154,17 +155,21 @@ function bestSavingsSlot(
   overrides: RoadmapOverrides,
 ): RoadmapSavingsSlot {
   const currentApy = Math.max(0, numberValue(profile.current_hysa_apy));
-  const hysaCandidates = ranked
-    .filter((result) => result.item.category === "hysa" && result.safetyPassed)
+  const allHysaCandidates = ranked
+    .filter((result) => result.item.category === "hysa")
+    .filter((result) => result.cashFit >= 95)
     .filter((result) => opportunityCashNeed(result.item) <= amount + 0.01)
-    .sort((a, b) => numberValue(b.item.apy) - numberValue(a.item.apy) || b.score - a.score);
+    .sort((a, b) => Number(b.safetyPassed) - Number(a.safetyPassed) || numberValue(b.item.apy) - numberValue(a.item.apy) || b.score - a.score);
+  const clearedHysaCandidates = allHysaCandidates.filter((result) => result.safetyPassed);
 
+  // The automatic route never chooses a research-hold HYSA. A user may explicitly
+  // select one as a planning candidate, in which case the UI keeps the hold visible.
   const forced = overrides.hysaId
-    ? hysaCandidates.find((result) => result.item.id === overrides.hysaId)
+    ? allHysaCandidates.find((result) => result.item.id === overrides.hysaId)
     : null;
-  const candidate = forced || hysaCandidates[0] || null;
+  const candidate = forced || clearedHysaCandidates[0] || null;
 
-  if (overrides.keepCurrentSavings || !candidate || currentApy >= numberValue(candidate.item.apy)) {
+  if (overrides.keepCurrentSavings || !candidate || (!forced && currentApy >= numberValue(candidate.item.apy))) {
     return {
       opportunity: null,
       amount,
@@ -172,6 +177,7 @@ function bestSavingsSlot(
       label: currentApy > 0 ? "Keep in your current savings / HYSA" : "Keep liquid while you compare savings options",
       projectedAdvantage: 0,
       isCurrentSavings: true,
+      researchReady: true,
     };
   }
 
@@ -185,6 +191,7 @@ function bestSavingsSlot(
     label: `${candidate.item.institution} · ${candidate.item.product_name}`,
     projectedAdvantage,
     isCurrentSavings: false,
+    researchReady: candidate.safetyPassed,
   };
 }
 
