@@ -616,3 +616,107 @@
   line-height:1.5 !important;
 }
 .roadmap-close-copy strong { color:var(--muted-strong); }
+
+
+.roadmap-recommended-setup {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:18px;
+  align-items:center;
+  margin:0 22px 16px;
+  padding:17px 18px;
+  border:1px solid rgba(59,178,115,.20);
+  border-radius:15px;
+  background:linear-gradient(135deg,rgba(59,178,115,.09),rgba(255,255,255,.025));
+}
+.roadmap-recommended-copy h3 {
+  margin:5px 0 4px;
+  font-size:17px;
+  letter-spacing:-.025em;
+}
+.roadmap-recommended-copy p {
+  margin:0;
+  color:var(--muted);
+  font-size:9px;
+  line-height:1.5;
+}
+.roadmap-recommended-score {
+  min-width:130px;
+  padding:11px 13px;
+  border:1px solid var(--line);
+  border-radius:11px;
+  background:rgba(31,46,38,.72);
+  text-align:right;
+}
+.roadmap-recommended-score small,
+.roadmap-recommended-score strong,
+.roadmap-recommended-score span { display:block; }
+.roadmap-recommended-score small {
+  color:var(--green);
+  font-size:6px;
+  font-weight:850;
+  letter-spacing:.08em;
+}
+.roadmap-recommended-score strong {
+  margin-top:2px;
+  font-size:25px;
+  letter-spacing:-.04em;
+}
+.roadmap-recommended-score span {
+  color:var(--muted);
+  font-size:7px;
+}
+.roadmap-research-warning {
+  display:flex;
+  gap:9px;
+  align-items:flex-start;
+  margin:0 22px 16px;
+  padding:11px 12px;
+  border:1px solid rgba(255,211,122,.20);
+  border-radius:11px;
+  background:rgba(255,211,122,.07);
+}
+.roadmap-research-warning svg {
+  flex:0 0 auto;
+  color:var(--amber);
+}
+.roadmap-research-warning strong,
+.roadmap-research-warning small { display:block; }
+.roadmap-research-warning strong {
+  color:#ffe4ad;
+  font-size:9px;
+}
+.roadmap-research-warning small {
+  margin-top:2px;
+  color:var(--muted);
+  font-size:8px;
+  line-height:1.45;
+}
+.roadmap-dd-unlock {
+  display:flex;
+  gap:8px;
+  align-items:flex-start;
+  margin-top:10px;
+  padding:9px 10px;
+  border:1px dashed rgba(255,211,122,.18);
+  border-radius:9px;
+  color:var(--muted);
+  font-size:8px;
+  line-height:1.45;
+}
+.roadmap-dd-unlock svg {
+  flex:0 0 auto;
+  color:var(--amber);
+}
+
+@media (max-width:720px) {
+  .roadmap-recommended-setup {
+    grid-template-columns:1fr;
+    margin-inline:15px;
+  }
+  .roadmap-recommended-score {
+    min-width:0;
+    text-align:left;
+  }
+  .roadmap-research-warning { margin-inline:15px; }
+}
