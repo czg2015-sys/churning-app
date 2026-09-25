@@ -233,7 +233,7 @@ export function PersonalPlanDashboard({
       </div>
 
       <div className="personal-dashboard-stats">
-        <article><WalletCards size={18} /><span><small>Cash tracked</small><strong>{money.format(trackedCash)}</strong></span></article>
+        <article><WalletCards size={18} /><span><small>Cash in active offers</small><strong>{money.format(trackedCash)}</strong></span></article>
         <article><Target size={18} /><span><small>Active rewards</small><strong>{active.length}</strong></span></article>
         <article><CircleDollarSign size={18} /><span><small>Potential rewards</small><strong>{money.format(potentialRewards)}</strong></span></article>
         <article className={endingSoon ? "attention" : ""}><Clock3 size={18} /><span><small>Ending in 30 days</small><strong>{endingSoon}</strong></span></article>
