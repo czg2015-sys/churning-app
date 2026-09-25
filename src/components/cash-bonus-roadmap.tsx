@@ -185,7 +185,7 @@ export function CashBonusRoadmap({
 
     if (roadmap.savingsSlot.opportunity?.benefit_duration_days) {
       const dates = planningDates(roadmap.savingsSlot.opportunity, roadmap.planningStartDate);
-      if (dates.benefitEnd) items.push({ key: `${roadmap.savingsSlot.opportunity.id}-benefit`, date: dates.benefitEnd, title: `${roadmap.savingsSlot.opportunity.institution} promo-rate review`, detail: "Compare the next savings destination before the promotional period ends.", kind: "planned" });
+      if (dates.benefitEnd) items.push({ key: `${roadmap.savingsSlot.opportunity.id}-benefit`, date: dates.benefitEnd, title: `${roadmap.savingsSlot.opportunity.institution} promo ending · review next move`, detail: "The promotional benefit reaches its stored end date. Compare the next HYSA or bonus destination and move funds only after re-checking current terms.", kind: "planned" });
     }
 
     return items
@@ -206,6 +206,10 @@ export function CashBonusRoadmap({
   const plannedDdSlots = roadmap.bonusSlots.filter((slot) => slot.monthlyDdAmount > 0);
   const unassignedDd = Math.max(0, roadmap.monthlyDdStream - roadmap.activeMonthlyDd - roadmap.ddUsed);
   const accountedCash = roadmap.reserve + roadmap.activeCash + roadmap.bonusCashUsed + roadmap.savingsSlot.amount;
+  const cashCoverage = roadmap.totalCash > 0 ? Math.min(100, Math.round((accountedCash / roadmap.totalCash) * 100)) : 100;
+  const ddRouted = roadmap.activeMonthlyDd + roadmap.ddUsed;
+  const ddLaneCount = plannedDdSlots.length + (roadmap.activeMonthlyDd > 0 ? 1 : 0);
+  const planningDateLabel = formatDate(roadmap.planningStartDate);
 
   return (
     <section className="cash-roadmap-shell">
@@ -213,13 +217,38 @@ export function CashBonusRoadmap({
         <div>
           <span className="kicker">YOUR CASH & BONUS ROADMAP</span>
           <h2>See where the money goes, where the bonuses come from, and when each move matters.</h2>
-          <p>{strategyCopy(roadmap.strategyName)} This is the recommended route from your answers; every offer can be swapped and the map recalculates around your choice.</p>
+          <p>{strategyCopy(roadmap.strategyName)} This is the recommended structure from your answers; every offer can be swapped and the map recalculates around your choice.</p>
         </div>
         <div className="roadmap-head-actions">
           <span className="roadmap-strategy-pill"><Route size={14} /> {roadmap.strategyName} roadmap</span>
           <button type="button" className="button ghost compact" onClick={resetRoadmap} disabled={savingChoice}><RefreshCw size={14} /> Reset recommendation</button>
         </div>
       </div>
+
+      <div className="roadmap-recommended-setup">
+        <div className="roadmap-recommended-copy">
+          <span className="kicker">RECOMMENDED SETUP · STARTING {planningDateLabel.toUpperCase()}</span>
+          <h3>{money.format(roadmap.reserve)} protected · {money.format(roadmap.bonusCashUsed)} across bonus lanes · {money.format(roadmap.savingsSlot.amount)} kept liquid</h3>
+          <p>
+            {plannedDdSlots.length
+              ? `Route about ${money.format(roadmap.ddUsed)}/month across ${plannedDdSlots.length} planned DD lane${plannedDdSlots.length === 1 ? "" : "s"}.`
+              : "No new DD lane is required by the current recommended mix."}
+            {" "}The rest of your cash stays accounted for in the liquid-savings lane.
+          </p>
+        </div>
+        <div className="roadmap-recommended-score">
+          <small>CASH ACCOUNTED FOR</small>
+          <strong>{cashCoverage}%</strong>
+          <span>{money.format(accountedCash)} of {money.format(roadmap.totalCash)}</span>
+        </div>
+      </div>
+
+      {roadmap.warningCount > 0 ? (
+        <div className="roadmap-research-warning">
+          <ShieldAlert size={16} />
+          <span><strong>{roadmap.warningCount} roadmap lane{roadmap.warningCount === 1 ? "" : "s"} still need research clearance.</strong><small>They are planning candidates, not action-ready recommendations. Re-check the official terms before opening anything.</small></span>
+        </div>
+      ) : null}
 
       <div className="roadmap-capacity-strip">
         <div><small>AVAILABLE TO OPTIMIZE</small><strong>{money.format(roadmap.availableCash)}</strong><span>after reserve + active commitments</span></div>
@@ -261,6 +290,8 @@ export function CashBonusRoadmap({
                 const choices = bonusAlternatives.filter((result) => result.item.id === slot.opportunity.id || !selectedIds.has(result.item.id));
                 const userSelected = (overrides.bonusIds || [])[index] === slot.opportunity.id;
                 const lifecycle = accountLifecycleGuidance(slot.opportunity);
+                const plannedDates = planningDates(slot.opportunity, roadmap.planningStartDate);
+                const targetDate = plannedDates.qualification || plannedDates.payout || plannedDates.benefitEnd;
                 return (
                   <article className="roadmap-bubble bonus" key={slot.opportunity.id}>
                     <div className="roadmap-bubble-top">
@@ -278,6 +309,7 @@ export function CashBonusRoadmap({
                       {slot.cashAmount > 0 ? <span><small>Cash</small><b>{money.format(slot.cashAmount)}</b></span> : null}
                       {slot.monthlyDdAmount > 0 ? <span><small>DD / month</small><b>{money.format(slot.monthlyDdAmount)}</b></span> : null}
                       <span><small>Potential</small><b>{compactOpportunity(slot.opportunity)}</b></span>
+                      {targetDate ? <span><small>Projected target</small><b>{formatDate(targetDate)}</b></span> : null}
                     </div>
                     <label className="roadmap-swap">
                       <span>Swap this recommendation</span>
@@ -299,13 +331,14 @@ export function CashBonusRoadmap({
             <div className="roadmap-lane-heading"><span>03</span><div><small>STAY LIQUID</small><strong>Put the remaining cash somewhere useful</strong></div></div>
             <div className="roadmap-bubble savings">
               <span className="roadmap-bubble-icon"><Landmark size={18} /></span>
-              {roadmap.savingsSlot.opportunity ? <span className={`roadmap-close-tag ${accountLifecycleGuidance(roadmap.savingsSlot.opportunity).tone}`}>{accountLifecycleGuidance(roadmap.savingsSlot.opportunity).label}</span> : null}
+              {roadmap.savingsSlot.opportunity ? <div className="roadmap-bubble-tags"><span className={roadmap.savingsSlot.researchReady ? "roadmap-review-state cleared" : "roadmap-review-state pending"}>{roadmap.savingsSlot.researchReady ? "Research cleared" : "Research pending · your selected candidate"}</span><span className={`roadmap-close-tag ${accountLifecycleGuidance(roadmap.savingsSlot.opportunity).tone}`}>{accountLifecycleGuidance(roadmap.savingsSlot.opportunity).label}</span></div> : null}
               <small>LIQUID SAVINGS LANE</small>
               <strong>{money.format(roadmap.savingsSlot.amount)}</strong>
               <b>{roadmap.savingsSlot.label}</b>
               <div className="roadmap-bubble-metrics">
                 <span><small>Stored APY</small><b>{roadmap.savingsSlot.apy.toFixed(2)}%</b></span>
                 <span><small>Role</small><b>Flexible cash</b></span>
+                {roadmap.savingsSlot.opportunity?.benefit_duration_days ? <span><small>Promo review</small><b>{formatDate(planningDates(roadmap.savingsSlot.opportunity, roadmap.planningStartDate).benefitEnd || roadmap.planningStartDate)}</b></span> : null}
               </div>
               <label className="roadmap-swap">
                 <span>Change savings destination</span>
@@ -324,20 +357,21 @@ export function CashBonusRoadmap({
       <div className="roadmap-dd-route">
         <div className="roadmap-dd-head">
           <div><span className="kicker">PAYCHECK ROUTING</span><h3>See where your monthly direct deposit can go.</h3></div>
-          <p>This lane uses the paycheck amount you entered. We never stack DD offers beyond the amount your roadmap can support.</p>
+          <p>This lane uses the paycheck amount you entered. We never stack DD offers beyond the amount your roadmap can support, and multiple DD lanes require you to confirm payroll can split deposits.</p>
         </div>
         <div className="roadmap-dd-track">
-          <div className="roadmap-dd-node source"><small>MONTHLY DD STREAM</small><strong>{money.format(roadmap.monthlyDdStream)}</strong></div>
+          <div className="roadmap-dd-node source"><small>MONTHLY DD STREAM</small><strong>{money.format(roadmap.monthlyDdStream)}</strong><span>{ddRouted > 0 ? `${money.format(ddRouted)}/mo mapped across ${ddLaneCount} lane${ddLaneCount === 1 ? "" : "s"}` : "no DD assigned yet"}</span></div>
           {roadmap.activeMonthlyDd > 0 ? <><ArrowRight size={17} /><div className="roadmap-dd-node active"><small>ALREADY ROUTED</small><strong>{money.format(roadmap.activeMonthlyDd)}</strong></div></> : null}
           {plannedDdSlots.map((slot) => <div className="roadmap-dd-piece" key={`dd-${slot.opportunity.id}`}><ArrowRight size={17} /><div className="roadmap-dd-node"><small>{slot.opportunity.institution.toUpperCase()}</small><strong>{money.format(slot.monthlyDdAmount)}/mo</strong><span>{slot.opportunity.product_name}</span></div></div>)}
           <div className="roadmap-dd-piece"><ArrowRight size={17} /><div className="roadmap-dd-node remainder"><small>UNASSIGNED / FLEXIBLE</small><strong>{money.format(unassignedDd)}/mo</strong><span>available for bills, checking, or a future lane</span></div></div>
         </div>
+        {roadmap.strategyName === "Active" && profile.employer_multiple_dd !== true ? <div className="roadmap-dd-unlock"><ShieldAlert size={14} /><span>Active mode can use multiple DD lanes, but your profile does not currently confirm that payroll can split deposits. Update that answer to unlock safe multi-lane routing.</span></div> : null}
       </div>
 
       <div className="roadmap-allocation-check">
         <CircleDollarSign size={17} />
-        <span><strong>{money.format(accountedCash)} of {money.format(roadmap.totalCash)} accounted for.</strong><small>Reserve + active commitments + planned bonus cash + liquid savings.</small></span>
-        <b>{roadmap.bonusSlots.length ? `${roadmap.bonusSlots.length} recommended bonus lane${roadmap.bonusSlots.length === 1 ? "" : "s"}` : "No bonus lane activated yet"}</b>
+        <span><strong>{money.format(accountedCash)} of {money.format(roadmap.totalCash)} accounted for · {cashCoverage}% coverage.</strong><small>Reserve + active commitments + planned bonus cash + liquid savings. Cash not used by a bonus remains in the savings lane rather than disappearing from the plan.</small></span>
+        <b>{roadmap.bonusSlots.length ? `${roadmap.bonusSlots.length} planned bonus lane${roadmap.bonusSlots.length === 1 ? "" : "s"}` : "No bonus lane activated yet"}</b>
       </div>
 
       <div className="roadmap-timeline">
