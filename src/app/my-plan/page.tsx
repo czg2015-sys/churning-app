@@ -2,10 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowUpRight, CreditCard, Settings2 } from "lucide-react";
-import { CardsOptInPrompt } from "@/components/cards-opt-in-prompt";
-import { CashBonusRoadmap } from "@/components/cash-bonus-roadmap";
-import { PersonalPlanDashboard } from "@/components/personal-plan-dashboard";
-import { RecommendedOpportunities } from "@/components/recommended-opportunities";
+import { PlanStrategyHub } from "@/components/plan-strategy-hub";
 import { RewardTracker } from "@/components/reward-tracker";
 import { SignOutButton } from "@/components/sign-out-button";
 import { createClient } from "@/lib/supabase/server";
@@ -34,32 +31,27 @@ export default async function MyPlanPage() {
   const typedOpportunities = (opportunities || []) as Opportunity[];
   const typedMissions = (missions || []) as Mission[];
   const typedHistory = (bankHistory || []) as AccountHistory[];
-  const usedBanks: string[] = Array.from(new Set(typedHistory.map((row) => row.institution).filter((bank): bank is string => Boolean(bank))));
-  const addedOpportunityIds = typedMissions.filter((mission) => !["complete", "cancelled"].includes(mission.status)).map((mission) => mission.opportunity_id).filter((id): id is string => Boolean(id));
+  const usedBanks = Array.from(new Set(typedHistory.map((row) => row.institution).filter((bank): bank is string => Boolean(bank))));
+  const addedOpportunityIds = typedMissions
+    .filter((mission) => !["complete", "cancelled"].includes(mission.status))
+    .map((mission) => mission.opportunity_id)
+    .filter((id): id is string => Boolean(id));
   const stateCode = userProfile?.state_code || "CA";
 
   return (
     <main className="page-shell my-plan-page">
       <div className="shell">
         <div className="plan-topbar">
-          <div><span className="workspace-dot" /> Your saved plan</div>
+          <div><span className="workspace-dot" /> My Plan · saved to your account</div>
           <div className="plan-topbar-actions">
-            <Link href="/opportunities">All opportunities <ArrowUpRight size={13} /></Link>
+            <Link href="/opportunities">Compare all options <ArrowUpRight size={13} /></Link>
             {typedProfile.card_helper_opt_in ? <Link href="/cards"><CreditCard size={14} /> Cards & Spending</Link> : null}
-            <Link href="/questionnaire"><Settings2 size={14} /> Update profile</Link>
+            <Link href="/questionnaire"><Settings2 size={14} /> Update answers</Link>
             <SignOutButton />
           </div>
         </div>
 
-        <PersonalPlanDashboard
-          missions={typedMissions}
-          opportunities={typedOpportunities}
-          accountHistory={typedHistory}
-          reminderPreference={typedProfile.reminder_preference || "off"}
-          profile={typedProfile}
-        />
-
-        <CashBonusRoadmap
+        <PlanStrategyHub
           profile={typedProfile}
           opportunities={typedOpportunities}
           missions={typedMissions}
@@ -68,21 +60,11 @@ export default async function MyPlanPage() {
           addedOpportunityIds={addedOpportunityIds}
         />
 
-        <RecommendedOpportunities
-          profile={typedProfile}
-          opportunities={typedOpportunities}
-          usedBanks={usedBanks}
-          addedOpportunityIds={addedOpportunityIds}
-          stateCode={stateCode}
-          prominent
-          categoriesOnly
-        />
-
-        <CardsOptInPrompt
-          answered={Boolean(typedProfile.card_helper_prompt_answered)}
-          enabled={Boolean(typedProfile.card_helper_opt_in)}
-        />
-
+        <div className="my-plan-tracker-heading">
+          <span className="kicker">ACTIVE ACCOUNT CHECKLISTS</span>
+          <h2>Once you actually start an offer, track every requirement here.</h2>
+          <p>Your plan above decides what fits. The tracker below handles the real account, progress, payout timing, quick-access link, and safe-close review.</p>
+        </div>
         <RewardTracker missions={typedMissions} />
       </div>
     </main>
