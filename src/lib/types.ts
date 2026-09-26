@@ -144,8 +144,12 @@ export type FinancialProfile = {
   credit_cards_pay_in_full?: boolean;
   roadmap_selected_opportunity_ids?: {
     bonusIds?: string[];
+    ddIds?: string[];
     hysaId?: string | null;
+    savingsBonusId?: string | null;
+    spendingId?: string | null;
     keepCurrentSavings?: boolean;
+    sortMode?: "overall" | "profit" | "ease" | "liquidity";
   } | string[] | null;
   roadmap_updated_at?: string | null;
 };
