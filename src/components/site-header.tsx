@@ -15,10 +15,10 @@ export async function SiteHeader() {
       <div className="shell header-inner">
         <Link className="brand" href="/" aria-label="Churning home"><span className="brand-mark">C</span><span>CHURNING</span><i>beta</i></Link>
         <nav aria-label="Primary navigation">
-          <Link href="/#how-it-works">How it works</Link>
-          <Link href="/opportunities">Opportunities</Link>
+          <Link href={signedIn ? "/questionnaire" : "/auth?next=/questionnaire"}>Start Here</Link>
           <Link href="/my-plan"><BarChart3 size={14} /> My Plan</Link>
-          <Link href="/research-standards"><ShieldCheck size={14} /> Research & Risk</Link>
+          <Link href="/opportunities">Opportunities</Link>
+          <Link href="/research-standards"><ShieldCheck size={14} /> Safety</Link>
         </nav>
         <div className="header-actions">
           {signedIn
