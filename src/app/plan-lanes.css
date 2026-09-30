@@ -140,3 +140,136 @@
 .my-plan-tracker-heading { margin:30px 0 12px; }
 .my-plan-tracker-heading h2 { margin:5px 0 4px; font-size:22px; letter-spacing:-.03em; }
 .my-plan-tracker-heading p { margin:0; max-width:760px; color:var(--muted); font-size:10px; line-height:1.55; }
+
+
+/* My Plan V2 — simpler first-look roadmap */
+.plan-hub-simple .plan-hub-hero.simple { padding:22px 24px 18px; grid-template-columns:minmax(0,1fr) 190px; }
+.plan-hub-simple .plan-hub-copy h1 { margin:5px 0 5px; font-size:clamp(29px,3.4vw,42px); }
+.plan-hub-simple .plan-hub-copy p { font-size:11px; }
+.plan-hub-simple .plan-hub-stats.compact { grid-template-columns:repeat(4,1fr); }
+.plan-hub-simple .plan-hub-stats.compact > div { padding:12px 15px; }
+.plan-hub-simple .plan-hub-stats.compact strong { font-size:16px; }
+
+.compact-mission-hub { margin:14px 18px 0; overflow:hidden; border:1px solid var(--line); border-radius:14px; background:rgba(255,255,255,.018); }
+.compact-mission-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 13px; border-bottom:1px solid var(--line); }
+.compact-mission-head small,.compact-mission-head strong { display:block; }
+.compact-mission-head small { color:var(--green); font-size:7px; font-weight:850; letter-spacing:.08em; }
+.compact-mission-head strong { margin-top:1px; font-size:9px; }
+.compact-mission-head > span { padding:4px 7px; border-radius:999px; background:rgba(255,255,255,.035); color:var(--muted); font-size:7px; font-weight:800; }
+.compact-mission-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:8px; padding:9px; }
+.compact-mission-card { min-width:0; padding:11px; border:1px solid var(--line); border-radius:10px; background:rgba(31,46,38,.9); color:var(--ink); text-align:left; cursor:pointer; }
+.compact-mission-card:hover { border-color:rgba(59,178,115,.28); background:rgba(59,178,115,.04); }
+.compact-mission-card-top { display:flex; justify-content:space-between; gap:10px; }
+.compact-mission-card-top small,.compact-mission-card-top strong { display:block; }
+.compact-mission-card-top small { color:var(--green); font-size:7px; font-weight:850; text-transform:uppercase; }
+.compact-mission-card-top strong { margin-top:2px; font-size:9px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.compact-mission-card-top > b { color:var(--green); font-size:13px; }
+.compact-mission-progress { height:4px; margin:9px 0 7px; overflow:hidden; border-radius:999px; background:rgba(255,255,255,.07); }
+.compact-mission-progress span { display:block; height:100%; border-radius:inherit; background:var(--green); }
+.compact-mission-card-foot { display:flex; gap:10px; align-items:center; color:var(--muted); font-size:7px; }
+.compact-mission-card-foot span,.compact-mission-card-foot em { display:inline-flex; align-items:center; gap:4px; }
+.compact-mission-card-foot em { margin-left:auto; color:var(--muted-strong); font-style:normal; font-weight:800; }
+.compact-mission-empty { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:11px 13px; }
+.compact-mission-empty strong,.compact-mission-empty small { display:block; }
+.compact-mission-empty strong { font-size:9px; }
+.compact-mission-empty small { margin-top:1px; color:var(--muted); font-size:7px; }
+.compact-mission-empty > b { color:var(--muted); font-size:12px; }
+
+.mission-drawer-backdrop { position:fixed; inset:0; z-index:100; background:rgba(5,10,7,.63); backdrop-filter:blur(3px); }
+.mission-drawer { position:absolute; inset:0 0 0 auto; width:min(720px,94vw); height:100%; overflow:hidden; border-left:1px solid var(--line-strong); background:var(--bg); box-shadow:-24px 0 80px rgba(0,0,0,.38); }
+.mission-drawer-head { height:60px; display:flex; align-items:center; justify-content:space-between; gap:14px; padding:0 18px; border-bottom:1px solid var(--line); background:rgba(29,42,34,.96); }
+.mission-drawer-head small,.mission-drawer-head strong { display:block; }
+.mission-drawer-head small { color:var(--green); font-size:7px; font-weight:850; }
+.mission-drawer-head strong { margin-top:2px; font-size:10px; }
+.mission-drawer-head button { width:34px; height:34px; display:grid; place-items:center; border:1px solid var(--line); border-radius:9px; background:rgba(255,255,255,.025); color:var(--ink); cursor:pointer; }
+.mission-drawer-body { height:calc(100% - 60px); overflow:auto; padding:14px; }
+.mission-drawer-body .reward-tracker-shell { margin:0; border-radius:14px; }
+.mission-drawer-body .reward-tracker-head { padding:18px; }
+.mission-drawer-body .reward-tracker-head h2 { font-size:22px; }
+.mission-drawer-body .reward-tracker-head p { font-size:10px; }
+
+.simple-roadmap-head { display:flex; align-items:end; justify-content:space-between; gap:18px; margin:18px 18px 0; padding:16px 0 10px; }
+.simple-roadmap-head h2 { margin:3px 0 2px; font-size:19px; letter-spacing:-.03em; }
+.simple-roadmap-head p { margin:0; color:var(--muted); font-size:9px; }
+.simple-roadmap-actions { display:flex; gap:7px; align-items:center; }
+.simple-roadmap-actions select,.simple-roadmap-actions button { min-height:38px; border:1px solid var(--line); border-radius:9px; background:rgba(25,39,31,.96); color:var(--ink); }
+.simple-roadmap-actions select { padding:0 10px; }
+.simple-roadmap-actions button { display:inline-flex; align-items:center; gap:6px; padding:0 11px; cursor:pointer; font-weight:760; font-size:9px; }
+.simple-roadmap-actions button:hover { border-color:rgba(59,178,115,.3); }
+
+.simple-roadmap-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:0 18px 16px; }
+.simple-roadmap-card { min-width:0; padding:14px; border:1px solid var(--line); border-radius:13px; background:linear-gradient(155deg,rgba(42,59,48,.96),rgba(30,44,36,.96)); }
+.simple-roadmap-card.dd { grid-column:1/-1; }
+.simple-roadmap-card-head { display:flex; gap:9px; align-items:flex-start; margin-bottom:10px; }
+.simple-roadmap-card-head > span { width:32px; height:32px; flex:0 0 auto; display:grid; place-items:center; border-radius:9px; background:var(--green-soft); color:var(--green); }
+.simple-roadmap-card-head small,.simple-roadmap-card-head h3,.simple-roadmap-card-head p { display:block; }
+.simple-roadmap-card-head small { color:var(--green); font-size:7px; font-weight:850; letter-spacing:.08em; }
+.simple-roadmap-card-head h3 { margin:2px 0 0; font-size:22px; line-height:1; letter-spacing:-.04em; }
+.simple-roadmap-card-head p { margin:3px 0 0; color:var(--muted); font-size:7px; }
+.simple-roadmap-select,.simple-dd-line > label { display:grid; gap:5px; }
+.simple-roadmap-select > span,.simple-dd-line > label > span { color:var(--muted); font-size:7px; font-weight:760; }
+.simple-roadmap-select select,.simple-dd-line select { width:100%; min-height:38px; border:1px solid var(--line-strong); border-radius:9px; padding:0 10px; background:rgba(23,36,28,.96); color:var(--ink); font-size:9px; }
+.simple-dd-line + .simple-dd-line { margin-top:10px; padding-top:10px; border-top:1px solid var(--line); }
+
+.simple-pick { margin-top:8px; padding:10px; border:1px solid rgba(59,178,115,.12); border-radius:10px; background:rgba(255,255,255,.018); }
+.simple-pick-main { display:flex; justify-content:space-between; gap:10px; }
+.simple-pick-main small,.simple-pick-main strong { display:block; }
+.simple-pick-main small { color:var(--green); font-size:7px; font-weight:850; text-transform:uppercase; }
+.simple-pick-main strong { margin-top:1px; font-size:9px; }
+.simple-pick-main > b { color:var(--ink); font-size:13px; }
+.simple-pick-tags { display:flex; flex-wrap:wrap; gap:4px; margin-top:7px; }
+.simple-pick-tags span { display:inline-flex; align-items:center; gap:3px; padding:3px 5px; border:1px solid var(--line); border-radius:999px; color:var(--muted); font-size:6px; }
+.simple-pick-tags span.clear { color:#bfe6cf; background:var(--green-soft); }
+.simple-pick-tags span.hold { color:#ffe0a0; background:var(--amber-soft); }
+.simple-pick-foot { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-top:7px; padding-top:7px; border-top:1px solid var(--line); }
+.simple-pick-foot > span { color:var(--muted); font-size:7px; }
+.simple-pick-foot > span b { color:var(--green); }
+.simple-pick-foot > div { display:flex; gap:7px; align-items:center; }
+.simple-pick-foot a { display:inline-flex; align-items:center; gap:3px; color:var(--muted); font-size:7px; }
+.simple-current { display:flex; gap:8px; align-items:flex-start; margin-top:8px; padding:9px; border:1px dashed var(--line); border-radius:9px; }
+.simple-current svg { color:var(--green); flex:0 0 auto; }
+.simple-current strong,.simple-current small { display:block; }
+.simple-current strong { font-size:8px; }
+.simple-current small { margin-top:1px; color:var(--muted); font-size:7px; }
+
+.simple-plan-note { display:flex; gap:8px; align-items:flex-start; margin:0 18px 12px; padding:10px 11px; border:1px solid rgba(129,116,255,.15); border-radius:10px; background:rgba(129,116,255,.045); }
+.simple-plan-note svg { color:#aca4ff; flex:0 0 auto; }
+.simple-plan-note strong,.simple-plan-note small { display:block; }
+.simple-plan-note strong { font-size:8px; }
+.simple-plan-note small { margin-top:2px; color:var(--muted); font-size:7px; line-height:1.45; }
+
+.simple-timeline { margin:0 18px 14px; overflow:hidden; border:1px solid var(--line); border-radius:12px; background:rgba(255,255,255,.015); }
+.simple-timeline-head { display:flex; gap:8px; align-items:center; padding:10px 12px; border-bottom:1px solid var(--line); }
+.simple-timeline-head svg { color:var(--green); }
+.simple-timeline-head strong,.simple-timeline-head small { display:block; }
+.simple-timeline-head strong { font-size:9px; }
+.simple-timeline-head small { color:var(--muted); font-size:7px; }
+.simple-timeline-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); }
+.simple-timeline-item { min-width:0; padding:10px 11px; border-left:1px solid var(--line); }
+.simple-timeline-item:first-child { border-left:0; }
+.simple-timeline-item small,.simple-timeline-item strong,.simple-timeline-item span { display:block; }
+.simple-timeline-item small { color:var(--green); font-size:7px; font-weight:850; }
+.simple-timeline-item strong { margin-top:2px; font-size:8px; line-height:1.35; }
+.simple-timeline-item span { margin-top:3px; color:var(--muted); font-size:6px; text-transform:uppercase; letter-spacing:.06em; }
+.simple-timeline-item.active { background:rgba(59,178,115,.035); }
+.simple-timeline-empty { padding:12px; color:var(--muted); font-size:8px; }
+
+@media (max-width:820px) {
+  .plan-hub-simple .plan-hub-hero.simple { grid-template-columns:1fr; }
+  .plan-hub-simple .plan-hub-stats.compact { grid-template-columns:repeat(2,1fr); }
+  .simple-roadmap-head { align-items:flex-start; flex-direction:column; }
+  .simple-roadmap-actions { width:100%; }
+  .simple-roadmap-actions select,.simple-roadmap-actions button { flex:1; }
+  .simple-roadmap-grid { grid-template-columns:1fr; }
+  .simple-roadmap-card.dd { grid-column:auto; }
+}
+@media (max-width:560px) {
+  .compact-mission-row { grid-template-columns:1fr; }
+  .compact-mission-card-foot { flex-wrap:wrap; }
+  .compact-mission-card-foot em { margin-left:0; width:100%; }
+  .simple-roadmap-actions { flex-direction:column; align-items:stretch; }
+  .simple-pick-foot { align-items:flex-start; flex-direction:column; }
+  .simple-timeline-row { grid-template-columns:1fr; }
+  .simple-timeline-item { border-left:0; border-top:1px solid var(--line); }
+  .simple-timeline-item:first-child { border-top:0; }
+}
