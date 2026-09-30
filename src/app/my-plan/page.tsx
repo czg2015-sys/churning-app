@@ -3,7 +3,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowUpRight, CreditCard, Settings2 } from "lucide-react";
 import { PlanStrategyHub } from "@/components/plan-strategy-hub";
-import { RewardTracker } from "@/components/reward-tracker";
 import { SignOutButton } from "@/components/sign-out-button";
 import { createClient } from "@/lib/supabase/server";
 import type { AccountHistory, FinancialProfile, Mission, Opportunity } from "@/lib/types";
@@ -59,13 +58,6 @@ export default async function MyPlanPage() {
           stateCode={stateCode}
           addedOpportunityIds={addedOpportunityIds}
         />
-
-        <div className="my-plan-tracker-heading">
-          <span className="kicker">ACTIVE ACCOUNT CHECKLISTS</span>
-          <h2>Once you actually start an offer, track every requirement here.</h2>
-          <p>Your plan above decides what fits. The tracker below handles the real account, progress, payout timing, quick-access link, and safe-close review.</p>
-        </div>
-        <RewardTracker missions={typedMissions} />
       </div>
     </main>
   );
