@@ -16,6 +16,8 @@ const defaults: FinancialProfile = {
   emergency_reserve: 5000,
   current_hysa_apy: 0,
   biweekly_pay: 0,
+  dd_source_count: 1,
+  dd_source_amounts: [],
   biweekly_essential_spend: 0,
   estimated_tax_rate: null,
   tax_rate_known: false,
@@ -66,6 +68,10 @@ export function QuestionnaireForm({
   const [hasCurrentSavingsYield, setHasCurrentSavingsYield] = useState(Number(profile.current_hysa_apy || 0) > 0);
   const [cardSpendKnown, setCardSpendKnown] = useState(Number(profile.monthly_card_spend || 0) > 0);
   const [taxKnown, setTaxKnown] = useState(profile.tax_rate_known);
+  const [ddSourceCount, setDdSourceCount] = useState(Math.max(1, Math.min(3, Number(profile.dd_source_count || 1))));
+  const [ddSourceAmounts, setDdSourceAmounts] = useState<number[]>(() => Array.isArray(profile.dd_source_amounts) && profile.dd_source_amounts.length
+    ? profile.dd_source_amounts.map((value) => Number(value) || 0)
+    : [Number(profile.biweekly_pay || 0), 0, 0]);
   const [bankSearch, setBankSearch] = useState("");
   const [bankSelections, setBankSelections] = useState<string[]>(initialBanks);
   const [saving, setSaving] = useState(false);
@@ -91,6 +97,14 @@ export function QuestionnaireForm({
 
     const form = new FormData(event.currentTarget);
     const selectedBanks = form.getAll("bank_history").map(String);
+    const combinedBiweeklyPay = ddSourceCount === 1
+      ? numberValue(form.get("biweekly_pay"))
+      : ddSourceAmounts.slice(0, ddSourceCount).reduce((sum, value) => sum + Math.max(0, value), 0);
+    if (ddSourceCount > 1 && ddSourceAmounts.slice(0, ddSourceCount).some((value) => !(value > 0))) {
+      setError("Enter the average amount of each paycheck source so Churning can split DD recommendations correctly.");
+      setSaving(false);
+      return;
+    }
     const stateCode = String(form.get("state_code") || initialState);
     const financialProfile: FinancialProfile = {
       total_cash: totalCash,
@@ -98,7 +112,9 @@ export function QuestionnaireForm({
       checking_cash: checkingCash,
       emergency_reserve: emergencyReserve,
       current_hysa_apy: hasCurrentSavingsYield ? numberValue(form.get("current_hysa_apy")) : 0,
-      biweekly_pay: numberValue(form.get("biweekly_pay")),
+      biweekly_pay: combinedBiweeklyPay,
+      dd_source_count: ddSourceCount,
+      dd_source_amounts: ddSourceCount === 1 ? [combinedBiweeklyPay] : ddSourceAmounts.slice(0, ddSourceCount),
       biweekly_essential_spend: numberValue(form.get("biweekly_essential_spend")),
       monthly_card_spend: cardSpendKnown ? numberValue(form.get("monthly_card_spend")) : 0,
       current_spend_reward_rate: cardSpendKnown ? numberValue(form.get("current_spend_reward_rate")) : 0,
@@ -208,8 +224,11 @@ export function QuestionnaireForm({
         <section className="planner-section">
           <div className="form-section-heading"><span>02</span><div><h3>Your paycheck and normal spending</h3><p>This helps us avoid recommending direct-deposit or spending requirements that do not fit your real cash flow.</p></div></div>
           <div className="form-grid">
-            <div className="field"><label htmlFor="biweekly_pay">About how much is each biweekly take-home paycheck?</label><FormattedNumberInput id="biweekly_pay" name="biweekly_pay" defaultValue={Number(profile.biweekly_pay)} placeholder="1,500" /><small>Enter what usually lands in your account after payroll deductions.</small></div>
-            <div className="field"><label htmlFor="biweekly_essential_spend">About how much of each two-week paycheck goes to essentials?</label><FormattedNumberInput id="biweekly_essential_spend" name="biweekly_essential_spend" defaultValue={Number(profile.biweekly_essential_spend)} placeholder="900" /><small>Think rent, food, gas, bills, and other normal needs.</small></div>
+            <div className="field"><label htmlFor="dd_source_count">How many separate paychecks / direct deposit sources do you receive?</label><select id="dd_source_count" name="dd_source_count" value={ddSourceCount} onChange={(event) => setDdSourceCount(Number(event.target.value))}><option value={1}>1 paycheck source</option><option value={2}>2 paycheck sources</option><option value={3}>3 paycheck sources</option></select><small>Count jobs or income streams, not bank accounts. Don't double count the same paycheck.</small></div>
+            <div className="field"><label htmlFor="employer_multiple_dd">Can your employer split a paycheck between bank accounts?</label><select id="employer_multiple_dd" name="employer_multiple_dd" defaultValue={profile.employer_multiple_dd === true ? "yes" : profile.employer_multiple_dd === false ? "no" : "unknown"}><option value="unknown">I don't know</option><option value="yes">Yes, they allow a split</option><option value="no">No, one bank per paycheck</option></select><small>If you don't know, Churning will not assume you can split.</small></div>
+            {ddSourceCount === 1 ? <div className="field"><label htmlFor="biweekly_pay">Average take-home amount per two weeks</label><FormattedNumberInput id="biweekly_pay" name="biweekly_pay" defaultValue={Number(profile.biweekly_pay)} placeholder="650" /><small>This is the most you can route before keeping money for bills.</small></div>
+              : Array.from({ length: ddSourceCount }, (_, index) => <div className="field" key={index}><label htmlFor={`dd_source_${index}`}>Income source ${index + 1} — average take-home per two weeks</label><FormattedNumberInput id={`dd_source_${index}`} name={`dd_source_${index}`} value={ddSourceAmounts[index] || 0} onValueChange={(value) => setDdSourceAmounts((prev) => { const nextValues = [...prev]; nextValues[index] = Math.max(0, value); return nextValues; })} placeholder="650"/><small>Use an equivalent two-week amount so we can test each source independently.</small></div>)}
+            <div className="field"><label htmlFor="biweekly_essential_spend">About how much every 2 weeks goes to essentials?</label><FormattedNumberInput id="biweekly_essential_spend" name="biweekly_essential_spend" defaultValue={Number(profile.biweekly_essential_spend)} placeholder="500" /><small>Rent, food, gas, bills. Keep access to this money.</small></div>
           </div>
 
           <div className="optional-toggle-block">
@@ -236,7 +255,7 @@ export function QuestionnaireForm({
           <div className="form-grid" style={{ marginTop: 17 }}>
             <div className="field"><label htmlFor="ranking_preference">What should we prioritize first?</label><select id="ranking_preference" name="ranking_preference" defaultValue={profile.ranking_preference}><option value="balanced">Best overall fit</option><option value="profit">Highest estimated value</option><option value="ease">Simplest requirements</option><option value="liquidity">Keep cash most accessible</option></select><small>Balanced considers value, effort, liquidity, and fit together.</small></div>
             <div className="field"><label htmlFor="annual_extra_goal">Extra annual cash earnings goal</label><FormattedNumberInput id="annual_extra_goal" name="annual_extra_goal" defaultValue={Number(profile.annual_extra_goal)} placeholder="1,000" /><small>Optional target for bonuses + incremental interest.</small></div>
-            <div className="field"><label htmlFor="employer_multiple_dd">Can your payroll split direct deposit between multiple accounts?</label><select id="employer_multiple_dd" name="employer_multiple_dd" defaultValue={profile.employer_multiple_dd === true ? "yes" : profile.employer_multiple_dd === false ? "no" : "unknown"}><option value="unknown">I don’t know</option><option value="yes">Yes</option><option value="no">No</option></select><small>Only Active mode will use multiple DD lanes, and only when this is set to Yes.</small></div>
+
             <div className="field"><label className="switch-row" htmlFor="alerts_opt_in"><input id="alerts_opt_in" name="alerts_opt_in" type="checkbox" defaultChecked={Boolean(profile.alerts_opt_in)} /><span>Enable important tracker alerts</span></label><small>Used for deadline, fee, payout and safe-close reminders once notification delivery is connected.</small></div>
           </div>
         </section>
