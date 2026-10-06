@@ -223,5 +223,82 @@ export async function runReminderSweep() {
     }
   }
 
+  // Promotional savings rates are tracked independently of reward missions.
+  // A posted bank APY is never assumed to be the account holder's confirmed APY.
+  const { data: tracked, error: trackedError } = await supabase.from("tracked_cash_accounts")
+    .select("id,user_id,institution,product_name,promotional_end_date,confirmed_post_promo_apy,email_reminders_enabled,status")
+    .eq("status", "active")
+    .not("promotional_end_date", "is", null);
+  if (trackedError) throw trackedError;
+
+  for (const account of tracked || []) {
+    const endDate = account.promotional_end_date as string | null;
+    if (!endDate) continue;
+    const preference = preferenceByUser.get(account.user_id as string) || "important";
+    const level = effectiveLevel(preference, account.email_reminders_enabled as boolean | null);
+    if (level === "off") continue;
+    const days = daysUntil(endDate, today);
+    const overdue = days < 0 && days >= -7 && account.confirmed_post_promo_apy == null;
+    if (!scheduleFor(level, "benefit").includes(days) && !overdue) continue;
+
+    // All overdue reminders collapse into a single -1 notice so a late entry does
+    // not send duplicate emails on successive sweeps.
+    const notificationDay = overdue ? -1 : days;
+    const isOver = days <= 0;
+    const title = isOver
+      ? `Your ${account.institution} promotional benefit has ended`
+      : `${account.institution} savings promotion ends ${formatDays(days)}`;
+    const message = isOver
+      ? `Your ${account.product_name} promotional APY ended on ${endDate}. Check the APY actually shown by your bank, update Churning, and review other savings options. Any previously published post-promotion rate is not guaranteed.`
+      : `The promotional rate for your ${account.product_name} ends on ${endDate}. Check what rate the bank will apply afterward and decide whether a move is worthwhile. Do not move money before reviewing the current account terms.`;
+    const { data: inserted, error } = await supabase.from("reminder_notifications")
+      .insert({
+        user_id: account.user_id,
+        mission_id: null,
+        tracked_account_id: account.id,
+        reminder_type: "hysa_promotion_expiration",
+        target_date: endDate,
+        days_before: notificationDay,
+        title,
+        message,
+        channel: process.env.RESEND_API_KEY && process.env.REMINDER_FROM_EMAIL ? "email" : "in_app",
+        email_status: process.env.RESEND_API_KEY && process.env.REMINDER_FROM_EMAIL ? "pending" : "not_configured",
+      })
+      .select("id")
+      .single();
+    if (error) {
+      if (error.code === "23505") continue;
+      throw error;
+    }
+    if (!inserted) continue;
+    created += 1;
+
+    if (!process.env.RESEND_API_KEY || !process.env.REMINDER_FROM_EMAIL) {
+      inAppOnly += 1;
+      continue;
+    }
+    const { data: accountOwner } = await supabase.auth.admin.getUserById(account.user_id as string);
+    const email = accountOwner.user?.email;
+    if (!email) {
+      inAppOnly += 1;
+      await supabase.from("reminder_notifications").update({ email_status: "no_recipient", channel: "in_app" }).eq("id", inserted.id);
+      continue;
+    }
+    const result = await sendEmail(email, title, message);
+    if (result.sent) {
+      emailed += 1;
+      await supabase.from("reminder_notifications").update({
+        email_status: "sent",
+        sent_at: new Date().toISOString(),
+      }).eq("id", inserted.id);
+    } else {
+      inAppOnly += 1;
+      await supabase.from("reminder_notifications").update({
+        email_status: result.reason || "failed",
+        channel: "in_app",
+      }).eq("id", inserted.id);
+    }
+  }
+
   return { status: "completed", created, emailed, inAppOnly };
 }
