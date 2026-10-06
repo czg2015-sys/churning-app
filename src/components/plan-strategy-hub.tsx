@@ -490,7 +490,7 @@ export function PlanStrategyHub({
           <span className="kicker">YOUR MONEY PLAN</span>
           <h1>Here’s the plan.</h1>
           <p>{money.format(totalCash)} tracked in your plan · {money.format(savingsCash)} planned in savings · {money.format(plannedDd)}/mo for new DD.</p>
-          {baselineNeedsConfirmation ? <p className="cash-rate-alert"><ShieldAlert size={14}/> {expiredHysa?.institution} promotion ended {readableDate(expiredHysa.promotional_end_date!)}. Confirm your current APY before trusting interest comparisons.</p> : null}
+          {baselineNeedsConfirmation ? <p className="cash-rate-alert"><ShieldAlert size={14}/> {expiredHysa?.institution} promotion ended {(expiredHysa?.promotional_end_date ? readableDate(expiredHysa.promotional_end_date) : "recently")}. Confirm your current APY before trusting interest comparisons.</p> : null}
         </div>
         <div className="plan-hub-return">
           <small>{profile.tax_rate_known ? "EST. AFTER-TAX EXTRA" : "EST. PRE-TAX EXTRA"}</small>
