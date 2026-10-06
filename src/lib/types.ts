@@ -125,6 +125,7 @@ export type FinancialProfile = {
   emergency_reserve: number | string;
   current_hysa_apy: number | string;
   biweekly_pay: number | string;
+  dd_source_count?: number;
   biweekly_essential_spend: number | string;
   estimated_tax_rate: number | string | null;
   tax_rate_known: boolean;
@@ -178,4 +179,29 @@ export type AccountHistory = {
   bonus_amount?: number | string | null;
   outcome?: string | null;
   notes?: string | null;
+};
+
+export type TrackedCashAccount = {
+  id: string;
+  user_id: string;
+  opportunity_id?: string | null;
+  institution: string;
+  product_name: string;
+  account_kind: "hysa" | "checking" | "direct_deposit" | "savings_bonus" | "other";
+  balance: number | string;
+  current_apy?: number | string | null;
+  promotional_apy?: number | string | null;
+  promotional_start_date?: string | null;
+  promotional_end_date?: string | null;
+  published_standard_apy?: number | string | null;
+  published_rate_asof?: string | null;
+  confirmed_post_promo_apy?: number | string | null;
+  apy_last_confirmed_at?: string | null;
+  dd_received_total?: number | string;
+  dd_last_received_date?: string | null;
+  opened_at?: string | null;
+  email_reminders_enabled?: boolean;
+  status: "active" | "archived";
+  created_at?: string;
+  updated_at?: string;
 };
