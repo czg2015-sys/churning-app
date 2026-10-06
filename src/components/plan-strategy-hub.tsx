@@ -15,11 +15,11 @@ import {
   WalletCards,
 } from "lucide-react";
 import { AddToPlanButton } from "@/components/add-to-plan-button";
-import { CompactMissionHub } from "@/components/compact-mission-hub";
+import { AccountTrackerHub } from "@/components/account-tracker-hub";
 import { createClient } from "@/lib/supabase/client";
 import { money, numberValue, rankMatches } from "@/lib/plan-math";
 import { planningDates } from "@/lib/roadmap";
-import type { FinancialProfile, Mission, Opportunity } from "@/lib/types";
+import type { FinancialProfile, Mission, Opportunity, TrackedCashAccount } from "@/lib/types";
 
 type RankedMatch = ReturnType<typeof rankMatches>[number];
 type SortMode = "overall" | "profit" | "ease" | "liquidity";
@@ -91,8 +91,12 @@ function monthlyDdNeed(item: Opportunity) {
   if (explicit > 0) return explicit;
   const required = numberValue(item.direct_deposit_required);
   if (required <= 0) return 0;
-  const days = Math.max(30, numberValue(item.direct_deposit_window_days || item.qualification_days || 30));
-  return required / Math.max(1, days / 30);
+  const days = Math.max(1, numberValue(item.direct_deposit_window_days || item.qualification_days || 90));
+  const conservativeChecks = Math.max(1, Math.floor(days / 14));
+  if (numberValue(item.dd_deposit_count) > conservativeChecks) return Number.POSITIVE_INFINITY;
+  const perCheckNeed = Math.max(numberValue(item.dd_min_each), required / conservativeChecks);
+  const monthlyFromChecks = perCheckNeed * 26 / 12;
+  return Math.max(monthlyFromChecks, required / (days / 30), numberValue(item.reward_monthly_dd_threshold));
 }
 
 function hysaExtra(result: RankedMatch, amount: number, profile: FinancialProfile) {
@@ -187,6 +191,7 @@ export function PlanStrategyHub({
   profile,
   opportunities,
   missions,
+  accounts,
   usedBanks,
   stateCode,
   addedOpportunityIds,
@@ -194,12 +199,22 @@ export function PlanStrategyHub({
   profile: FinancialProfile;
   opportunities: Opportunity[];
   missions: Mission[];
+  accounts: TrackedCashAccount[];
   usedBanks: string[];
   stateCode?: string | null;
   addedOpportunityIds: string[];
 }) {
   const stored = useMemo(() => normalizedSelections(profile.roadmap_selected_opportunity_ids), [profile.roadmap_selected_opportunity_ids]);
-  const ranked = useMemo(() => rankMatches(opportunities, profile, usedBanks, stateCode), [opportunities, profile, usedBanks, stateCode]);
+  const todayLocal = (() => { const now = new Date(); return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-"); })();
+  const expiredHysa = accounts.find((account) => account.status === "active" && account.account_kind === "hysa"
+    && account.promotional_end_date && account.promotional_end_date.slice(0, 10) <= todayLocal);
+  const baselineNeedsConfirmation = Boolean(expiredHysa && expiredHysa.confirmed_post_promo_apy == null);
+  const accountConfirmedApy = expiredHysa && expiredHysa.confirmed_post_promo_apy != null
+    ? numberValue(expiredHysa.confirmed_post_promo_apy) : null;
+  const effectiveProfile = useMemo(() =>
+    accountConfirmedApy == null ? profile : { ...profile, current_hysa_apy: accountConfirmedApy },
+    [profile, accountConfirmedApy]);
+  const ranked = useMemo(() => rankMatches(opportunities, effectiveProfile, usedBanks, stateCode), [opportunities, effectiveProfile, usedBanks, stateCode]);
   const initialSort = stored.sortMode || (profile.ranking_preference === "profit" ? "profit" : profile.ranking_preference === "ease" ? "ease" : profile.ranking_preference === "liquidity" ? "liquidity" : "overall");
   const [sortMode, setSortMode] = useState<SortMode>(initialSort);
   const [saving, setSaving] = useState(false);
@@ -218,8 +233,22 @@ export function PlanStrategyHub({
   const bonusRanks = useMemo(() => rankMaps(bonusBase, profile), [bonusBase, profile]);
   const spendingRanks = useMemo(() => rankMaps(spendingBase, profile), [spendingBase, profile]);
 
-  const monthlyDdCapacity = Math.max(0, numberValue(profile.biweekly_pay)) * (26 / 12);
-  const ddLaneLimit = profile.employer_multiple_dd === true && ddBase.length > 1 ? 2 : 1;
+  const activeDdCommitted = missions.filter((mission) => !["complete", "cancelled"].includes(mission.status))
+    .reduce((sum, mission) => sum + (mission.opportunity ? monthlyDdNeed(mission.opportunity) : 0), 0);
+  const grossMonthlyDd = Math.max(0, numberValue(profile.biweekly_pay)) * 26 / 12;
+  const monthlyDdCapacity = Math.max(0, grossMonthlyDd - activeDdCommitted);
+  const ddSourceCount = Math.max(1, Math.min(3, Math.floor(numberValue(profile.dd_source_count || 1))));
+  const canSplitPayroll = profile.employer_multiple_dd === true;
+  const rawSourceCaps = Array.isArray(profile.dd_source_amounts) && profile.dd_source_amounts.length >= ddSourceCount
+    ? profile.dd_source_amounts.slice(0, ddSourceCount).map((amount) => Math.max(0, numberValue(amount)) * 26 / 12)
+    : Array.from({ length: ddSourceCount }, () => grossMonthlyDd / ddSourceCount);
+  const sourceCaps = rawSourceCaps.map((amount, index) => Math.max(0, amount - (index === 0 ? activeDdCommitted : 0)));
+  const ddLaneLimit = Math.min(3, Math.max(1, ddSourceCount === 1 ? (canSplitPayroll ? 2 : 1) : (canSplitPayroll ? 3 : ddSourceCount)));
+  function ddRoomAt(index: number, ids: string[]) {
+    const alreadyUsed = ids.reduce((sum, id) => sum + monthlyDdNeed(ddBase.find((row) => row.item.id === id)?.item || {} as Opportunity), 0);
+    if (!canSplitPayroll && ddSourceCount > 1) return Math.min(sourceCaps[index] || 0, Math.max(0, monthlyDdCapacity - alreadyUsed));
+    return Math.max(0, monthlyDdCapacity - alreadyUsed);
+  }
 
   const activeCash = missions
     .filter((mission) => !["complete", "cancelled"].includes(mission.status))
@@ -236,7 +265,7 @@ export function PlanStrategyHub({
       const result = ddBase.find((candidate) => candidate.item.id === id);
       if (!result) continue;
       const need = monthlyDdNeed(result.item);
-      if (usedMonthly + need > monthlyDdCapacity + 0.01) continue;
+      if (need > ddRoomAt(picks.length, picks) + .01) continue;
       if (picks.some((pick) => ddBase.find((candidate) => candidate.item.id === pick)?.item.institution === result.item.institution)) continue;
       picks.push(id);
       usedMonthly += need;
@@ -250,7 +279,7 @@ export function PlanStrategyHub({
       if (picks.includes(result.item.id)) continue;
       if (picks.some((pick) => ddBase.find((candidate) => candidate.item.id === pick)?.item.institution === result.item.institution)) continue;
       const need = monthlyDdNeed(result.item);
-      if (usedMonthly + need > monthlyDdCapacity + 0.01) continue;
+      if (need > ddRoomAt(picks.length, picks) + .01) continue;
       picks.push(result.item.id);
       usedMonthly += need;
     }
@@ -268,7 +297,7 @@ export function PlanStrategyHub({
     return (spendingSorted.find((result) => result.safetyPassed) || spendingSorted[0])?.item.id || "none";
   }
 
-  const initialDd = stored.ddIds?.length ? buildDdPlan(stored.ddIds.slice(0, ddLaneLimit)) : buildDdPlan();
+  const initialDd = Array.isArray(stored.ddIds) ? buildDdPlan(stored.ddIds.slice(0, ddLaneLimit)) : buildDdPlan();
   const initialBonus = stored.savingsBonusId || bestBonusId();
   const initialSpending = stored.spendingId || bestSpendingId();
 
@@ -303,7 +332,7 @@ export function PlanStrategyHub({
 
   const plannedDd = selectedDd.reduce((sum, result) => sum + monthlyDdNeed(result.item), 0);
   const spendingFits = spendingBase.length > 0 && numberValue(profile.monthly_card_spend) > 0;
-  const currentApy = numberValue(profile.current_hysa_apy);
+  const currentApy = numberValue(effectiveProfile.current_hysa_apy);
 
   const selectedUnique = Array.from(new Map([...selectedDd, selectedBonus, selectedSpending].filter((item): item is RankedMatch => Boolean(item)).map((item) => [item.item.id, item])).values());
   const nonSavingsExtra = selectedUnique.reduce((sum, result) => sum + profitValue(result, profile), 0);
@@ -446,7 +475,8 @@ export function PlanStrategyHub({
         <div className="plan-hub-copy">
           <span className="kicker">YOUR MONEY PLAN</span>
           <h1>Here’s the plan.</h1>
-          <p>{money.format(reserve)} protected · {money.format(savingsCash)} liquid · {money.format(plannedDd)}/mo routed to DD.</p>
+          <p>{money.format(totalCash)} tracked in your plan · {money.format(savingsCash)} planned in savings · {money.format(plannedDd)}/mo for new DD.</p>
+          {baselineNeedsConfirmation ? <p className="cash-rate-alert"><ShieldAlert size={14}/> {expiredHysa?.institution} promotion ended {readableDate(expiredHysa.promotional_end_date!)}. Confirm your current APY before trusting interest comparisons.</p> : null}
         </div>
         <div className="plan-hub-return">
           <small>{profile.tax_rate_known ? "EST. AFTER-TAX EXTRA" : "EST. PRE-TAX EXTRA"}</small>
@@ -457,12 +487,12 @@ export function PlanStrategyHub({
 
       <div className="plan-hub-stats compact">
         <div><small>TOTAL CASH</small><strong>{money.format(totalCash)}</strong></div>
-        <div><small>PROTECTED</small><strong>{money.format(reserve)}</strong></div>
+        <div><small>ACTIVE OFFERS</small><strong>{missions.filter((mission) => !["complete", "cancelled"].includes(mission.status)).length + accounts.filter((account) => account.status === "active").length}</strong></div>
         <div><small>READY TO USE</small><strong>{money.format(baseAvailableCash)}</strong></div>
-        <div><small>DD CAPACITY</small><strong>{money.format(monthlyDdCapacity)}/mo</strong></div>
+        <div><small>NEXT DEADLINE</small><strong>{timeline.find((event) => event.date >= todayLocal)?.date ? readableDate(timeline.find((event) => event.date >= todayLocal)!.date) : "N/A"}</strong></div>
       </div>
 
-      <CompactMissionHub missions={missions} />
+      <AccountTrackerHub missions={missions} accounts={accounts} opportunities={opportunities} />
 
       <div className="simple-roadmap-head">
         <div><span className="kicker">RECOMMENDED ROADMAP</span><h2>Pick one. The next recommendation updates.</h2><p>Start with Churning’s recommendation, or use any dropdown to choose another option.</p></div>
@@ -479,11 +509,10 @@ export function PlanStrategyHub({
 
       <div className="simple-roadmap-grid">
         <section className="simple-roadmap-card dd">
-          <div className="simple-roadmap-card-head"><span><Banknote size={18} /></span><div><small>DIRECT DEPOSIT</small><h3>{selectedDd.length ? money.format(plannedDd) + "/mo" : "Skip"}</h3><p>{ddLaneLimit > 1 ? "Up to 2 paycheck lanes" : "1 paycheck lane"}</p></div></div>
+          <div className="simple-roadmap-card-head"><span><Banknote size={18} /></span><div><small>DIRECT DEPOSIT</small><h3>{selectedDd.length ? money.format(plannedDd) + "/mo" : "Skip"}</h3><p>{ddSourceCount} paycheck source{ddSourceCount === 1 ? "" : "s"} · {canSplitPayroll ? "splitting enabled" : "no splitting assumed"}</p></div></div>
           {Array.from({ length: ddLaneLimit }).map((_, index) => {
             const selected = selectedDd[index] || null;
-            const usedBefore = selectedDd.slice(0, index).reduce((sum, result) => sum + monthlyDdNeed(result.item), 0);
-            const availableForThisLine = Math.max(0, monthlyDdCapacity - usedBefore);
+            const availableForThisLine = ddRoomAt(index, ddIds.slice(0, index));
             const otherIds = ddIds.slice(0, index);
             const otherInstitutions = new Set(otherIds.map((id) => ddBase.find((candidate) => candidate.item.id === id)?.item.institution));
             const options = ddSorted.filter((result) => {
@@ -493,8 +522,8 @@ export function PlanStrategyHub({
             });
             return (
               <div className="simple-dd-line" key={index}>
-                <label><span>DD line {index + 1} · {money.format(availableForThisLine)}/mo available</span><select value={selected?.item.id || "none"} onChange={(event) => updateDd(index, event.target.value)} disabled={saving}><option value="none">No DD offer</option>{options.map((result) => <option key={result.item.id} value={result.item.id}>{optionLabel(result, ddRanks, profile, sortMode)}</option>)}</select></label>
-                {selected ? <SimplePick result={selected} profile={profile} amount={monthlyDdNeed(selected.item)} amountLabel={money.format(monthlyDdNeed(selected.item)) + "/mo"} ranks={ddRanks} addedOpportunityIds={addedOpportunityIds} /> : null}
+                <label><span>DD line {index + 1} · {money.format(availableForThisLine)}/mo available · real payroll only</span><select value={selected?.item.id || "none"} onChange={(event) => updateDd(index, event.target.value)} disabled={saving}><option value="none">No DD offer</option>{options.map((result) => <option key={result.item.id} value={result.item.id}>{optionLabel(result, ddRanks, profile, sortMode)}</option>)}</select></label>
+                {selected ? <SimplePick result={selected} profile={profile} amount={monthlyDdNeed(selected.item)} amountLabel={money.format(monthlyDdNeed(selected.item)) + "/mo (" + money.format(Math.ceil(monthlyDdNeed(selected.item) * 12 / 26)) + "/paycheck)"} ranks={ddRanks} addedOpportunityIds={addedOpportunityIds} /> : null}
               </div>
             );
           })}
@@ -502,8 +531,8 @@ export function PlanStrategyHub({
 
         <section className="simple-roadmap-card">
           <div className="simple-roadmap-card-head"><span><Landmark size={18} /></span><div><small>SAVINGS / HYSA</small><h3>{money.format(savingsCash)}</h3><p>Keep this liquid</p></div></div>
-          <label className="simple-roadmap-select"><span>Recommended home</span><select value={hysaId} onChange={(event) => updateHysa(event.target.value)} disabled={saving}><option value="current">Current savings · {currentApy.toFixed(2)}% APY</option>{hysaSorted.map((result) => <option key={result.item.id} value={result.item.id}>{optionLabel(result, hysaRanks, profile, sortMode, savingsCash)} · {numberValue(result.item.apy).toFixed(2)}%</option>)}</select></label>
-          {selectedHysa ? <SimplePick result={selectedHysa} profile={profile} amount={savingsCash} amountLabel={money.format(savingsCash)} ranks={hysaRanks} addedOpportunityIds={addedOpportunityIds} /> : <div className="simple-current"><WalletCards size={16} /><span><strong>Keep current savings</strong><small>{money.format(savingsCash)} stays at {currentApy.toFixed(2)}% APY.</small></span></div>}
+          <label className="simple-roadmap-select"><span>Recommended home</span><select value={hysaId} onChange={(event) => updateHysa(event.target.value)} disabled={saving}><option value="current">Current savings · {baselineNeedsConfirmation ? "APY needs update" : currentApy.toFixed(2) + "% APY"}</option>{hysaSorted.map((result) => <option key={result.item.id} value={result.item.id}>{optionLabel(result, hysaRanks, profile, sortMode, savingsCash)} · {numberValue(result.item.apy).toFixed(2)}%</option>)}</select></label>
+          {selectedHysa ? <SimplePick result={selectedHysa} profile={profile} amount={savingsCash} amountLabel={money.format(savingsCash)} ranks={hysaRanks} addedOpportunityIds={addedOpportunityIds} /> : <div className="simple-current"><WalletCards size={16} /><span><strong>Keep current savings</strong><small>{money.format(savingsCash)} · {baselineNeedsConfirmation ? "Confirm your new APY after the promo" : "current " + currentApy.toFixed(2) + "% APY"}.</small></span></div>}
         </section>
 
         <section className="simple-roadmap-card">
