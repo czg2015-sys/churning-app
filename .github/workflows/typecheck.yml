@@ -4,6 +4,9 @@ on:
     branches:
       - account-expiry-roadmap-oct
       - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 permissions:
   contents: read
