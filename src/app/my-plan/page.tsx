@@ -3,10 +3,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowUpRight, CreditCard, Settings2 } from "lucide-react";
 import { PlanStrategyHub } from "@/components/plan-strategy-hub";
-import { TopOpportunityTable } from "@/components/top-opportunity-table";
 import { SignOutButton } from "@/components/sign-out-button";
 import { createClient } from "@/lib/supabase/server";
-import type { AccountHistory, FinancialProfile, Mission, Opportunity, TrackedCashAccount } from "@/lib/types";
+import type { AccountHistory, FinancialProfile, Mission, Opportunity } from "@/lib/types";
 
 export const metadata: Metadata = { title: "My Plan" };
 export const dynamic = "force-dynamic";
@@ -17,13 +16,12 @@ export default async function MyPlanPage() {
   const userId = claimsData?.claims?.sub;
   if (!userId) redirect("/auth");
 
-  const [{ data: profile }, { data: opportunities }, { data: missions }, { data: bankHistory }, { data: userProfile }, { data: trackedAccounts }] = await Promise.all([
+  const [{ data: profile }, { data: opportunities }, { data: missions }, { data: bankHistory }, { data: userProfile }] = await Promise.all([
     supabase.from("financial_profiles").select("*").eq("user_id", userId).maybeSingle(),
     supabase.from("opportunities").select("*, opportunity_reviews(*)").eq("offer_status", "live"),
     supabase.from("missions").select("*, mission_steps(*), opportunity:opportunities(*, opportunity_reviews(*))").eq("user_id", userId).order("created_at", { ascending: false }),
     supabase.from("account_history").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
     supabase.from("profiles").select("state_code").eq("user_id", userId).maybeSingle(),
-    supabase.from("tracked_cash_accounts").select("*").eq("user_id", userId).eq("status", "active"),
   ]);
 
   if (!profile) redirect("/questionnaire");
@@ -31,7 +29,6 @@ export default async function MyPlanPage() {
   const typedProfile = profile as FinancialProfile;
   const typedOpportunities = (opportunities || []) as Opportunity[];
   const typedMissions = (missions || []) as Mission[];
-  const typedAccounts = (trackedAccounts || []) as TrackedCashAccount[];
   const typedHistory = (bankHistory || []) as AccountHistory[];
   const usedBanks = Array.from(new Set(typedHistory.map((row) => row.institution).filter((bank): bank is string => Boolean(bank))));
   const addedOpportunityIds = typedMissions
@@ -57,12 +54,10 @@ export default async function MyPlanPage() {
           profile={typedProfile}
           opportunities={typedOpportunities}
           missions={typedMissions}
-          accounts={typedAccounts}
           usedBanks={usedBanks}
           stateCode={stateCode}
           addedOpportunityIds={addedOpportunityIds}
         />
-        <TopOpportunityTable opportunities={typedOpportunities} profile={typedProfile} usedBanks={usedBanks} stateCode={stateCode} heading="Browse the best options by category." />
       </div>
     </main>
   );
