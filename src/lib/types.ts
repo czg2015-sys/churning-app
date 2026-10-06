@@ -126,6 +126,7 @@ export type FinancialProfile = {
   current_hysa_apy: number | string;
   biweekly_pay: number | string;
   dd_source_count?: number;
+  dd_source_amounts?: number[];
   biweekly_essential_spend: number | string;
   estimated_tax_rate: number | string | null;
   tax_rate_known: boolean;
