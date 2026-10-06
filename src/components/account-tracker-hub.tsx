@@ -77,6 +77,7 @@ export function AccountTrackerHub({
   const [editBalance, setEditBalance] = useState("");
   const [editApy, setEditApy] = useState("");
   const [editDD, setEditDD] = useState("");
+  const [useAsSavingsBaseline, setUseAsSavingsBaseline] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -113,6 +114,16 @@ export function AccountTrackerHub({
     }));
     return [...tracked, ...active].sort((a, b) => sortKey(a.date, a.urgent).localeCompare(sortKey(b.date, b.urgent)));
   }, [localAccounts, missions]);
+
+  function onPromotionStart(value: string) {
+    setPromoStart(value);
+    const chosen = catalog.find((item) => item.id === offerId);
+    if (value && chosen?.benefit_duration_days) {
+      const d = new Date(value + "T12:00:00");
+      d.setDate(d.getDate() + Number(chosen.benefit_duration_days));
+      setPromoEnd([d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-"));
+    }
+  }
 
   function pickOffer(id: string) {
     setOfferId(id);
@@ -192,10 +203,11 @@ export function AccountTrackerHub({
     setEditBalance(String(a.balance || ""));
     setEditApy(a.confirmed_post_promo_apy != null ? String(a.confirmed_post_promo_apy) : a.current_apy != null ? String(a.current_apy) : "");
     setEditDD("");
+    setUseAsSavingsBaseline(false);
     setSelectedAccountId(id);
   }
 
-  async function updateAccount(patch: Record<string, unknown>) {
+  async function updateAccount(patch: Record<string, unknown>, applyToPlanTotal = false) {
     if (!selectedAccount) return;
     setSaving(true);
     setError("");
@@ -206,6 +218,20 @@ export function AccountTrackerHub({
     if (dbError || !data) setError(dbError?.message || "Could not save.");
     else {
       setLocalAccounts((current) => current.map((item) => item.id === selectedAccount.id ? data as TrackedCashAccount : item));
+      if (applyToPlanTotal && typeof patch.balance === "number") {
+        const supabase = createClient();
+        const { data: financial } = await supabase.from("financial_profiles").select("checking_cash,savings_cash").eq("user_id", uid).maybeSingle();
+        if (financial) {
+          const savings = ["hysa", "savings_bonus"].includes(selectedAccount.account_kind)
+            ? patch.balance : numberValue(financial.savings_cash);
+          const checking = ["checking", "direct_deposit"].includes(selectedAccount.account_kind)
+            ? patch.balance : numberValue(financial.checking_cash);
+          const { error: profileError } = await supabase.from("financial_profiles")
+            .update({ savings_cash: savings, checking_cash: checking, total_cash: savings + checking, updated_at: new Date().toISOString() })
+            .eq("user_id", uid);
+          if (profileError) setError("Account balance saved, but My Plan totals could not update: " + profileError.message);
+        }
+      }
       router.refresh();
     }
     setSaving(false);
@@ -262,7 +288,7 @@ export function AccountTrackerHub({
                 <label>Account type<select value={kind} onChange={(e) => setKind(e.target.value as TrackedCashAccount["account_kind"])}><option value="hysa">HYSA</option><option value="checking">Checking</option><option value="direct_deposit">Direct deposit</option><option value="savings_bonus">Savings bonus</option><option value="other">Other</option></select></label>
                 <label>Current balance ($)<input type="number" min={0} step="0.01" value={balance} onChange={(e) => setBalance(e.target.value)} placeholder="0"/></label>
                 <label>APY while promo is active (%)<input type="number" min={0} max={100} step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="4.10"/></label>
-                <div className="cash-account-two"><label>Promo started (optional)<input type="date" value={promoStart} onChange={(e) => setPromoStart(e.target.value)}/></label><label>YOUR promo ends<input type="date" value={promoEnd} onChange={(e) => setPromoEnd(e.target.value)}/></label></div>
+                <div className="cash-account-two"><label>Promo started (optional)<input type="date" value={promoStart} onChange={(e) => onPromotionStart(e.target.value)}/></label><label>YOUR promo ends<input type="date" value={promoEnd} onChange={(e) => setPromoEnd(e.target.value)}/><small>Auto-estimated from offer length when available; confirm against your own opening terms.</small></label></div>
                 <label>Published standard APY after promo (%) <input type="number" min={0} max={100} step="0.01" value={publishedRate} onChange={(e) => setPublishedRate(e.target.value)} placeholder="Only if published by the bank"/></label>
                 {publishedRate !== "" ? <label>Published rate as of<input type="date" value={publishedRateAsOf} onChange={(e) => setPublishedRateAsOf(e.target.value)}/></label> : null}
                 <label className="cash-account-checkbox"><input type="checkbox" checked={emails} onChange={(e) => setEmails(e.target.checked)}/> Request email reminders when available</label>
@@ -279,9 +305,12 @@ export function AccountTrackerHub({
                   {selectedAccount.published_standard_apy != null ? <div><small>Bank's published standard rate</small><strong>{Number(selectedAccount.published_standard_apy).toFixed(2)}% (as of {formatDate(selectedAccount.published_rate_asof)})</strong></div> : null}
                 </div>
                 <label>Update current balance ($)<input type="number" min={0} step="0.01" value={editBalance} onChange={(e) => setEditBalance(e.target.value)}/></label>
-                <button disabled={saving || editBalance === ""} onClick={() => void updateAccount({ balance: Number(editBalance) })}><Save size={14}/> Update balance</button>
+                <label className="cash-account-checkbox"><input type="checkbox" checked={useAsSavingsBaseline} onChange={(e) => setUseAsSavingsBaseline(e.target.checked)} /><span>Also replace my overall {["hysa", "savings_bonus"].includes(selectedAccount.account_kind) ? "savings" : "checking"} total in My Plan with this balance (only if this is my full balance for that category)</span></label>
+                <button disabled={saving || editBalance === ""} onClick={() => void updateAccount({ balance: Number(editBalance) }, useAsSavingsBaseline)}><Save size={14}/> Update balance</button>
                 <label>{isEnded(selectedAccount) ? "Confirm actual rate after promotion (%)" : "Update your account APY (%)"}<input type="number" min={0} max={100} step="0.01" value={editApy} onChange={(e) => setEditApy(e.target.value)} placeholder="Rate shown by your bank"/></label>
-                <button disabled={saving || editApy === ""} onClick={() => void updateAccount(isEnded(selectedAccount) ? { confirmed_post_promo_apy: Number(editApy), apy_last_confirmed_at: new Date().toISOString() } : { current_apy: Number(editApy), apy_last_confirmed_at: new Date().toISOString() })}><Save size={14}/> Confirm APY</button>
+                <button disabled={saving || editApy === ""} onClick={() => void updateAccount(isEnded(selectedAccount)
+                  ? { confirmed_post_promo_apy: Number(editApy), current_apy: Number(editApy), apy_last_confirmed_at: new Date().toISOString() }
+                  : { current_apy: Number(editApy), apy_last_confirmed_at: new Date().toISOString() })}><Save size={14}/> Confirm APY</button>
                 <label className="cash-account-checkbox"><input type="checkbox" checked={Boolean(selectedAccount.email_reminders_enabled)} onChange={(e) => void updateAccount({ email_reminders_enabled: e.target.checked })}/> Opt in to email reminders (if service is configured)</label>
                 {selectedAccount.account_kind === "direct_deposit" ? <><label>New qualifying deposit received ($)<input type="number" min={0} step="0.01" value={editDD} onChange={(e) => setEditDD(e.target.value)}/></label><button disabled={saving || !(Number(editDD) > 0)} onClick={() => void updateAccount({ dd_received_total: numberValue(selectedAccount.dd_received_total) + Number(editDD), dd_last_received_date: localDate() }).then(() => setEditDD(""))}>+ Record deposit</button><small>Total entered: {money.format(numberValue(selectedAccount.dd_received_total))} · Confirm qualification in your bank's transaction history.</small></> : null}
                 <button className="cash-account-archive" disabled={saving} onClick={() => void updateAccount({ status: "archived" }).then(() => setSelectedAccountId(null))}>Archive this account</button>
