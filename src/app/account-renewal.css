@@ -1,0 +1,110 @@
+
+/* Account renewal dashboard – brighter green with legible compact panels */
+.cash-accounts-hub { margin:14px 18px 5px; border:1px solid var(--line-strong); border-radius:15px; background:rgba(255,255,255,.034); overflow:hidden; }
+.cash-accounts-header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 15px; border-bottom:1px solid var(--line); }
+.cash-accounts-header small, .cash-accounts-header strong { display:block; }
+.cash-accounts-header small { font-size:9px; font-weight:850; letter-spacing:.065em; color:var(--green); }
+.cash-accounts-header strong { font-size:12px; margin-top:2px; }
+.cash-accounts-header button, .cash-account-edit > button, .cash-mission-quick button { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:37px; padding:7px 12px; border:1px solid rgba(88,205,136,.35); border-radius:9px; color:var(--ink); background:rgba(74,172,108,.14); font-size:11px; font-weight:750; cursor:pointer; }
+.cash-accounts-header button:hover, .cash-account-edit > button:hover { background:rgba(74,172,108,.25); }
+.cash-accounts-cards { padding:10px; display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:9px; }
+.cash-owned-card { min-width:0; display:block; border:1px solid var(--line); padding:13px; border-radius:11px; background:rgba(10,29,19,.18); text-align:left; cursor:pointer; color:var(--ink); }
+.cash-owned-card:hover { border-color:var(--green); background:rgba(53,161,89,.10); }
+.cash-owned-card.urgent { border-color:rgba(247,191,93,.55); background:rgba(230,169,63,.11); }
+.cash-owned-top { display:flex; justify-content:space-between; align-items:flex-start; gap:7px; }
+.cash-owned-top small, .cash-owned-top strong { display:block; }
+.cash-owned-top small { color:var(--green); font-weight:850; font-size:9px; text-transform:uppercase; }
+.cash-owned-top strong { font-size:12px; line-height:1.35; margin-top:2px; }
+.cash-owned-top > b { font-size:16px; font-weight:800; white-space:nowrap; }
+.cash-owned-bottom { display:flex; justify-content:space-between; align-items:center; gap:5px; padding-top:12px; }
+.cash-owned-bottom > span { font-size:10px; font-weight:760; display:inline-flex; align-items:center; gap:4px; }
+.cash-owned-bottom > em { display:inline-flex; align-items:center; gap:2px; color:var(--muted); font-size:9px; font-style:normal; }
+.cash-owned-progress { background:rgba(255,255,255,.14); height:5px; border-radius:10px; overflow:hidden; margin:11px 0 0; }
+.cash-owned-progress span { display:block; height:100%; border-radius:10px; background:var(--green); }
+.cash-owned-card.urgent .cash-owned-bottom { color:var(--amber); }
+.cash-owned-empty { padding:14px; font-size:11px; color:var(--muted); }
+
+.cash-account-form,.cash-account-edit,.cash-mission-quick { display:grid; gap:12px; padding:8px 2px 20px; }
+.cash-account-form p,.cash-mission-quick p { font-size:12px; line-height:1.55; color:var(--muted); margin:0; }
+.cash-account-form > small { font-size:10px; color:var(--muted); line-height:1.45; }
+.cash-account-form label,.cash-account-edit > label,.cash-mission-quick label { display:grid; gap:6px; color:var(--muted-strong); font-size:11px; font-weight:750; }
+.cash-account-form input:not([type="checkbox"]),.cash-account-form select,.cash-account-edit input:not([type="checkbox"]),.cash-mission-quick input { width:100%; min-width:0; min-height:42px; border:1px solid var(--line-strong); border-radius:9px; padding:9px 12px; background:#1b3025; color:var(--ink); font-size:13px; }
+.cash-account-form input:focus,.cash-account-edit input:focus { outline:2px solid rgba(90,207,138,.38); outline-offset:1px; }
+.cash-account-two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.cash-account-two label { display:grid; gap:5px; font-size:10px; color:var(--muted-strong); }
+.cash-account-checkbox { display:flex!important; align-items:center; gap:8px; color:var(--ink)!important; }
+.cash-account-checkbox input { width:16px; height:16px; accent-color:var(--green); }
+.cash-account-ended { display:flex; align-items:flex-start; gap:10px; padding:13px; border:1px solid rgba(247,191,93,.45); background:rgba(247,191,93,.11); border-radius:11px; }
+.cash-account-ended svg { color:var(--amber); flex:0 0 auto; }
+.cash-account-ended strong,.cash-account-ended small { display:block; }
+.cash-account-ended strong { font-size:13px; }
+.cash-account-ended small { font-size:11px; color:var(--muted-strong); line-height:1.45; margin-top:3px; }
+.cash-account-details { display:grid; grid-template-columns:repeat(2,1fr); gap:9px; }
+.cash-account-details > div { border:1px solid var(--line); border-radius:10px; padding:12px; background:rgba(255,255,255,.025); }
+.cash-account-details small,.cash-account-details strong { display:block; }
+.cash-account-details small { font-size:9px; color:var(--muted); }
+.cash-account-details strong { font-size:13px; line-height:1.4; margin-top:4px; }
+.cash-account-edit > button { justify-self:start; }
+.cash-account-edit > button:disabled,.cash-mission-quick button:disabled { opacity:.45; cursor:not-allowed; }
+.cash-account-archive { background:transparent!important; border-color:rgba(255,255,255,.18)!important; color:var(--muted)!important; margin-top:10px; }
+.cash-account-error { color:#ffbdad!important; font-size:11px!important; }
+.cash-mission-wrapper .reward-tracker-shell { margin-top:20px; }
+
+.cash-roadmap-map { list-style:none; padding:11px 18px 16px; margin:0; display:grid; position:relative; gap:0; }
+.cash-roadmap-step { display:grid; grid-template-columns:90px 21px minmax(0,1fr) 92px; gap:11px; min-height:67px; align-items:center; position:relative; }
+.cash-roadmap-step:not(:last-child):before { content:""; position:absolute; left:111px; top:36px; bottom:-34px; width:2px; background:rgba(104,208,141,.25); }
+.cash-roadmap-date { font-size:11px; font-weight:780; color:var(--muted-strong); }
+.cash-roadmap-dot { height:15px; width:15px; border-radius:50%; border:4px solid #83d5a5; background:#234c37; box-shadow:0 0 0 4px rgba(99,195,138,.1); }
+.cash-roadmap-step.expired .cash-roadmap-dot { border-color:var(--amber); background:#67522d; }
+.cash-roadmap-content { display:grid; gap:3px; padding:10px 0; }
+.cash-roadmap-content strong { font-size:12px; line-height:1.4; }
+.cash-roadmap-content small { font-size:10px; line-height:1.35; color:var(--muted); }
+.cash-roadmap-step > em { font-size:9px; font-style:normal; font-weight:850; text-align:right; color:var(--muted); }
+.cash-roadmap-step.expired > em { color:var(--amber); }
+.simple-timeline { margin-top:3px!important; }
+.cash-rate-alert { margin-top:9px!important; color:var(--amber)!important; display:flex; align-items:center; gap:7px; font-size:11px!important; font-weight:750; }
+.cash-rate-alert svg { flex:0 0 auto; }
+.plan-hub-simple .plan-hub-return strong { font-size:clamp(19px,2.2vw,29px); overflow-wrap:anywhere; }
+.plan-hub-simple .plan-hub-hero.simple { background:linear-gradient(120deg,rgba(60,121,76,.15),rgba(30,68,48,.08)); }
+.plan-hub-simple .simple-roadmap-card { background:rgba(57,94,70,.27); }
+.plan-hub-simple .simple-roadmap-card-head small { font-size:9px; }
+.plan-hub-simple .simple-roadmap-card-head h3 { font-size:24px; }
+.plan-hub-simple .simple-roadmap-select select,.plan-hub-simple .simple-dd-line select { font-size:11px; min-height:44px; background:#213a2c; }
+
+.top-opportunities-table { margin:22px 0 30px; }
+.top-opportunities-heading { display:flex; justify-content:space-between; align-items:end; gap:16px; margin-bottom:12px; }
+.top-opportunities-heading h2 { font-size:23px; letter-spacing:-.035em; margin:5px 0 4px; }
+.top-opportunities-heading p { margin:0; font-size:11px; color:var(--muted); }
+.top-opportunities-heading a { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:750; padding:9px 12px; border:1px solid var(--line); border-radius:9px; white-space:nowrap; color:var(--ink); }
+.top-opportunities-heading a:hover { border-color:var(--green); color:var(--green); }
+.top-opportunity-rows { overflow:hidden; border:1px solid var(--line-strong); border-radius:15px; background:var(--surface); }
+.top-opportunity-category + .top-opportunity-category { border-top:1px solid var(--line); }
+.top-opportunity-category summary { display:flex; align-items:center; gap:12px; cursor:pointer; list-style:none; padding:13px 16px; }
+.top-opportunity-category summary::-webkit-details-marker { display:none; }
+.top-opportunity-category[open] summary { background:rgba(76,162,103,.13); }
+.top-category-icon { height:31px; width:31px; display:grid; place-items:center; border-radius:9px; background:var(--green-soft); color:var(--green); }
+.top-opportunity-category summary > span:nth-child(2) { display:grid; gap:2px; flex:1; }
+.top-opportunity-category summary strong { font-size:12px; }
+.top-opportunity-category summary small { color:var(--muted); font-size:10px; }
+.top-opportunity-category summary em { font-size:10px; font-style:normal; color:var(--muted); }
+.top-opportunity-category[open] summary > svg { transform:rotate(180deg); }
+.top-opportunity-scroll { overflow:auto; padding:0 12px 13px; }
+.top-opportunity-scroll table { width:100%; border-collapse:collapse; min-width:600px; }
+.top-opportunity-scroll th { text-align:left; font-size:10px; color:var(--muted); font-weight:780; padding:12px 10px; border-bottom:1px solid var(--line-strong); }
+.top-opportunity-scroll td { padding:12px 10px; font-size:11px; vertical-align:middle; border-bottom:1px solid var(--line); }
+.top-opportunity-scroll tr:last-child td { border-bottom:0; }
+.top-opportunity-scroll a { color:var(--green); }
+.top-research-tag { display:inline-block; border-radius:999px; padding:4px 8px; font-weight:800; font-size:9px; }
+.top-research-tag.hold { color:var(--amber); background:rgba(247,191,93,.1); }
+.top-research-tag.green { color:#bcf6d1; background:rgba(87,192,122,.14); }
+.top-opportunity-empty { padding:14px 18px; color:var(--muted); font-size:11px; }
+.top-ranking-note { font-size:10px; color:var(--muted); margin:9px 2px; }
+
+@media (max-width:760px) {
+ .cash-account-two { grid-template-columns:1fr; }
+ .cash-roadmap-step { grid-template-columns:68px 20px minmax(0,1fr); gap:8px; }
+ .cash-roadmap-step > em { grid-column:3; text-align:left; margin-top:-9px; }
+ .cash-roadmap-step:not(:last-child):before { left:86px; }
+ .top-opportunities-heading { align-items:start; flex-direction:column; }
+ .cash-accounts-cards { grid-template-columns:1fr; }
+}
