@@ -1,5 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
+import { TopOpportunityTable } from "@/components/top-opportunity-table";
+import { getLiveOpportunities } from "@/lib/opportunities";
 import {
   ArrowRight,
   BadgeDollarSign,
@@ -73,7 +75,8 @@ function HomeDashboardExample() {
   );
 }
 
-export default function Home() {
+export default async function Home() {
+  const { opportunities } = await getLiveOpportunities();
   return (
     <main className="home-page">
       <section className="home-hero shell refreshed-home-hero">
@@ -108,6 +111,8 @@ export default function Home() {
           <article><div className="process-number">04</div><div className="process-icon"><ShieldCheck size={22} /></div><h3>Finish the reward safely</h3><p>Track payout timing, fees, waiver rules, closing restrictions, and the actual reward received before deciding what to keep or close.</p><span>Your completed earnings build a history.</span></article>
         </div>
       </section>
+
+      <div className="shell"><TopOpportunityTable opportunities={opportunities} heading="Explore the latest researched cash opportunities." /></div>
 
       <section className="home-research shell compact-research-section">
         <div className="research-home-copy"><span className="kicker">RESEARCH YOU CAN SEE</span><h2>A bonus number is only the beginning.</h2><p>Each opportunity can publish the evidence that matters before you act. If research is stale or incomplete, Churning shows that instead of hiding it.</p></div>
