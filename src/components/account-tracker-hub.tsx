@@ -49,10 +49,11 @@ function sortKey(date?: string | null, ended = false) {
   return ended ? "0000-00-00" : (date || "9999-12-31").slice(0, 10);
 }
 
-function accountBadge(opportunity?: Opportunity | null, urgent = false) {
+function accountBadge(opportunity?: Opportunity | null, urgent = false, afterReward = false) {
   if (urgent) return { text: "Rotate", tone: "red", reason: "The promotional benefit ended. Review the current rate and alternatives." };
   const fee = numberValue(opportunity?.monthly_fee);
   if (fee <= 0) return { text: "$0 fee", tone: "green", reason: "No stored monthly maintenance fee." };
+  if (afterReward) return { text: "Review close", tone: "red", reason: `${money.format(fee)}/mo stored fee after the reward stage. Review current terms and the safe-close date before closing.` };
   if (opportunity?.fee_waiver_summary) return { text: "Fee check", tone: "amber", reason: `${money.format(fee)}/mo stored fee. A waiver may apply; review the current conditions.` };
   return { text: "Review close", tone: "red", reason: `${money.format(fee)}/mo stored fee. Review the safe-close date after the reward posts.` };
 }
@@ -137,7 +138,8 @@ export function AccountTrackerHub({
       priority: 1,
     }] : [];
     const active = liveMissions.map((mission) => {
-      const badge = accountBadge(mission.opportunity || null, false);
+      const afterReward = ["bonus_received", "safe_to_close"].includes(mission.status) || Boolean(mission.safe_close_review_date && mission.safe_close_review_date.slice(0, 10) <= localDate());
+      const badge = accountBadge(mission.opportunity || null, false, afterReward);
       return {
         key: "mission:" + mission.id,
         kind: "mission" as const,
