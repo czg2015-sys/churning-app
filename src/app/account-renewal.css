@@ -108,3 +108,20 @@
  .top-opportunities-heading { align-items:start; flex-direction:column; }
  .cash-accounts-cards { grid-template-columns:1fr; }
 }
+
+
+/* V2 account badges + DD payoff math */
+.cash-owned-badge-row { display:flex; justify-content:flex-end; margin-top:7px; }
+.cash-lifecycle-badge { display:inline-flex; align-items:center; min-height:20px; padding:3px 7px; border:1px solid transparent; border-radius:999px; font-size:8px; font-weight:850; letter-spacing:.02em; }
+.cash-lifecycle-badge.green { color:#c9f8da; background:rgba(63,190,112,.13); border-color:rgba(93,216,140,.24); }
+.cash-lifecycle-badge.amber { color:#ffe4ad; background:rgba(238,178,68,.11); border-color:rgba(238,178,68,.27); }
+.cash-lifecycle-badge.red { color:#ffc0b9; background:rgba(231,104,93,.11); border-color:rgba(231,104,93,.28); }
+.dd-completion-note { display:flex; align-items:flex-start; gap:7px; margin:8px 0 1px; padding:8px 10px; border:1px solid rgba(88,207,140,.18); border-radius:8px; background:rgba(88,207,140,.055); color:var(--muted-strong); font-size:9px; line-height:1.45; }
+.dd-completion-note svg { flex:0 0 auto; color:var(--green); margin-top:1px; }
+.dd-source-pair { display:contents; }
+.optional-label { color:var(--muted); font-weight:600; font-size:.86em; }
+.planner-form input[type="date"] { min-height:46px; border:1px solid var(--line-strong); border-radius:10px; padding:0 11px; background:#213a2c; color:var(--ink); color-scheme:dark; }
+
+@media (max-width:720px) {
+  .dd-source-pair { display:contents; }
+}
