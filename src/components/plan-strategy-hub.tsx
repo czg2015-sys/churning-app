@@ -519,6 +519,37 @@ export function PlanStrategyHub({
     const activeIds = new Set(missions.map((mission) => mission.opportunity_id).filter(Boolean));
     for (const result of selected) {
       if (activeIds.has(result.item.id)) continue;
+
+      const ddIndex = selectedDd.findIndex((candidate) => candidate.item.id === result.item.id);
+      if (ddIndex >= 0 && numberValue(result.item.direct_deposit_required) > 0) {
+        const sourceIndex = sourceIndexForLane(ddIndex);
+        const nextPayday = sourceNextDates[sourceIndex] || null;
+        const completion = ddCompletionPlan(result.item, nextPayday);
+        if (completion.qualificationDate) {
+          add(
+            completion.qualificationDate,
+            result.item.institution + " · DD requirement complete",
+            "planned",
+            `${money.format(completion.perPaycheck)} each paycheck × ${completion.depositsNeeded} deposits`,
+          );
+          add(
+            completion.payoutDate,
+            result.item.institution + " · estimated payout review",
+            "planned",
+            "Based on the stored payout window after your projected qualifying deposit",
+          );
+          continue;
+        }
+        const fallback = planningDates(result.item, todayLocal);
+        add(
+          fallback.qualification,
+          result.item.institution + " · DD target window",
+          "planned",
+          `${money.format(completion.perPaycheck)} per paycheck × ${completion.depositsNeeded} deposits. Add your next payday for an exact completion date.`,
+        );
+        continue;
+      }
+
       const dates = planningDates(result.item, todayLocal);
       add(dates.qualification, result.item.institution + " · estimated qualification", "planned", "Only applies if you open the offer");
       add(dates.payout, result.item.institution + " · estimated payout", "planned", "Verify the offer's real timeline");
@@ -528,7 +559,7 @@ export function PlanStrategyHub({
     return unique.filter((event) => event.kind === "expired" || event.date >= todayLocal)
       .sort((a, b) => (a.kind === "expired" ? -1 : 0) - (b.kind === "expired" ? -1 : 0) || a.date.localeCompare(b.date))
       .slice(0, 9);
-  }, [missions, accounts, selectedDd, selectedBonus, selectedSpending, selectedHysa, todayLocal]);
+  }, [missions, accounts, selectedDd, selectedBonus, selectedSpending, selectedHysa, todayLocal, sourceNextDates]);
 
   return (
     <section className="plan-hub plan-hub-simple">
