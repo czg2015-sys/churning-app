@@ -18,6 +18,7 @@ const defaults: FinancialProfile = {
   biweekly_pay: 0,
   dd_source_count: 1,
   dd_source_amounts: [],
+  dd_source_next_dates: [],
   biweekly_essential_spend: 0,
   estimated_tax_rate: null,
   tax_rate_known: false,
@@ -72,6 +73,11 @@ export function QuestionnaireForm({
   const [ddSourceAmounts, setDdSourceAmounts] = useState<number[]>(() => Array.isArray(profile.dd_source_amounts) && profile.dd_source_amounts.length
     ? profile.dd_source_amounts.map((value) => Number(value) || 0)
     : [Number(profile.biweekly_pay || 0), 0, 0]);
+  const [ddSourceNextDates, setDdSourceNextDates] = useState<string[]>(() =>
+    Array.isArray(profile.dd_source_next_dates) && profile.dd_source_next_dates.length
+      ? profile.dd_source_next_dates.map((value) => String(value || ""))
+      : ["", "", ""]
+  );
   const [bankSearch, setBankSearch] = useState("");
   const [bankSelections, setBankSelections] = useState<string[]>(initialBanks);
   const [saving, setSaving] = useState(false);
@@ -115,6 +121,7 @@ export function QuestionnaireForm({
       biweekly_pay: combinedBiweeklyPay,
       dd_source_count: ddSourceCount,
       dd_source_amounts: ddSourceCount === 1 ? [combinedBiweeklyPay] : ddSourceAmounts.slice(0, ddSourceCount),
+      dd_source_next_dates: ddSourceNextDates.slice(0, ddSourceCount),
       biweekly_essential_spend: numberValue(form.get("biweekly_essential_spend")),
       monthly_card_spend: cardSpendKnown ? numberValue(form.get("monthly_card_spend")) : 0,
       current_spend_reward_rate: cardSpendKnown ? numberValue(form.get("current_spend_reward_rate")) : 0,
@@ -226,8 +233,14 @@ export function QuestionnaireForm({
           <div className="form-grid">
             <div className="field"><label htmlFor="dd_source_count">How many separate paychecks / direct deposit sources do you receive?</label><select id="dd_source_count" name="dd_source_count" value={ddSourceCount} onChange={(event) => setDdSourceCount(Number(event.target.value))}><option value={1}>1 paycheck source</option><option value={2}>2 paycheck sources</option><option value={3}>3 paycheck sources</option></select><small>Count jobs or income streams, not bank accounts. Don't double count the same paycheck.</small></div>
             <div className="field"><label htmlFor="employer_multiple_dd">Can your employer split a paycheck between bank accounts?</label><select id="employer_multiple_dd" name="employer_multiple_dd" defaultValue={profile.employer_multiple_dd === true ? "yes" : profile.employer_multiple_dd === false ? "no" : "unknown"}><option value="unknown">I don't know</option><option value="yes">Yes, they allow a split</option><option value="no">No, one bank per paycheck</option></select><small>If you don't know, Churning will not assume you can split.</small></div>
-            {ddSourceCount === 1 ? <div className="field"><label htmlFor="biweekly_pay">Average take-home amount per two weeks</label><FormattedNumberInput id="biweekly_pay" name="biweekly_pay" defaultValue={Number(profile.biweekly_pay)} placeholder="650" /><small>This is the most you can route before keeping money for bills.</small></div>
-              : Array.from({ length: ddSourceCount }, (_, index) => <div className="field" key={index}><label htmlFor={`dd_source_${index}`}>Income source ${index + 1} — average take-home per two weeks</label><FormattedNumberInput id={`dd_source_${index}`} name={`dd_source_${index}`} value={ddSourceAmounts[index] || 0} onValueChange={(value) => setDdSourceAmounts((prev) => { const nextValues = [...prev]; nextValues[index] = Math.max(0, value); return nextValues; })} placeholder="650"/><small>Use an equivalent two-week amount so we can test each source independently.</small></div>)}
+            {ddSourceCount === 1 ? <>
+                <div className="field"><label htmlFor="biweekly_pay">Average take-home amount per two weeks</label><FormattedNumberInput id="biweekly_pay" name="biweekly_pay" defaultValue={Number(profile.biweekly_pay)} placeholder="650" /><small>This is the most you can route before keeping money for bills.</small></div>
+                <div className="field"><label htmlFor="dd_next_0">Next expected payday <span className="optional-label">optional</span></label><input id="dd_next_0" type="date" value={ddSourceNextDates[0] || ""} onChange={(event) => setDdSourceNextDates((prev) => { const nextValues = [...prev]; nextValues[0] = event.target.value; return nextValues; })}/><small>Add this if you want exact projected qualification and payout dates.</small></div>
+              </>
+              : Array.from({ length: ddSourceCount }, (_, index) => <div className="dd-source-pair" key={index}>
+                  <div className="field"><label htmlFor={`dd_source_${index}`}>Income source ${index + 1} — average take-home per two weeks</label><FormattedNumberInput id={`dd_source_${index}`} name={`dd_source_${index}`} value={ddSourceAmounts[index] || 0} onValueChange={(value) => setDdSourceAmounts((prev) => { const nextValues = [...prev]; nextValues[index] = Math.max(0, value); return nextValues; })} placeholder="650"/><small>Use an equivalent two-week amount so we can test each source independently.</small></div>
+                  <div className="field"><label htmlFor={`dd_next_${index}`}>Source ${index + 1} next payday <span className="optional-label">optional</span></label><input id={`dd_next_${index}`} type="date" value={ddSourceNextDates[index] || ""} onChange={(event) => setDdSourceNextDates((prev) => { const nextValues = [...prev]; nextValues[index] = event.target.value; return nextValues; })}/><small>Used only to estimate when a DD requirement could finish.</small></div>
+                </div>)}
             <div className="field"><label htmlFor="biweekly_essential_spend">About how much every 2 weeks goes to essentials?</label><FormattedNumberInput id="biweekly_essential_spend" name="biweekly_essential_spend" defaultValue={Number(profile.biweekly_essential_spend)} placeholder="500" /><small>Rent, food, gas, bills. Keep access to this money.</small></div>
           </div>
 
