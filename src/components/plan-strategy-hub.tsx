@@ -187,6 +187,34 @@ function readableDate(value: string) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
 }
 
+function addDaysIso(value: string, days: number) {
+  const date = new Date(`${value.slice(0, 10)}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
+}
+
+function ddPerPaycheck(item: Opportunity) {
+  const required = numberValue(item.direct_deposit_required);
+  const windowDays = Math.max(1, numberValue(item.direct_deposit_window_days || item.qualification_days || 90));
+  const checksInWindow = Math.max(1, Math.floor(windowDays / 14));
+  const cumulativeNeed = required > 0 ? required / checksInWindow : 0;
+  const monthlyThresholdPerCheck = numberValue(item.reward_monthly_dd_threshold) * 12 / 26;
+  return Math.ceil(Math.max(numberValue(item.dd_min_each), cumulativeNeed, monthlyThresholdPerCheck));
+}
+
+function ddCompletionPlan(item: Opportunity, nextPayday?: string | null) {
+  const perPaycheck = Math.max(1, ddPerPaycheck(item));
+  const required = numberValue(item.direct_deposit_required);
+  const minimumCount = Math.max(0, Math.floor(numberValue(item.dd_deposit_count)));
+  const depositsNeeded = Math.max(minimumCount, required > 0 ? Math.ceil(required / perPaycheck) : minimumCount || 1);
+  const weeksFromFirst = Math.max(0, depositsNeeded - 1) * 2;
+  const qualificationDate = nextPayday ? addDaysIso(nextPayday, Math.max(0, depositsNeeded - 1) * 14) : null;
+  const payoutDate = qualificationDate && numberValue(item.payout_days) > 0
+    ? addDaysIso(qualificationDate, numberValue(item.payout_days))
+    : null;
+  return { perPaycheck, depositsNeeded, weeksFromFirst, qualificationDate, payoutDate };
+}
+
 export function PlanStrategyHub({
   profile,
   opportunities,
@@ -234,7 +262,14 @@ export function PlanStrategyHub({
   const spendingRanks = useMemo(() => rankMaps(spendingBase, profile), [spendingBase, profile]);
 
   const activeDdCommitted = missions.filter((mission) => !["complete", "cancelled"].includes(mission.status))
-    .reduce((sum, mission) => sum + (mission.opportunity ? monthlyDdNeed(mission.opportunity) : 0), 0);
+    .reduce((sum, mission) => {
+      if (!mission.opportunity || numberValue(mission.opportunity.direct_deposit_required) <= 0) return sum;
+      const ddStep = (mission.mission_steps || []).find((step) => step.step_type === "direct_deposit");
+      const target = numberValue(ddStep?.target_amount) || numberValue(mission.opportunity.direct_deposit_required);
+      const current = numberValue(ddStep?.current_amount);
+      if (ddStep?.is_complete || (target > 0 && current >= target)) return sum;
+      return sum + monthlyDdNeed(mission.opportunity);
+    }, 0);
   const grossMonthlyDd = Math.max(0, numberValue(profile.biweekly_pay)) * 26 / 12;
   const monthlyDdCapacity = Math.max(0, grossMonthlyDd - activeDdCommitted);
   const ddSourceCount = Math.max(1, Math.min(3, Math.floor(numberValue(profile.dd_source_count || 1))));
@@ -244,13 +279,25 @@ export function PlanStrategyHub({
     : Array.from({ length: ddSourceCount }, () => grossMonthlyDd / ddSourceCount);
   const sourceCaps = rawSourceCaps.map((amount, index) => Math.max(0, amount - (index === 0 ? activeDdCommitted : 0)));
   const ddLaneLimit = Math.min(3, Math.max(1, ddSourceCount === 1 ? (canSplitPayroll ? 2 : 1) : (canSplitPayroll ? 3 : ddSourceCount)));
+  const sourceNextDates = Array.isArray(profile.dd_source_next_dates)
+    ? profile.dd_source_next_dates.slice(0, ddSourceCount).map((value) => String(value || ""))
+    : [];
+  function sourceIndexForLane(index: number) {
+    if (ddSourceCount <= 1) return 0;
+    return index % ddSourceCount;
+  }
   function ddRoomAt(index: number, ids: string[]) {
-    const alreadyUsed = ids.reduce((sum, id) => {
+    const sourceIndex = sourceIndexForLane(index);
+    const usedOnSource = ids.reduce((sum, id, priorIndex) => {
+      if (sourceIndexForLane(priorIndex) !== sourceIndex) return sum;
       const result = ddBase.find((row) => row.item.id === id);
       return sum + (result ? monthlyDdNeed(result.item) : 0);
     }, 0);
-    if (!canSplitPayroll && ddSourceCount > 1) return Math.min(sourceCaps[index] || 0, Math.max(0, monthlyDdCapacity - alreadyUsed));
-    return Math.max(0, monthlyDdCapacity - alreadyUsed);
+    const sourceRoom = Math.max(0, (sourceCaps[sourceIndex] || 0) - usedOnSource);
+    return Math.min(sourceRoom, Math.max(0, monthlyDdCapacity - ids.reduce((sum, id) => {
+      const result = ddBase.find((row) => row.item.id === id);
+      return sum + (result ? monthlyDdNeed(result.item) : 0);
+    }, 0)));
   }
 
   const activeCash = missions
@@ -506,7 +553,7 @@ export function PlanStrategyHub({
         <div><small>NEXT ACTION</small><strong>{timeline.some((event) => event.kind === "expired") ? "Review APY" : timeline.find((event) => event.date >= todayLocal) ? readableDate(timeline.find((event) => event.date >= todayLocal)!.date) : "N/A"}</strong></div>
       </div>
 
-      <AccountTrackerHub missions={missions} accounts={accounts} opportunities={opportunities} />
+      <AccountTrackerHub missions={missions} accounts={accounts} opportunities={opportunities} profile={profile} />
 
       <div className="simple-roadmap-head">
         <div><span className="kicker">RECOMMENDED ROADMAP</span><h2>Pick one. The next recommendation updates.</h2><p>Start with Churning’s recommendation, or use any dropdown to choose another option.</p></div>
@@ -537,7 +584,15 @@ export function PlanStrategyHub({
             return (
               <div className="simple-dd-line" key={index}>
                 <label><span>DD line {index + 1} · {money.format(availableForThisLine)}/mo available · real payroll only</span><select value={selected?.item.id || "none"} onChange={(event) => updateDd(index, event.target.value)} disabled={saving}><option value="none">No DD offer</option>{options.map((result) => <option key={result.item.id} value={result.item.id}>{optionLabel(result, ddRanks, effectiveProfile, sortMode)}</option>)}</select></label>
-                {selected ? <SimplePick result={selected} profile={effectiveProfile} amount={monthlyDdNeed(selected.item)} amountLabel={money.format(monthlyDdNeed(selected.item)) + "/mo (" + money.format(Math.ceil(monthlyDdNeed(selected.item) * 12 / 26)) + "/paycheck)"} ranks={ddRanks} addedOpportunityIds={addedOpportunityIds} /> : null}
+                {selected ? (() => {
+                  const sourceIndex = sourceIndexForLane(index);
+                  const nextPayday = sourceNextDates[sourceIndex] || null;
+                  const completion = ddCompletionPlan(selected.item, nextPayday);
+                  const timing = completion.qualificationDate
+                    ? `${money.format(completion.perPaycheck)}/paycheck · ${completion.depositsNeeded} deposits · qualify around ${readableDate(completion.qualificationDate)}${completion.payoutDate ? ` · payout review around ${readableDate(completion.payoutDate)}` : ""}`
+                    : `${money.format(completion.perPaycheck)}/paycheck · ${completion.depositsNeeded} deposits · about ${completion.weeksFromFirst} weeks from the first deposit · add next payday for exact dates`;
+                  return <div className="dd-pick-wrap"><SimplePick result={selected} profile={effectiveProfile} amount={monthlyDdNeed(selected.item)} amountLabel={money.format(completion.perPaycheck) + "/paycheck"} ranks={ddRanks} addedOpportunityIds={addedOpportunityIds} /><div className="dd-completion-note"><CalendarDays size={13}/><span>{timing}</span></div></div>;
+                })() : null}
               </div>
             );
           })}
