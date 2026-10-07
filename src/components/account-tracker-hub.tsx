@@ -6,7 +6,7 @@ import { ArrowRight, CalendarClock, CheckCircle2, ChevronRight, Plus, Save, Shie
 import { RewardTracker } from "@/components/reward-tracker";
 import { money, numberValue } from "@/lib/plan-math";
 import { createClient } from "@/lib/supabase/client";
-import type { Mission, Opportunity, TrackedCashAccount } from "@/lib/types";
+import type { FinancialProfile, Mission, Opportunity, TrackedCashAccount } from "@/lib/types";
 
 function localDate() {
   const now = new Date();
@@ -49,14 +49,24 @@ function sortKey(date?: string | null, ended = false) {
   return ended ? "0000-00-00" : (date || "9999-12-31").slice(0, 10);
 }
 
+function accountBadge(opportunity?: Opportunity | null, urgent = false) {
+  if (urgent) return { text: "Rotate", tone: "red", reason: "The promotional benefit ended. Review the current rate and alternatives." };
+  const fee = numberValue(opportunity?.monthly_fee);
+  if (fee <= 0) return { text: "$0 fee", tone: "green", reason: "No stored monthly maintenance fee." };
+  if (opportunity?.fee_waiver_summary) return { text: "Fee check", tone: "amber", reason: `${money.format(fee)}/mo stored fee. A waiver may apply; review the current conditions.` };
+  return { text: "Review close", tone: "red", reason: `${money.format(fee)}/mo stored fee. Review the safe-close date after the reward posts.` };
+}
+
 export function AccountTrackerHub({
   missions,
   accounts,
   opportunities,
+  profile,
 }: {
   missions: Mission[];
   accounts: TrackedCashAccount[];
   opportunities: Opportunity[];
+  profile: FinancialProfile;
 }) {
   const router = useRouter();
   const [localAccounts, setLocalAccounts] = useState(accounts);
@@ -86,34 +96,67 @@ export function AccountTrackerHub({
   const liveMissions = missions.filter((mission) => !["complete", "cancelled"].includes(mission.status));
   const activeAccounts = localAccounts.filter((account) => account.status === "active");
   const catalog = opportunities.filter((item) => ["hysa", "checking_bonus", "savings_bonus"].includes(item.category));
+  const opportunityById = useMemo(() => new Map(opportunities.map((item) => [item.id, item])), [opportunities]);
+  const hasTrackedHysa = activeAccounts.some((account) => account.account_kind === "hysa");
 
   const cards = useMemo(() => {
-    const tracked = activeAccounts.map((account) => ({
-      key: "acct:" + account.id,
-      kind: "account" as const,
-      id: account.id,
-      institution: account.institution,
-      name: account.product_name,
-      date: account.promotional_end_date || null,
-      urgent: isEnded(account) && account.confirmed_post_promo_apy == null,
-      value: account.balance ? money.format(numberValue(account.balance)) : "Balance N/A",
-      subtitle: isEnded(account) ? "Promotion ended " + formatDate(account.promotional_end_date) : accountRate(account),
-      progress: null as number | null,
-    }));
-    const active = liveMissions.map((mission) => ({
-      key: "mission:" + mission.id,
-      kind: "mission" as const,
-      id: mission.id,
-      institution: mission.institution,
-      name: mission.title,
-      date: nextMissionDate(mission),
+    const tracked = activeAccounts.map((account) => {
+      const urgent = isEnded(account) && account.confirmed_post_promo_apy == null;
+      const badge = accountBadge(account.opportunity_id ? opportunityById.get(account.opportunity_id) : null, urgent);
+      return {
+        key: "acct:" + account.id,
+        kind: "account" as const,
+        id: account.id,
+        institution: account.institution,
+        name: account.product_name,
+        date: account.promotional_end_date || null,
+        urgent,
+        value: account.balance ? money.format(numberValue(account.balance)) : "Balance N/A",
+        subtitle: isEnded(account) ? "Benefit ended " + formatDate(account.promotional_end_date) + " · " + accountRate(account) : accountRate(account) + (account.promotional_end_date ? " · ends " + formatDate(account.promotional_end_date) : " · no end date"),
+        progress: null as number | null,
+        badgeText: badge.text,
+        badgeTone: badge.tone,
+        badgeReason: badge.reason,
+        priority: account.account_kind === "hysa" ? (urgent ? 0 : 1) : 2,
+      };
+    });
+    const baseline = !hasTrackedHysa && numberValue(profile.savings_cash) > 0 ? [{
+      key: "baseline:savings",
+      kind: "baseline" as const,
+      id: "baseline:savings",
+      institution: "Current savings",
+      name: "Savings / HYSA",
+      date: null,
       urgent: false,
-      value: money.format(numberValue(mission.expected_bonus) + numberValue(mission.expected_interest)),
-      subtitle: formatDate(nextMissionDate(mission)) + " next check",
-      progress: missionProgress(mission),
-    }));
-    return [...tracked, ...active].sort((a, b) => sortKey(a.date, a.urgent).localeCompare(sortKey(b.date, b.urgent)));
-  }, [localAccounts, missions]);
+      value: money.format(numberValue(profile.savings_cash)),
+      subtitle: numberValue(profile.current_hysa_apy).toFixed(2) + "% APY · expiration N/A",
+      progress: null as number | null,
+      badgeText: "Add dates",
+      badgeTone: "amber",
+      badgeReason: "Track the bank and promotion dates so Churning can warn you when the rate changes.",
+      priority: 1,
+    }] : [];
+    const active = liveMissions.map((mission) => {
+      const badge = accountBadge(mission.opportunity || null, false);
+      return {
+        key: "mission:" + mission.id,
+        kind: "mission" as const,
+        id: mission.id,
+        institution: mission.institution,
+        name: mission.title,
+        date: nextMissionDate(mission),
+        urgent: false,
+        value: money.format(numberValue(mission.expected_bonus) + numberValue(mission.expected_interest)),
+        subtitle: formatDate(nextMissionDate(mission)) + " next check",
+        progress: missionProgress(mission),
+        badgeText: badge.text,
+        badgeTone: badge.tone,
+        badgeReason: badge.reason,
+        priority: 2,
+      };
+    });
+    return [...tracked, ...baseline, ...active].sort((a, b) => a.priority - b.priority || sortKey(a.date, a.urgent).localeCompare(sortKey(b.date, b.urgent)));
+  }, [localAccounts, missions, hasTrackedHysa, opportunityById, profile.savings_cash, profile.current_hysa_apy]);
 
   function onPromotionStart(value: string) {
     setPromoStart(value);
@@ -196,6 +239,21 @@ export function AccountTrackerHub({
     setSaving(false);
   }
 
+  function openBaselineSavings() {
+    setError("");
+    setOfferId("");
+    setInstitution("");
+    setProductName("Savings account");
+    setKind("hysa");
+    setBalance(String(numberValue(profile.savings_cash) || ""));
+    setRate(numberValue(profile.current_hysa_apy) > 0 ? String(profile.current_hysa_apy) : "");
+    setPromoStart("");
+    setPromoEnd("");
+    setPublishedRate("");
+    setPublishedRateAsOf("");
+    setAdding(true);
+  }
+
   function openAccount(id: string) {
     const a = localAccounts.find((item) => item.id === id);
     if (!a) return;
@@ -239,15 +297,44 @@ export function AccountTrackerHub({
 
   async function updateMissionDD(mission: Mission, amount: number) {
     if (!(amount > 0)) return;
-    const step = (mission.mission_steps || []).find((item) => item.step_type === "direct_deposit");
-    if (!step) { setError("No direct-deposit step is stored for this mission."); return; }
     setSaving(true);
+    setError("");
     const uid = await userId();
     if (!uid) { setSaving(false); return; }
-    const { error: dbError } = await createClient().from("mission_steps").update({
-      current_amount: numberValue(step.current_amount) + amount,
-      updated_at: new Date().toISOString(),
-    }).eq("id", step.id).eq("user_id", uid);
+
+    const required = numberValue(mission.opportunity?.direct_deposit_required);
+    const existing = (mission.mission_steps || []).find((item) => item.step_type === "direct_deposit");
+    let dbError: { message?: string } | null = null;
+
+    if (existing) {
+      const updatedAmount = numberValue(existing.current_amount) + amount;
+      const target = numberValue(existing.target_amount) || required;
+      const completed = target > 0 && updatedAmount >= target;
+      const result = await createClient().from("mission_steps").update({
+        current_amount: updatedAmount,
+        target_amount: target || null,
+        is_complete: completed,
+        completed_at: completed ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      }).eq("id", existing.id).eq("user_id", uid);
+      dbError = result.error;
+    } else {
+      const order = Math.max(0, ...(mission.mission_steps || []).map((item) => Number(item.step_order) || 0)) + 1;
+      const completed = required > 0 && amount >= required;
+      const result = await createClient().from("mission_steps").insert({
+        mission_id: mission.id,
+        user_id: uid,
+        label: required > 0 ? `Qualifying direct deposit · ${money.format(required)} target` : "Qualifying direct deposit",
+        step_type: "direct_deposit",
+        step_order: order,
+        target_amount: required || null,
+        current_amount: amount,
+        is_complete: completed,
+        completed_at: completed ? new Date().toISOString() : null,
+      });
+      dbError = result.error;
+    }
+
     setError(dbError?.message || "");
     setEditDD("");
     setSaving(false);
@@ -264,10 +351,11 @@ export function AccountTrackerHub({
         </div>
         {cards.length ? <div className="cash-accounts-cards">{cards.slice(0, 8).map((card) => (
           <button type="button" className={"cash-owned-card" + (card.urgent ? " urgent" : "")} key={card.key}
-            onClick={() => card.kind === "account" ? openAccount(card.id) : setSelectedMissionId(card.id)}>
+            onClick={() => card.kind === "account" ? openAccount(card.id) : card.kind === "baseline" ? openBaselineSavings() : setSelectedMissionId(card.id)}>
             <div className="cash-owned-top"><span><small>{card.institution}</small><strong>{card.name}</strong></span><b>{card.value}</b></div>
+            <div className="cash-owned-badge-row"><span className={`cash-lifecycle-badge ${card.badgeTone}`} title={card.badgeReason}>{card.badgeText}</span></div>
             {card.progress != null ? <div className="cash-owned-progress"><span style={{ width: card.progress + "%" }} /></div> : null}
-            <div className="cash-owned-bottom"><span>{card.urgent ? <ShieldAlert size={13} /> : <CheckCircle2 size={13} />}{card.subtitle}</span><em>Update <ChevronRight size={14} /></em></div>
+            <div className="cash-owned-bottom"><span>{card.urgent ? <ShieldAlert size={13} /> : <CheckCircle2 size={13} />}{card.subtitle}</span><em>{card.kind === "baseline" ? "Track details" : "Update"} <ChevronRight size={14} /></em></div>
           </button>
         ))}</div> : <div className="cash-owned-empty">N/A · Add a savings or checking account, or choose a roadmap recommendation below.</div>}
       </section>
