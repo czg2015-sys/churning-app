@@ -127,6 +127,7 @@ export type FinancialProfile = {
   biweekly_pay: number | string;
   dd_source_count?: number;
   dd_source_amounts?: number[];
+  dd_source_next_dates?: string[];
   biweekly_essential_spend: number | string;
   estimated_tax_rate: number | string | null;
   tax_rate_known: boolean;
