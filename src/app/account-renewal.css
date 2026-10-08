@@ -125,3 +125,65 @@
 @media (max-width:720px) {
   .dd-source-pair { display:contents; }
 }
+
+
+/* V3 simplification: account labels, one-click rotate, clear DD math */
+.cash-owned-card { position:relative; cursor:default; }
+.cash-owned-top span { min-width:0; }
+.cash-owned-top em { display:block; margin-top:3px; max-width:250px; color:var(--muted); font-size:8px; font-style:normal; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cash-owned-badge-row { min-height:24px; }
+.cash-owned-badge-row .cash-lifecycle-badge { appearance:none; cursor:pointer; font-family:inherit; }
+.cash-owned-badge-row .cash-lifecycle-badge:hover { filter:brightness(1.12); transform:translateY(-1px); }
+.cash-owned-update { width:100%; margin:0; padding:10px 0 0; border:0; border-top:0; background:transparent; color:inherit; display:flex; justify-content:space-between; align-items:center; gap:7px; text-align:left; cursor:pointer; }
+.cash-owned-update > span { display:inline-flex; align-items:center; gap:4px; min-width:0; font-size:10px; font-weight:760; }
+.cash-owned-update > em { display:inline-flex; align-items:center; gap:3px; color:var(--muted); font-size:9px; font-style:normal; white-space:nowrap; }
+.cash-owned-card:hover .cash-owned-update > em { color:var(--green); }
+.cash-known-offer { display:grid; gap:2px; padding:11px 12px; border:1px solid rgba(88,207,140,.2); border-radius:10px; background:rgba(88,207,140,.055); }
+.cash-known-offer strong { color:var(--green); font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+.cash-known-offer span { font-size:12px; font-weight:780; }
+.cash-known-offer small { color:var(--muted); font-size:10px; }
+.cash-account-details.compact { grid-template-columns:repeat(3,1fr); }
+.cash-account-quick-fields { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.cash-account-quick-fields label { display:grid; gap:6px; color:var(--muted-strong); font-size:11px; font-weight:750; }
+.cash-rotate-button { border-color:rgba(247,191,93,.34)!important; background:rgba(247,191,93,.09)!important; color:#ffe4ad!important; }
+.cash-account-settings { margin-top:8px; border-top:1px solid var(--line); padding-top:10px; }
+.cash-account-settings summary { cursor:pointer; color:var(--muted); font-size:10px; font-weight:760; }
+.cash-account-settings[open] { display:grid; gap:10px; }
+.cash-quick-current { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px; border:1px solid var(--line); border-radius:9px; background:rgba(255,255,255,.025); }
+.cash-quick-current small { color:var(--muted); font-size:9px; }
+.cash-quick-current b { font-size:13px; }
+
+.dd-plan-summary { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; margin:8px 0 1px; overflow:hidden; border:1px solid var(--line); border-radius:9px; background:var(--line); }
+.dd-plan-summary > div { min-width:0; padding:10px; background:#294535; }
+.dd-plan-summary small,.dd-plan-summary strong,.dd-plan-summary span { display:block; }
+.dd-plan-summary small { color:var(--green); font-size:7px; font-weight:850; letter-spacing:.06em; }
+.dd-plan-summary strong { margin-top:3px; font-size:13px; letter-spacing:-.02em; }
+.dd-plan-summary span { margin-top:2px; color:var(--muted); font-size:8px; line-height:1.35; }
+
+.savings-decision-group { grid-column:1/-1; scroll-margin-top:82px; border:1px solid rgba(88,207,140,.22); border-radius:15px; padding:12px; background:rgba(88,207,140,.025); }
+.savings-decision-head { display:flex; justify-content:space-between; gap:16px; align-items:end; padding:3px 3px 12px; }
+.savings-decision-head small { color:var(--green); font-size:8px; font-weight:850; letter-spacing:.08em; }
+.savings-decision-head h3 { margin:2px 0 3px; font-size:18px; letter-spacing:-.025em; }
+.savings-decision-head p { margin:0; max-width:760px; color:var(--muted); font-size:9px; line-height:1.45; }
+.savings-decision-head > span { flex:0 0 auto; font-size:12px; font-weight:800; color:var(--muted-strong); }
+.savings-decision-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.savings-return-note { margin-top:8px; padding:8px 10px; border:1px solid rgba(88,207,140,.16); border-radius:8px; background:rgba(88,207,140,.045); color:var(--muted-strong); font-size:8px; line-height:1.45; }
+.savings-return-note strong { color:var(--green); }
+
+.timeline-with-tabs { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; }
+.timeline-tabs { display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; }
+.timeline-tabs button { min-height:29px; padding:5px 9px; border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.02); color:var(--muted); font-size:8px; font-weight:790; cursor:pointer; }
+.timeline-tabs button:hover { border-color:rgba(88,207,140,.34); color:var(--ink); }
+.timeline-tabs button.active { border-color:rgba(88,207,140,.42); background:rgba(88,207,140,.13); color:#d5f7e1; }
+
+@media (max-width:900px) {
+  .dd-plan-summary { grid-template-columns:1fr 1fr; }
+  .savings-decision-grid { grid-template-columns:1fr; }
+  .timeline-with-tabs { grid-template-columns:auto 1fr; }
+  .timeline-tabs { grid-column:1/-1; justify-content:flex-start; margin-top:8px; }
+}
+@media (max-width:620px) {
+  .cash-account-details.compact,.cash-account-quick-fields { grid-template-columns:1fr; }
+  .dd-plan-summary { grid-template-columns:1fr; }
+  .savings-decision-head { align-items:flex-start; flex-direction:column; }
+}
