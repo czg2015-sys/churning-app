@@ -22,8 +22,35 @@ function formatDate(date?: string | null) {
 
 function missionProgress(mission: Mission) {
   const steps = mission.mission_steps || [];
+  const opportunity = mission.opportunity;
+
+  const ddTarget = Math.max(
+    numberValue(opportunity?.direct_deposit_required),
+    numberValue(steps.find((step) => step.step_type === "direct_deposit")?.target_amount),
+  );
+  if (ddTarget > 0) {
+    const current = numberValue(steps.find((step) => step.step_type === "direct_deposit")?.current_amount);
+    return Math.max(0, Math.min(100, Math.round((current / ddTarget) * 100)));
+  }
+
+  const balanceTarget = Math.max(
+    numberValue(opportunity?.required_balance),
+    numberValue(opportunity?.min_opening_deposit),
+    numberValue(steps.find((step) => step.step_type === "hold")?.target_amount),
+  );
+  if (balanceTarget > 0) {
+    const tracked = Math.max(
+      numberValue(mission.amount_committed),
+      numberValue(steps.find((step) => step.step_type === "hold")?.current_amount),
+    );
+    return Math.max(0, Math.min(100, Math.round((tracked / balanceTarget) * 100)));
+  }
+
   if (!steps.length) return 0;
-  return Math.round(100 * steps.filter((step) => step.is_complete).length / steps.length);
+  const qualifyingSteps = steps.filter((step) => step.step_type !== "bonus_received");
+  const denominator = qualifyingSteps.length || steps.length;
+  const completed = (qualifyingSteps.length ? qualifyingSteps : steps).filter((step) => step.is_complete).length;
+  return Math.max(0, Math.min(100, Math.round((completed / denominator) * 100)));
 }
 
 function nextMissionDate(mission: Mission) {
