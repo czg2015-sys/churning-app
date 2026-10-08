@@ -194,16 +194,38 @@ function addDaysIso(value: string, days: number) {
 }
 
 function ddPerPaycheck(item: Opportunity) {
+  const monthlyThreshold = numberValue(item.reward_monthly_dd_threshold);
+  if (monthlyThreshold > 0) {
+    // Biweekly payroll usually has only two checks in a calendar month.
+    // Using threshold / 2 prevents an average-month estimate from underfunding a two-check month.
+    return Math.ceil(Math.max(numberValue(item.dd_min_each), monthlyThreshold / 2));
+  }
   const required = numberValue(item.direct_deposit_required);
   const windowDays = Math.max(1, numberValue(item.direct_deposit_window_days || item.qualification_days || 90));
   const checksInWindow = Math.max(1, Math.floor(windowDays / 14));
   const cumulativeNeed = required > 0 ? required / checksInWindow : 0;
-  const monthlyThresholdPerCheck = numberValue(item.reward_monthly_dd_threshold) * 12 / 26;
-  return Math.ceil(Math.max(numberValue(item.dd_min_each), cumulativeNeed, monthlyThresholdPerCheck));
+  return Math.ceil(Math.max(numberValue(item.dd_min_each), cumulativeNeed));
 }
 
 function ddCompletionPlan(item: Opportunity, nextPayday?: string | null) {
   const perPaycheck = Math.max(1, ddPerPaycheck(item));
+  const monthlyThreshold = numberValue(item.reward_monthly_dd_threshold);
+  if (monthlyThreshold > 0) {
+    const maxMonths = Math.max(1, Math.round(numberValue(item.benefit_duration_days || item.qualification_days || 183) / 30.4375));
+    const monthlyReward = numberValue(item.bonus_amount) / maxMonths;
+    return {
+      perPaycheck,
+      depositsNeeded: 2,
+      weeksFromFirst: 2,
+      qualificationDate: null,
+      payoutDate: null,
+      recurringMonthly: true,
+      monthlyThreshold,
+      maxMonths,
+      monthlyReward,
+    };
+  }
+
   const required = numberValue(item.direct_deposit_required);
   const minimumCount = Math.max(0, Math.floor(numberValue(item.dd_deposit_count)));
   const depositsNeeded = Math.max(minimumCount, required > 0 ? Math.ceil(required / perPaycheck) : minimumCount || 1);
@@ -212,7 +234,7 @@ function ddCompletionPlan(item: Opportunity, nextPayday?: string | null) {
   const payoutDate = qualificationDate && numberValue(item.payout_days) > 0
     ? addDaysIso(qualificationDate, numberValue(item.payout_days))
     : null;
-  return { perPaycheck, depositsNeeded, weeksFromFirst, qualificationDate, payoutDate };
+  return { perPaycheck, depositsNeeded, weeksFromFirst, qualificationDate, payoutDate, recurringMonthly: false, monthlyThreshold: 0, maxMonths: 1, monthlyReward: numberValue(item.bonus_amount) };
 }
 
 export function PlanStrategyHub({
@@ -652,16 +674,21 @@ export function PlanStrategyHub({
                   const requiredDd = numberValue(selected.item.direct_deposit_required);
                   const reward = numberValue(selected.item.bonus_amount);
                   const monthlyRoute = completion.perPaycheck * 26 / 12;
-                  const ratio = requiredDd > 0 ? reward / requiredDd * 100 : 0;
+                  const recurring = completion.recurringMonthly;
+                  const ratioBase = recurring ? completion.monthlyThreshold : requiredDd;
+                  const ratioReward = recurring ? completion.monthlyReward : reward;
+                  const ratio = ratioBase > 0 ? ratioReward / ratioBase * 100 : 0;
                   return <div className="dd-pick-wrap">
                     <SimplePick result={selected} profile={effectiveProfile} amount={monthlyDdNeed(selected.item)} amountLabel={money.format(completion.perPaycheck) + "/paycheck"} ranks={ddRanks} addedOpportunityIds={addedOpportunityIds} />
                     <div className="dd-plan-summary">
-                      <div><small>TOTAL DD NEEDED</small><strong>{money.format(requiredDd)}</strong><span>within {numberValue(selected.item.direct_deposit_window_days || selected.item.qualification_days)} days</span></div>
+                      <div><small>{recurring ? "DD NEEDED EACH MONTH" : "TOTAL DD NEEDED"}</small><strong>{money.format(recurring ? completion.monthlyThreshold : requiredDd)}</strong><span>{recurring ? `repeat for up to ${completion.maxMonths} months` : `within ${numberValue(selected.item.direct_deposit_window_days || selected.item.qualification_days)} days`}</span></div>
                       <div><small>YOUR ROUTE</small><strong>{money.format(completion.perPaycheck)}/paycheck</strong><span>≈ {money.format(monthlyRoute)}/month</span></div>
-                      <div><small>EST. FINISH</small><strong>{completion.qualificationDate ? readableDate(completion.qualificationDate) : completion.depositsNeeded + " deposits"}</strong><span>{completion.qualificationDate ? completion.depositsNeeded + " deposits" : "about " + completion.weeksFromFirst + " weeks from first DD"}</span></div>
-                      <div><small>BONUS RATIO</small><strong>{ratio.toFixed(1)}%</strong><span>{money.format(reward)} ÷ {money.format(requiredDd)} DD · not APY</span></div>
+                      <div><small>{recurring ? "MONTHLY REWARD" : "EST. FINISH"}</small><strong>{recurring ? money.format(completion.monthlyReward) : completion.qualificationDate ? readableDate(completion.qualificationDate) : completion.depositsNeeded + " deposits"}</strong><span>{recurring ? `up to ${money.format(reward)} total` : completion.qualificationDate ? completion.depositsNeeded + " deposits" : "about " + completion.weeksFromFirst + " weeks from first DD"}</span></div>
+                      <div><small>BONUS RATIO</small><strong>{ratio.toFixed(1)}%</strong><span>{recurring ? `${money.format(completion.monthlyReward)} ÷ ${money.format(completion.monthlyThreshold)} monthly DD` : `${money.format(reward)} ÷ ${money.format(requiredDd)} DD`} · not APY</span></div>
                     </div>
-                    {!completion.qualificationDate ? <div className="dd-completion-note"><CalendarDays size={13}/><span>Add your next payday in Start Here to turn this into exact qualification and payout dates.</span></div> : completion.payoutDate ? <div className="dd-completion-note"><CalendarDays size={13}/><span>Estimated payout review: {readableDate(completion.payoutDate)}.</span></div> : null}
+                    {recurring ? <div className="dd-completion-note"><CalendarDays size={13}/><span>This is a monthly threshold, not one six-month lump sum. In a normal two-paycheck month, route at least {money.format(completion.perPaycheck)} from each paycheck to reach {money.format(completion.monthlyThreshold)}.</span></div>
+                    : !completion.qualificationDate ? <div className="dd-completion-note"><CalendarDays size={13}/><span>Add your next payday in Start Here to turn this into exact qualification and payout dates.</span></div>
+                    : completion.payoutDate ? <div className="dd-completion-note"><CalendarDays size={13}/><span>Estimated payout review: {readableDate(completion.payoutDate)}.</span></div> : null}
                   </div>;
                 })() : null}
               </div>
