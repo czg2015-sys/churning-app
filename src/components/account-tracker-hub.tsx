@@ -89,7 +89,6 @@ export function AccountTrackerHub({
   const [editApy, setEditApy] = useState("");
   const [editDD, setEditDD] = useState("");
   const [editMissionBalance, setEditMissionBalance] = useState("");
-  const [useAsSavingsBaseline, setUseAsSavingsBaseline] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -103,7 +102,7 @@ export function AccountTrackerHub({
 
   const cards = useMemo(() => {
     const tracked = activeAccounts.map((account) => {
-      const urgent = isEnded(account) && account.confirmed_post_promo_apy == null;
+      const urgent = isEnded(account);
       const badge = accountBadge(account.opportunity_id ? opportunityById.get(account.opportunity_id) : null, urgent);
       return {
         key: "acct:" + account.id,
@@ -281,7 +280,6 @@ export function AccountTrackerHub({
     setEditApy(a.confirmed_post_promo_apy != null ? String(a.confirmed_post_promo_apy) : a.current_apy != null ? String(a.current_apy) : "");
     setEditDD("");
     setEditMissionBalance("");
-    setUseAsSavingsBaseline(false);
     setSelectedAccountId(id);
   }
 
