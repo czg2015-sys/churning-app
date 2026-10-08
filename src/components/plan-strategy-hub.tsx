@@ -245,6 +245,7 @@ export function PlanStrategyHub({
   const ranked = useMemo(() => rankMatches(opportunities, effectiveProfile, usedBanks, stateCode), [opportunities, effectiveProfile, usedBanks, stateCode]);
   const initialSort = stored.sortMode || (profile.ranking_preference === "profit" ? "profit" : profile.ranking_preference === "ease" ? "ease" : profile.ranking_preference === "liquidity" ? "liquidity" : "overall");
   const [sortMode, setSortMode] = useState<SortMode>(initialSort);
+  const [timelineLane, setTimelineLane] = useState<"all" | "dd" | "savings" | "hysa">("all");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -494,26 +495,31 @@ export function PlanStrategyHub({
   }
 
   const timeline = useMemo(() => {
-    type Event = { date: string; title: string; kind: "active" | "planned" | "expired"; notes: string };
+    type Lane = "dd" | "savings" | "hysa";
+    type Event = { date: string; title: string; kind: "active" | "planned" | "expired"; notes: string; lane: Lane; subject: string };
     const events: Event[] = [];
-    const add = (date: string | null | undefined, title: string, kind: Event["kind"], notes: string) => {
-      if (date) events.push({ date: date.slice(0, 10), title, kind, notes });
+    const add = (date: string | null | undefined, title: string, kind: Event["kind"], notes: string, lane: Lane, subject: string) => {
+      if (date) events.push({ date: date.slice(0, 10), title, kind, notes, lane, subject });
     };
 
     for (const account of accounts.filter((item) => item.status === "active" && item.promotional_end_date)) {
       const end = account.promotional_end_date!.slice(0, 10);
       if (end <= todayLocal && account.confirmed_post_promo_apy == null) {
-        add(end, account.institution + " · benefit ended", "expired", "Update your APY and review where to keep this money");
+        add(end, account.institution + " · benefit ended", "expired", "Your promotional benefit ended. Review the current APY and compare the best place for this cash.", "hysa", "account:" + account.id);
       } else if (end > todayLocal) {
-        add(end, account.institution + " · promotional rate ends", "active", "Confirm the new rate and compare alternatives");
+        add(end, account.institution + " · promotional rate ends", "active", "Confirm the new rate and compare alternatives.", "hysa", "account:" + account.id);
       }
     }
     for (const mission of missions.filter((item) => !["complete", "cancelled"].includes(item.status))) {
-      const name = mission.institution + " · " + mission.title.split(" — ")[0];
-      add(mission.benefit_end_date, name + " rate ends", "active", "Review your benefit before it expires");
-      add(mission.qualification_deadline, name + " qualify", "active", "Confirm requirements against posted activity");
-      add(mission.payout_due_date, name + " payout check", "active", "Check for the actual reward");
-      add(mission.safe_close_review_date, name + " keep/close review", "active", "Review terms before deciding to close");
+      const isSavingsBonus = mission.opportunity?.category === "savings_bonus";
+      const isDd = numberValue(mission.opportunity?.direct_deposit_required) > 0 || mission.opportunity?.category === "checking_bonus";
+      const lane: Lane = isSavingsBonus ? "savings" : isDd ? "dd" : "hysa";
+      const label = isSavingsBonus ? mission.institution + " savings bonus" : isDd ? mission.institution + " DD / checking" : mission.institution;
+      const subject = "mission:" + mission.id;
+      add(mission.benefit_end_date, label + " · rate ends", "active", "Review the benefit before it expires.", lane, subject);
+      add(mission.qualification_deadline, label + " · qualify", "active", "Confirm the requirement against your bank activity.", lane, subject);
+      add(mission.payout_due_date, label + " · payout check", "active", "Check whether the reward actually posted.", lane, subject);
+      add(mission.safe_close_review_date, label + " · keep/close review", "active", "Review fees and terms before deciding to keep or close.", lane, subject);
     }
     const selected = [...selectedDd, selectedBonus, selectedSpending, selectedHysa].filter((item): item is RankedMatch => Boolean(item));
     const activeIds = new Set(missions.map((mission) => mission.opportunity_id).filter(Boolean));
@@ -531,12 +537,16 @@ export function PlanStrategyHub({
             result.item.institution + " · DD requirement complete",
             "planned",
             `${money.format(completion.perPaycheck)} each paycheck × ${completion.depositsNeeded} deposits`,
+            "dd",
+            "plan:" + result.item.id,
           );
           add(
             completion.payoutDate,
             result.item.institution + " · estimated payout review",
             "planned",
-            "Based on the stored payout window after your projected qualifying deposit",
+            "Based on the stored payout window after your projected qualifying deposit.",
+            "dd",
+            "plan:" + result.item.id,
           );
           continue;
         }
@@ -546,20 +556,40 @@ export function PlanStrategyHub({
           result.item.institution + " · DD target window",
           "planned",
           `${money.format(completion.perPaycheck)} per paycheck × ${completion.depositsNeeded} deposits. Add your next payday for an exact completion date.`,
+          "dd",
+          "plan:" + result.item.id,
         );
         continue;
       }
 
       const dates = planningDates(result.item, todayLocal);
-      add(dates.qualification, result.item.institution + " · estimated qualification", "planned", "Only applies if you open the offer");
-      add(dates.payout, result.item.institution + " · estimated payout", "planned", "Verify the offer's real timeline");
-      add(dates.benefitEnd, result.item.institution + " · rate review", "planned", "Re-check your APY after the promotion");
+      const lane: Lane = result.item.category === "hysa" ? "hysa" : result.item.category === "savings_bonus" ? "savings" : "dd";
+      const subject = "plan:" + result.item.id;
+      add(dates.qualification, result.item.institution + " · estimated qualification", "planned", "Only applies if you open the offer.", lane, subject);
+      add(dates.payout, result.item.institution + " · estimated payout", "planned", "Verify the offer's real timeline.", lane, subject);
+      add(dates.benefitEnd, result.item.institution + " · rate review", "planned", "Re-check your APY after the promotion.", lane, subject);
     }
     const unique = Array.from(new Map(events.map((event) => [event.date + ":" + event.title, event])).values());
     return unique.filter((event) => event.kind === "expired" || event.date >= todayLocal)
-      .sort((a, b) => (a.kind === "expired" ? -1 : 0) - (b.kind === "expired" ? -1 : 0) || a.date.localeCompare(b.date))
-      .slice(0, 9);
+      .sort((a, b) => (a.kind === "expired" ? -1 : 0) - (b.kind === "expired" ? -1 : 0) || a.date.localeCompare(b.date));
   }, [missions, accounts, selectedDd, selectedBonus, selectedSpending, selectedHysa, todayLocal, sourceNextDates]);
+
+  const timelineView = useMemo(() => {
+    if (timelineLane !== "all") return timeline.filter((event) => event.lane === timelineLane).slice(0, 10);
+    const seen = new Set<string>();
+    const compact = [];
+    for (const event of timeline) {
+      if (event.kind === "expired") {
+        compact.push(event);
+        seen.add(event.subject);
+        continue;
+      }
+      if (seen.has(event.subject)) continue;
+      seen.add(event.subject);
+      compact.push(event);
+    }
+    return compact.slice(0, 7);
+  }, [timeline, timelineLane]);
 
   return (
     <section className="plan-hub plan-hub-simple">
@@ -619,27 +649,52 @@ export function PlanStrategyHub({
                   const sourceIndex = sourceIndexForLane(index);
                   const nextPayday = sourceNextDates[sourceIndex] || null;
                   const completion = ddCompletionPlan(selected.item, nextPayday);
-                  const timing = completion.qualificationDate
-                    ? `${money.format(completion.perPaycheck)}/paycheck · ${completion.depositsNeeded} deposits · qualify around ${readableDate(completion.qualificationDate)}${completion.payoutDate ? ` · payout review around ${readableDate(completion.payoutDate)}` : ""}`
-                    : `${money.format(completion.perPaycheck)}/paycheck · ${completion.depositsNeeded} deposits · about ${completion.weeksFromFirst} weeks from the first deposit · add next payday for exact dates`;
-                  return <div className="dd-pick-wrap"><SimplePick result={selected} profile={effectiveProfile} amount={monthlyDdNeed(selected.item)} amountLabel={money.format(completion.perPaycheck) + "/paycheck"} ranks={ddRanks} addedOpportunityIds={addedOpportunityIds} /><div className="dd-completion-note"><CalendarDays size={13}/><span>{timing}</span></div></div>;
+                  const requiredDd = numberValue(selected.item.direct_deposit_required);
+                  const reward = numberValue(selected.item.bonus_amount);
+                  const monthlyRoute = completion.perPaycheck * 26 / 12;
+                  const ratio = requiredDd > 0 ? reward / requiredDd * 100 : 0;
+                  return <div className="dd-pick-wrap">
+                    <SimplePick result={selected} profile={effectiveProfile} amount={monthlyDdNeed(selected.item)} amountLabel={money.format(completion.perPaycheck) + "/paycheck"} ranks={ddRanks} addedOpportunityIds={addedOpportunityIds} />
+                    <div className="dd-plan-summary">
+                      <div><small>TOTAL DD NEEDED</small><strong>{money.format(requiredDd)}</strong><span>within {numberValue(selected.item.direct_deposit_window_days || selected.item.qualification_days)} days</span></div>
+                      <div><small>YOUR ROUTE</small><strong>{money.format(completion.perPaycheck)}/paycheck</strong><span>≈ {money.format(monthlyRoute)}/month</span></div>
+                      <div><small>EST. FINISH</small><strong>{completion.qualificationDate ? readableDate(completion.qualificationDate) : completion.depositsNeeded + " deposits"}</strong><span>{completion.qualificationDate ? completion.depositsNeeded + " deposits" : "about " + completion.weeksFromFirst + " weeks from first DD"}</span></div>
+                      <div><small>BONUS RATIO</small><strong>{ratio.toFixed(1)}%</strong><span>{money.format(reward)} ÷ {money.format(requiredDd)} DD · not APY</span></div>
+                    </div>
+                    {!completion.qualificationDate ? <div className="dd-completion-note"><CalendarDays size={13}/><span>Add your next payday in Start Here to turn this into exact qualification and payout dates.</span></div> : completion.payoutDate ? <div className="dd-completion-note"><CalendarDays size={13}/><span>Estimated payout review: {readableDate(completion.payoutDate)}.</span></div> : null}
+                  </div>;
                 })() : null}
               </div>
             );
           })}
         </section>
 
-        <section className="simple-roadmap-card">
-          <div className="simple-roadmap-card-head"><span><Landmark size={18} /></span><div><small>SAVINGS / HYSA</small><h3>{money.format(savingsCash)}</h3><p>Keep this liquid</p></div></div>
-          <label className="simple-roadmap-select"><span>Recommended home</span><select value={hysaId} onChange={(event) => updateHysa(event.target.value)} disabled={saving}><option value="current">Current savings · {baselineNeedsConfirmation ? "APY needs update" : currentApy.toFixed(2) + "% APY"}</option>{hysaSorted.map((result) => <option key={result.item.id} value={result.item.id}>{optionLabel(result, hysaRanks, effectiveProfile, sortMode, savingsCash)} · {numberValue(result.item.apy).toFixed(2)}%</option>)}</select></label>
-          {selectedHysa ? <SimplePick result={selectedHysa} profile={effectiveProfile} amount={savingsCash} amountLabel={money.format(savingsCash)} ranks={hysaRanks} addedOpportunityIds={addedOpportunityIds} /> : <div className="simple-current"><WalletCards size={16} /><span><strong>Keep current savings</strong><small>{money.format(savingsCash)} · {baselineNeedsConfirmation ? "Confirm your new APY after the promo" : "current " + currentApy.toFixed(2) + "% APY"}.</small></span></div>}
-        </section>
+        <div id="savings-decision" className="savings-decision-group">
+          <div className="savings-decision-head">
+            <div><small>SAVINGS DECISION</small><h3>Where should this cash work next?</h3><p>Compare a liquid HYSA against cash bonuses using the same dollars. Churning subtracts the interest you give up when money has to sit somewhere else.</p></div>
+            <span>{money.format(baseAvailableCash)} available</span>
+          </div>
+          <div className="savings-decision-grid">
+            <section className="simple-roadmap-card">
+              <div className="simple-roadmap-card-head"><span><Landmark size={18} /></span><div><small>SAVINGS / HYSA</small><h3>{money.format(savingsCash)}</h3><p>{baselineNeedsConfirmation ? "Update your current APY" : "liquid savings"}</p></div></div>
+              <label className="simple-roadmap-select"><span>Recommended home</span><select value={hysaId} onChange={(event) => updateHysa(event.target.value)} disabled={saving}><option value="current">Current savings · {baselineNeedsConfirmation ? "APY needs update" : currentApy.toFixed(2) + "% APY"}</option>{hysaSorted.map((result) => <option key={result.item.id} value={result.item.id}>{optionLabel(result, hysaRanks, effectiveProfile, sortMode, savingsCash)} · {numberValue(result.item.apy).toFixed(2)}%</option>)}</select></label>
+              {selectedHysa ? <><SimplePick result={selectedHysa} profile={effectiveProfile} amount={savingsCash} amountLabel={money.format(savingsCash)} ranks={hysaRanks} addedOpportunityIds={addedOpportunityIds} /><div className="savings-return-note">{numberValue(selectedHysa.item.apy).toFixed(2)}% APY ≈ {money.format(savingsCash * numberValue(selectedHysa.item.apy) / 100)} interest/year at this balance if the rate stayed unchanged.</div></> : <div className="simple-current"><WalletCards size={16} /><span><strong>Keep current savings</strong><small>{money.format(savingsCash)} · {baselineNeedsConfirmation ? "Confirm your new APY after the promo" : "current " + currentApy.toFixed(2) + "% APY"}.</small></span></div>}
+            </section>
 
-        <section className="simple-roadmap-card">
-          <div className="simple-roadmap-card-head"><span><BadgeDollarSign size={18} /></span><div><small>CASH BONUS</small><h3>{selectedBonus ? money.format(bonusCash) : "$0"}</h3><p>{selectedBonus ? "cash assigned" : "keep it in savings"}</p></div></div>
-          <label className="simple-roadmap-select"><span>Recommended bonus</span><select value={bonusId} onChange={(event) => updateBonus(event.target.value)} disabled={saving}><option value="none">Skip cash bonus</option>{bonusSorted.filter((result) => requiredCash(result.item) <= baseAvailableCash + .01).map((result) => <option key={result.item.id} value={result.item.id}>{optionLabel(result, bonusRanks, effectiveProfile, sortMode)} · needs {money.format(requiredCash(result.item))}</option>)}</select></label>
-          {selectedBonus ? <SimplePick result={selectedBonus} profile={effectiveProfile} amount={bonusCash} amountLabel={money.format(bonusCash)} ranks={bonusRanks} addedOpportunityIds={addedOpportunityIds} /> : null}
-        </section>
+            <section className="simple-roadmap-card">
+              <div className="simple-roadmap-card-head"><span><BadgeDollarSign size={18} /></span><div><small>SAVINGS BONUS</small><h3>{selectedBonus ? money.format(bonusCash) : "$0"}</h3><p>{selectedBonus ? "cash assigned to bonus" : "keep it in HYSA"}</p></div></div>
+              <label className="simple-roadmap-select"><span>Recommended bonus</span><select value={bonusId} onChange={(event) => updateBonus(event.target.value)} disabled={saving}><option value="none">Skip savings bonus</option>{bonusSorted.filter((result) => requiredCash(result.item) <= baseAvailableCash + .01).map((result) => <option key={result.item.id} value={result.item.id}>{optionLabel(result, bonusRanks, effectiveProfile, sortMode)} · needs {money.format(requiredCash(result.item))}</option>)}</select></label>
+              {selectedBonus ? (() => {
+                const required = requiredCash(selectedBonus.item);
+                const bonus = numberValue(selectedBonus.item.bonus_amount);
+                const days = Math.max(1, numberValue(selectedBonus.item.qualification_days || selectedBonus.item.benefit_duration_days || 365));
+                const periodReturn = required > 0 ? bonus / required * 100 : 0;
+                const annualizedSimple = periodReturn * 365 / days;
+                return <><SimplePick result={selectedBonus} profile={effectiveProfile} amount={bonusCash} amountLabel={money.format(bonusCash)} ranks={bonusRanks} addedOpportunityIds={addedOpportunityIds} /><div className="savings-return-note"><strong>{periodReturn.toFixed(1)}% bonus on required cash</strong> over about {days} days · ≈ {annualizedSimple.toFixed(1)}% simple annualized before lost interest/tax · not APY.</div></>;
+              })() : <div className="simple-current"><WalletCards size={16}/><span><strong>No bonus selected</strong><small>All available cash stays in the savings/HYSA side.</small></span></div>}
+            </section>
+          </div>
+        </div>
 
         {spendingFits ? (
           <section className="simple-roadmap-card">
@@ -656,15 +711,26 @@ export function PlanStrategyHub({
       </div>
 
       <section className="simple-timeline">
-        <div className="simple-timeline-head"><CalendarDays size={16} /><span><strong>Your money timeline</strong><small>Account dates first. Future recommendations are estimates until activated.</small></span></div>
-        {timeline.length ? <ol className="cash-roadmap-map">{timeline.map((event, index) =>
+        <div className="simple-timeline-head timeline-with-tabs">
+          <CalendarDays size={16} />
+          <span><strong>Your money timeline</strong><small>All shows only the next important event per account. Pick a lane for the full schedule.</small></span>
+          <div className="timeline-tabs" role="tablist" aria-label="Timeline category">
+            {[
+              ["all", "All"],
+              ["dd", "DD / Checking"],
+              ["savings", "Savings bonuses"],
+              ["hysa", "HYSA"],
+            ].map(([id, label]) => <button type="button" key={id} className={timelineLane === id ? "active" : ""} onClick={() => setTimelineLane(id as typeof timelineLane)}>{label}</button>)}
+          </div>
+        </div>
+        {timelineView.length ? <ol className="cash-roadmap-map">{timelineView.map((event, index) =>
           <li className={`cash-roadmap-step ${event.kind}`} key={`${event.date}-${event.title}-${index}`}>
             <div className="cash-roadmap-date">{readableDate(event.date)}</div>
             <span className="cash-roadmap-dot" />
             <div className="cash-roadmap-content"><strong>{event.title}</strong><small>{event.notes}</small></div>
             <em>{event.kind === "expired" ? "ACTION NEEDED" : event.kind === "active" ? "ACTIVE" : "PROJECTED"}</em>
           </li>
-        )}</ol> : <div className="simple-timeline-empty">Add an account or select an opportunity to see your deadlines here.</div>}
+        )}</ol> : <div className="simple-timeline-empty">Nothing scheduled in this lane yet.</div>}
       </section>
 
       <div className={`plan-safety-footer ${holdCount ? "hold" : "clear"}`}>
