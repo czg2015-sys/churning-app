@@ -181,11 +181,15 @@ export function opportunityFit(opportunity: Opportunity, profile: FinancialProfi
   const availablePayPerCycle = Math.max(0, numberValue(profile.biweekly_pay));
   const requiredDD = numberValue(opportunity.direct_deposit_required);
   const ddWindowDays = Math.max(14, numberValue(opportunity.direct_deposit_window_days || opportunity.qualification_days || 14));
-  const expectedAvailableDD = availablePayPerCycle * Math.max(1, ddWindowDays / 14);
+  const expectedAvailableDD = availablePayPerCycle * Math.floor(ddWindowDays / 14);
   const cashFit = economics.requiredCash <= economics.deployable
     ? 100
     : Math.max(0, 100 - ((economics.requiredCash - economics.deployable) / Math.max(economics.requiredCash, 1)) * 100);
-  const ddFit = requiredDD <= 0 ? 100 : Math.min(100, (expectedAvailableDD / requiredDD) * 100);
+  // A monthly requirement must fit an ordinary two-paycheck month.
+  const monthlyRequiredDD = numberValue(opportunity.reward_monthly_dd_threshold);
+  const totalDdFit = requiredDD <= 0 ? 100 : Math.min(100, (expectedAvailableDD / requiredDD) * 100);
+  const monthlyDdFit = monthlyRequiredDD <= 0 ? 100 : Math.min(100, (availablePayPerCycle * 2 / monthlyRequiredDD) * 100);
+  const ddFit = Math.min(totalDdFit, monthlyDdFit);
   const purchaseCount = Math.max(0, Number(opportunity.purchase_count || 0));
   const purchaseMinimum = numberValue(opportunity.purchase_min_amount);
   const requiredSpend = purchaseCount > 0 && purchaseMinimum > 0 ? purchaseCount * purchaseMinimum : 0;
@@ -219,9 +223,9 @@ export function opportunityFit(opportunity: Opportunity, profile: FinancialProfi
   const score = baseScore + (safetyPassed ? 35 : researchReady ? 8 : -25);
 
   const reasons: string[] = [];
-  if (cashFit >= 95 && economics.requiredCash > 0) reasons.push("fits your available cash");
-  if (ddFit >= 95 && requiredDD > 0) reasons.push("fits your paycheck capacity");
-  if (spendFit >= 95 && purchaseCount > 0) reasons.push("fits your normal spending");
+  if (cashFit >= 100 && economics.requiredCash > 0) reasons.push("fits your available cash");
+  if (ddFit >= 100 && requiredDD > 0) reasons.push("fits your paycheck capacity");
+  if (spendFit >= 100 && purchaseCount > 0) reasons.push("fits your normal spending");
   if (liquidity >= 85) reasons.push("keeps liquidity high");
   if (effort <= 2) reasons.push("low maintenance");
   if (economics.grossAdvantage > 0) reasons.push("beats your current cash baseline");
@@ -328,7 +332,7 @@ export function rankOpportunities(opportunities: Opportunity[], profile: Financi
   return opportunities
     .filter((item) => item.offer_status === "live" && stateEligible(item, stateCode) && !["credit_card_bonus", "brokerage_bonus"].includes(item.category))
     .map((item) => ({ item, ...opportunityFit(item, profile, usedBanks) }))
-    .filter((result) => result.safetyPassed && result.cashFit >= 95 && result.ddFit >= 90 && result.spendFit >= 75)
+    .filter((result) => result.safetyPassed && result.cashFit >= 100 && result.ddFit >= 100 && result.spendFit >= 100)
     .sort((a, b) => b.score - a.score);
 }
 
@@ -345,8 +349,8 @@ export function rankMatches(opportunities: Opportunity[], profile: FinancialProf
     .filter((item) => item.offer_status === "live" && stateEligible(item, stateCode) && !["credit_card_bonus", "brokerage_bonus"].includes(item.category))
     .map((item) => ({ item, ...opportunityFit(item, profile, usedBanks) }))
     .sort((a, b) => {
-      const bFit = Number(b.cashFit >= 95 && b.ddFit >= 90 && b.spendFit >= 75);
-      const aFit = Number(a.cashFit >= 95 && a.ddFit >= 90 && a.spendFit >= 75);
+      const bFit = Number(b.cashFit >= 100 && b.ddFit >= 100 && b.spendFit >= 100);
+      const aFit = Number(a.cashFit >= 100 && a.ddFit >= 100 && a.spendFit >= 100);
       return bFit - aFit
         || Number(b.safetyPassed) - Number(a.safetyPassed)
         || Number(b.researchReady) - Number(a.researchReady)
@@ -363,7 +367,7 @@ export function selectFeasibleRecommendations(
   limit = 3,
 ) {
   const ranked = rankMatches(opportunities, profile, usedBanks, stateCode)
-    .filter((result) => result.safetyPassed && result.cashFit >= 95 && result.ddFit >= 90 && result.spendFit >= 75)
+    .filter((result) => result.safetyPassed && result.cashFit >= 100 && result.ddFit >= 100 && result.spendFit >= 100)
     .slice(0, 12);
 
   if (ranked.length <= 1) return ranked.slice(0, limit);
