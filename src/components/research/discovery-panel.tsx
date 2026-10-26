@@ -1,4 +1,4 @@
-import { ArrowUpRight, Search, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, Search } from "lucide-react";
 import { RunDiscoverySweepButton } from "@/components/research/research-controls";
 import { getDiscoveryDashboardData } from "@/lib/research/discovery-dashboard";
 import styles from "@/app/research/research.module.css";
@@ -23,8 +23,8 @@ function durationLabel(days: number | null) {
 }
 
 function nextSweepDate(completedAt: string | null) {
-  if (!completedAt) return "Runs as soon as search is configured";
-  return formatDate(new Date(new Date(completedAt).getTime() + 14 * 86_400_000).toISOString());
+  if (!completedAt) return "Ready for first check";
+  return formatDate(new Date(new Date(completedAt).getTime() + 1 * 86_400_000).toISOString());
 }
 
 export async function DiscoveryPanel() {
@@ -36,10 +36,10 @@ export async function DiscoveryPanel() {
     <>
       <div className={styles.sectionHeading}>
         <div>
-          <span className="kicker">BIWEEKLY DISCOVERY ENGINE</span>
-          <h2>Find offers we do not know about yet</h2>
+          <span className="kicker">FREE OFFICIAL-PAGE CHECKS</span>
+          <h2>Check additional bank products</h2>
         </div>
-        <p>Every day Churning searches multiple offer categories. New discoveries stay in this private queue until an official source and research review are completed.</p>
+        <p>Checks a curated list of official bank pages daily, with no paid search API. This is not a whole-web search. New candidates stay private until their terms and eligibility have been reviewed.</p>
       </div>
 
       <section className={styles.runSummary}>
@@ -48,16 +48,6 @@ export async function DiscoveryPanel() {
         <span>{latestCompleted ? `Last completed ${formatDate(latestCompleted.completed_at)}` : "No completed discovery sweep yet"}</span>
         <RunDiscoverySweepButton configured={discovery.configured} />
       </section>
-
-      {!discovery.configured ? (
-        <section className={styles.guardrail}>
-          <ShieldCheck size={18} />
-          <div>
-            <strong>The discovery pipeline is installed but web search is not active yet.</strong>
-            <span>Add the server-only <code>DISCOVERY_SEARCH_API_KEY</code> in Vercel. The rest of the pipeline and the daily scheduling gate are already installed.</span>
-          </div>
-        </section>
-      ) : null}
 
       <section className={styles.metrics}>
         <article><span>DISCOVERED</span><strong>{discovery.metrics.totalCandidates}</strong><small>recent candidate records</small></article>
