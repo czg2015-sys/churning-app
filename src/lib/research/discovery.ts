@@ -1,12 +1,11 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
+import { fetchOfficialPage } from "@/lib/research/agent";
 import { createResearchAdminClient } from "@/lib/research/server";
 
-const SEARCH_TIMEOUT_MS = 10_000;
 const DISCOVERY_INTERVAL_DAYS = 1;
 const SEARCH_CONCURRENCY = 3;
-const RESULTS_PER_QUERY = 20;
 
 export type DiscoveryTrigger = "manual" | "cron";
 export type DiscoveryStatus = "completed" | "failed" | "skipped" | "already_running";
@@ -23,17 +22,6 @@ export type DiscoveryRunResult = {
 };
 
 type DiscoveryCategory = "hysa" | "savings_bonus" | "checking_bonus" | "debit_spend" | "credit_card_bonus";
-
-type SearchPlan = {
-  query: string;
-  category: DiscoveryCategory;
-};
-
-type BraveResult = {
-  title?: string;
-  url?: string;
-  description?: string;
-};
 
 type SearchHit = {
   query: string;
@@ -61,19 +49,10 @@ type ExistingOpportunity = {
   official_url: string;
 };
 
-const SEARCH_PLANS: SearchPlan[] = [
-  { category: "hysa", query: '"high yield savings" APY promotion bank' },
-  { category: "hysa", query: '"savings account" APY "promo code" bank' },
-  { category: "savings_bonus", query: '"savings account bonus" bank "new money"' },
-  { category: "savings_bonus", query: 'bank "savings bonus" "new account" cash' },
-  { category: "checking_bonus", query: '"checking account bonus" "direct deposit" bank' },
-  { category: "checking_bonus", query: '"new checking account bonus" bank direct deposit' },
-  { category: "checking_bonus", query: '"credit union checking bonus" "direct deposit"' },
-  { category: "checking_bonus", query: 'California "checking bonus" bank credit union' },
-  { category: "debit_spend", query: '"debit card bonus" checking purchases bank' },
-  { category: "debit_spend", query: '"cash back debit card" checking account' },
-  { category: "credit_card_bonus", query: '"credit card welcome bonus" cash back bank' },
-  { category: "credit_card_bonus", query: '"credit card welcome offer" cash bonus issuer' },
+const SOURCES: { institution: string; url: string; category: DiscoveryCategory }[] = [
+  { institution: "American Express", url: "https://www.americanexpress.com/en-us/banking/online-savings/high-yield-savings-account/", category: "hysa" },
+  { institution: "Synchrony Bank", url: "https://www.synchrony.com/banking/products/high-yield-savings", category: "hysa" },
+  { institution: "Capital One", url: "https://www.capitalone.com/bank/savings-accounts/online-performance-savings-account/", category: "hysa" },
 ];
 
 const NON_OFFICIAL_DOMAINS = [
@@ -96,13 +75,8 @@ const NON_OFFICIAL_DOMAINS = [
   "tiktok.com",
 ];
 
-function getDiscoveryApiKey() {
-  return (process.env.DISCOVERY_SEARCH_API_KEY || process.env.BRAVE_SEARCH_API_KEY || "").trim();
-}
-
-export function hasDiscoverySearchConfig() {
-  return Boolean(getDiscoveryApiKey());
-}
+// Direct official-page checks never call a paid search provider.
+export function hasDiscoverySearchConfig() { return true; }
 
 function canonicalizeUrl(raw: string) {
   try {
@@ -153,14 +127,6 @@ function candidateKey(category: DiscoveryCategory, rawUrl: string) {
   return createHash("sha256").update(`${category}|${canonicalizeUrl(rawUrl)}`).digest("hex");
 }
 
-function likelyOfferResult(hit: SearchHit) {
-  const text = `${hit.title} ${hit.description}`.toLowerCase();
-  if (!/^https:\/\//i.test(hit.url)) return false;
-  if (/login|sign in|customer service|routing number|locations|careers|privacy policy/.test(text)) return false;
-  const offerWords = /bonus|apy|annual percentage yield|cash back|cashback|welcome offer|direct deposit|new money|promo|promotion|reward/;
-  return offerWords.test(text);
-}
-
 const discoveryDurationWords: Record<string, number> = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
   seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
@@ -190,41 +156,19 @@ function detectBenefitDuration(hit: SearchHit) {
   return { days: Math.round(days), text: duration[0] };
 }
 
-async function searchBrave(plan: SearchPlan): Promise<SearchHit[]> {
-  const apiKey = getDiscoveryApiKey();
-  if (!apiKey) throw new Error("Discovery search is not configured. Add DISCOVERY_SEARCH_API_KEY in Vercel.");
-
-  const params = new URLSearchParams({
-    q: plan.query,
-    count: String(RESULTS_PER_QUERY),
-    country: "US",
-    search_lang: "en",
-    freshness: "pm",
-    safesearch: "moderate",
-  });
-
-  const response = await fetch(`https://api.search.brave.com/res/v1/web/search?${params.toString()}`, {
-    headers: {
-      accept: "application/json",
-      "x-subscription-token": apiKey,
-      "user-agent": "ChurningDiscovery/1.0 (+https://churning-app.vercel.app)",
-    },
-    cache: "no-store",
-    signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
-  });
-
-  if (!response.ok) throw new Error(`Discovery search returned HTTP ${response.status}.`);
-  const payload = await response.json() as { web?: { results?: BraveResult[] } };
-  return (payload.web?.results || [])
-    .map((result, index) => ({
-      query: plan.query,
-      category: plan.category,
-      title: (result.title || "").trim(),
-      url: (result.url || "").trim(),
-      description: (result.description || "").trim(),
-      rank: index + 1,
-    }))
-    .filter((hit) => hit.url && likelyOfferResult(hit));
+async function checkSource(source: typeof SOURCES[number]) {
+  const page = await fetchOfficialPage(source.url);
+  if (page.fetchStatus !== "ok") return { hits: [] as SearchHit[], error: `${source.institution}: ${page.fetchStatus}` };
+  const signal = /apy|annual percentage yield|bonus|cash back|direct deposit/i.exec(page.normalizedText);
+  if (!signal) return { hits: [] as SearchHit[], error: `${source.institution}: no offer terms found` };
+  return { error: null, hits: [{
+    query: `Official page: ${source.institution}`,
+    category: source.category,
+    title: page.pageTitle || source.institution,
+    url: source.url,
+    description: page.normalizedText.slice(Math.max(0, signal.index - 100), signal.index + 1100),
+    rank: 1,
+  }] };
 }
 
 async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>) {
@@ -279,18 +223,6 @@ function matchesExistingOpportunity(hit: SearchHit, opportunities: ExistingOppor
 export async function runDiscoverySweep({ triggerType, force = false }: { triggerType: DiscoveryTrigger; force?: boolean }): Promise<DiscoveryRunResult> {
   const supabase = createResearchAdminClient();
 
-  if (!hasDiscoverySearchConfig()) {
-    return {
-      runId: null,
-      status: "failed",
-      queriesCount: 0,
-      resultsCount: 0,
-      newCandidates: 0,
-      duplicateCandidates: 0,
-      message: "Discovery search is installed but not active. Add DISCOVERY_SEARCH_API_KEY to Vercel.",
-    };
-  }
-
   const running = await runningDiscovery();
   if (running) {
     return { runId: running.id, status: "already_running", queriesCount: 0, resultsCount: 0, newCandidates: 0, duplicateCandidates: 0, message: "A discovery sweep is already running." };
@@ -299,20 +231,22 @@ export async function runDiscoverySweep({ triggerType, force = false }: { trigge
   const latest = await latestCompletedRun();
   const nextEligibleAt = nextEligibleAtFrom(latest);
   if (triggerType === "cron" && !force && nextEligibleAt && Date.now() < new Date(nextEligibleAt).getTime()) {
-    return { runId: latest?.id || null, status: "skipped", queriesCount: 0, resultsCount: 0, newCandidates: 0, duplicateCandidates: 0, message: "Biweekly discovery is not due yet.", nextEligibleAt };
+    return { runId: latest?.id || null, status: "skipped", queriesCount: 0, resultsCount: 0, newCandidates: 0, duplicateCandidates: 0, message: "Daily official-page check is not due yet.", nextEligibleAt };
   }
 
   const { data: run, error: runError } = await supabase.from("discovery_runs").insert({
     trigger_type: triggerType,
     status: "running",
-    provider: "brave",
+    provider: "official_pages",
   }).select("id").single();
   if (runError || !run) throw runError || new Error("Could not start discovery run.");
   const runId = run.id as string;
 
   try {
-    const batches = await mapWithConcurrency(SEARCH_PLANS, SEARCH_CONCURRENCY, searchBrave);
-    const rawHits = batches.flat();
+    const batches = await mapWithConcurrency(SOURCES, SEARCH_CONCURRENCY, checkSource);
+    const failures = batches.flatMap((batch) => batch.error ? [batch.error] : []);
+    if (failures.length === SOURCES.length) throw new Error(failures.join("; "));
+    const rawHits = batches.flatMap((batch) => batch.hits);
     const dedupedHits: SearchHit[] = [];
     const seenKeys = new Set<string>();
     for (const hit of rawHits) {
@@ -406,8 +340,9 @@ export async function runDiscoverySweep({ triggerType, force = false }: { trigge
 
     const { error: completeError } = await supabase.from("discovery_runs").update({
       status: "completed",
+      error_message: failures.length ? `Partial coverage: ${failures.join("; ")}` : null,
       completed_at: now,
-      queries_count: SEARCH_PLANS.length,
+      queries_count: SOURCES.length,
       results_count: dedupedHits.length,
       new_candidates: newCandidates,
       duplicate_candidates: duplicateCandidates,
@@ -417,7 +352,7 @@ export async function runDiscoverySweep({ triggerType, force = false }: { trigge
     return {
       runId,
       status: "completed",
-      queriesCount: SEARCH_PLANS.length,
+      queriesCount: SOURCES.length,
       resultsCount: dedupedHits.length,
       newCandidates,
       duplicateCandidates,
