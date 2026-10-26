@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { runDiscoverySweep, hasDiscoverySearchConfig } from "@/lib/research/discovery";
+import { runDiscoverySweep } from "@/lib/research/discovery";
 import { getResearchAdminSession, hasResearchServerConfig } from "@/lib/research/server";
 
 export const runtime = "nodejs";
@@ -9,9 +9,7 @@ export async function POST() {
   if (!hasResearchServerConfig()) {
     return NextResponse.json({ error: "Research server credentials are not configured." }, { status: 503 });
   }
-  if (!hasDiscoverySearchConfig()) {
-    return NextResponse.json({ error: "Discovery search is installed but DISCOVERY_SEARCH_API_KEY is not configured." }, { status: 503 });
-  }
+
 
   const admin = await getResearchAdminSession();
   if (!admin.configured) {
