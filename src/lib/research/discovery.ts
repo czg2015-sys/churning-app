@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { createResearchAdminClient } from "@/lib/research/server";
 
 const SEARCH_TIMEOUT_MS = 10_000;
-const DISCOVERY_INTERVAL_DAYS = 14;
+const DISCOVERY_INTERVAL_DAYS = 1;
 const SEARCH_CONCURRENCY = 3;
 const RESULTS_PER_QUERY = 20;
 
@@ -255,7 +255,7 @@ async function latestCompletedRun() {
 
 function nextEligibleAtFrom(run: { completed_at: string | null } | null) {
   if (!run?.completed_at) return null;
-  return new Date(new Date(run.completed_at).getTime() + DISCOVERY_INTERVAL_DAYS * 86_400_000).toISOString();
+  return new Date(Date.parse(run.completed_at.slice(0, 10) + "T00:00:00.000Z") + DISCOVERY_INTERVAL_DAYS * 86_400_000).toISOString();
 }
 
 async function runningDiscovery() {

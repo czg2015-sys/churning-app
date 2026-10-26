@@ -39,7 +39,7 @@ export async function DiscoveryPanel() {
           <span className="kicker">BIWEEKLY DISCOVERY ENGINE</span>
           <h2>Find offers we do not know about yet</h2>
         </div>
-        <p>Every 14 days Churning searches multiple offer categories. New discoveries stay in this private queue until an official source and research review are completed.</p>
+        <p>Every day Churning searches multiple offer categories. New discoveries stay in this private queue until an official source and research review are completed.</p>
       </div>
 
       <section className={styles.runSummary}>
@@ -54,7 +54,7 @@ export async function DiscoveryPanel() {
           <ShieldCheck size={18} />
           <div>
             <strong>The discovery pipeline is installed but web search is not active yet.</strong>
-            <span>Add the server-only <code>DISCOVERY_SEARCH_API_KEY</code> in Vercel. The rest of the pipeline and the 14-day scheduling gate are already installed.</span>
+            <span>Add the server-only <code>DISCOVERY_SEARCH_API_KEY</code> in Vercel. The rest of the pipeline and the daily scheduling gate are already installed.</span>
           </div>
         </section>
       ) : null}

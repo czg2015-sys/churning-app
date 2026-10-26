@@ -16,8 +16,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Research Agent server credentials are not configured." }, { status: 503 });
   }
 
-  const schedule = request.headers.get("x-vercel-cron-schedule");
-  const scope = schedule === "0 16 * * 1" ? "full" : "expiring";
+  const scope = "full" as const;
   const result = await runResearchScan({ triggerType: "cron", scope });
   return NextResponse.json({ ...result, scope }, { status: result.status === "failed" ? 500 : 200 });
 }
