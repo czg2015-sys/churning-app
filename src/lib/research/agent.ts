@@ -400,7 +400,7 @@ async function safeFetch(url: string) {
   throw new Error("Too many redirects while checking the official source.");
 }
 
-async function fetchOfficialPage(url: string): Promise<PageScan> {
+export async function fetchOfficialPage(url: string): Promise<PageScan> {
   try {
     const response = await safeFetch(url);
     const finalUrl = response.url || url;
