@@ -3,7 +3,7 @@ import { runResearchScan } from "@/lib/research/agent";
 import { getResearchAdminSession, hasResearchServerConfig } from "@/lib/research/server";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function POST() {
   if (!hasResearchServerConfig()) {
