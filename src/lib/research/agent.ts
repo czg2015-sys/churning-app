@@ -452,7 +452,7 @@ export async function fetchOfficialPage(url: string): Promise<PageScan> {
       extractedTerms,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = error instanceof Error ? error.message : (typeof error === "object" && error !== null ? JSON.stringify(error) : String(error));
     const unsafe = /HTTPS|private|internal|network address/i.test(message);
     return {
       fetchStatus: unsafe ? "unsafe_url" : "network_error",
