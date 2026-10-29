@@ -9,7 +9,7 @@ function getResearchSecretKey() {
     process.env.SUPABASE_SECRET_KEY ||
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     ""
-  ).trim();
+  ).replace(/\s+/g, "");
 }
 
 export function getResearchAdminEmails() {
