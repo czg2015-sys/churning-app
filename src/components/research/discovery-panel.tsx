@@ -22,11 +22,6 @@ function durationLabel(days: number | null) {
   return `${days} days`;
 }
 
-function nextSweepDate(completedAt: string | null) {
-  if (!completedAt) return "Ready for first check";
-  return formatDate(new Date(new Date(completedAt).getTime() + 1 * 86_400_000).toISOString());
-}
-
 export async function DiscoveryPanel() {
   const discovery = await getDiscoveryDashboardData();
   const latestCompleted = discovery.runs.find((run) => run.status === "completed") || null;
@@ -39,15 +34,23 @@ export async function DiscoveryPanel() {
           <span className="kicker">FREE OFFICIAL-PAGE CHECKS</span>
           <h2>Check additional bank products</h2>
         </div>
-        <p>Checks a curated list of official bank pages daily, with no paid search API. This is not a whole-web search. New candidates stay private until their terms and eligibility have been reviewed.</p>
+        <p>Checks official pages for all live offers, additional banks, and linked promotions daily, with no paid search API. This is not a whole-web search. New candidates stay private until their terms and eligibility have been reviewed.</p>
       </div>
 
       <section className={styles.runSummary}>
-        <div><Search size={17} /><span>Next discovery sweep</span></div>
-        <strong>{discovery.configured ? nextSweepDate(latestCompleted?.completed_at || null) : "Search key required"}</strong>
+        <div><Search size={17} /><span>Daily discovery schedule</span></div>
+        <strong>{discovery.configured ? "16:30 UTC daily" : "Search key required"}</strong>
         <span>{latestCompleted ? `Last completed ${formatDate(latestCompleted.completed_at)}` : "No completed discovery sweep yet"}</span>
         <RunDiscoverySweepButton configured={discovery.configured} />
       </section>
+
+      {discovery.runs[0] ? <section className={styles.guardrail}>
+        <Search size={18} />
+        <div><strong>Latest run: {discovery.runs[0].status}</strong>
+          <span>{discovery.runs[0].queries_count} pages checked · {discovery.runs[0].new_candidates} new candidates · {formatDate(discovery.runs[0].started_at)}</span>
+          {discovery.runs[0].error_message ? <p>{discovery.runs[0].error_message}</p> : null}
+        </div>
+      </section> : null}
 
       <section className={styles.metrics}>
         <article><span>DISCOVERED</span><strong>{discovery.metrics.totalCandidates}</strong><small>recent candidate records</small></article>

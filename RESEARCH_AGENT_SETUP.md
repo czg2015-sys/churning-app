@@ -14,8 +14,8 @@
 - A first baseline, a material change, a stored-term mismatch, or repeated unreachable source puts the opportunity on Hold.
 - Research Center cannot approve a fetched baseline while mismatch flags/material changes remain unresolved.
 - An unchanged page can refresh `last_verified_at` only when its exact page hash was previously approved and no term mismatch is present.
-- Weekly full scan: Monday at 16:00 UTC.
-- Daily targeted scan: offers with a stored expiration date in the next 14 days.
+- Daily full scan: all live offers at 16:15 UTC.
+- Daily discovery: 16:30 UTC, using official pages and one level of related offer links.
 - Does not bypass bot protection, CAPTCHAs, or blocked bank pages.
 
 ### Safety / research standard
@@ -82,6 +82,6 @@ Keep these server-only values configured:
 Never prefix those secrets with `NEXT_PUBLIC_`.
 
 ## Important limitation
-V1.1 monitors/re-checks opportunities already in Churning. It still does **not** discover brand-new offers across the web. Discovery is Research Agent V2 and should use a search provider plus the same Hold -> Review -> Research Verified pipeline.
+Daily discovery now combines seven curated source/category entries with every live opportunity URL and follows up to 18 additional same-host promotional pages. It covers HYSA, checking/savings bonuses, debit rewards, and optional credit-card bonuses. No search/AI API is used. New findings stay in the private review queue; failed or blocked sources are reported. Coverage is limited to these banks and their linked pages, not the whole web. See DAILY_RESEARCH.md for operation and validation.
 
 The `alerts_opt_in` preference is stored now, but actual email/push notification delivery still needs a notification provider in a later phase. In-app tracker warnings are included now.

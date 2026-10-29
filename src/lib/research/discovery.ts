@@ -4,8 +4,11 @@ import { createHash } from "node:crypto";
 import { fetchOfficialPage } from "@/lib/research/agent";
 import { createResearchAdminClient } from "@/lib/research/server";
 
+import { canonicalizeUrl, isDiscoveryCategory, offerSignal, SEED_SOURCES, uniqueSources, type DiscoveryCategory, type DiscoverySource } from "./discovery-core";
+
 const DISCOVERY_INTERVAL_DAYS = 1;
 const SEARCH_CONCURRENCY = 3;
+const MAX_LINKED_PAGES = 18;
 
 export type DiscoveryTrigger = "manual" | "cron";
 export type DiscoveryStatus = "completed" | "failed" | "skipped" | "already_running";
@@ -21,8 +24,6 @@ export type DiscoveryRunResult = {
   nextEligibleAt?: string | null;
 };
 
-type DiscoveryCategory = "hysa" | "savings_bonus" | "checking_bonus" | "debit_spend" | "credit_card_bonus";
-
 type SearchHit = {
   query: string;
   category: DiscoveryCategory;
@@ -30,6 +31,7 @@ type SearchHit = {
   url: string;
   description: string;
   rank: number;
+  institution: string;
 };
 
 type ExistingCandidate = {
@@ -47,13 +49,8 @@ type ExistingOpportunity = {
   institution: string;
   product_name: string;
   official_url: string;
+  category: string;
 };
-
-const SOURCES: { institution: string; url: string; category: DiscoveryCategory }[] = [
-  { institution: "American Express", url: "https://www.americanexpress.com/en-us/banking/online-savings/high-yield-savings-account/", category: "hysa" },
-  { institution: "Synchrony Bank", url: "https://www.synchrony.com/banking/products/high-yield-savings", category: "hysa" },
-  { institution: "Capital One", url: "https://www.capitalone.com/bank/savings-accounts/online-performance-savings-account/", category: "hysa" },
-];
 
 const NON_OFFICIAL_DOMAINS = [
   "bankrate.com",
@@ -78,21 +75,6 @@ const NON_OFFICIAL_DOMAINS = [
 // Direct official-page checks never call a paid search provider.
 export function hasDiscoverySearchConfig() { return true; }
 
-function canonicalizeUrl(raw: string) {
-  try {
-    const url = new URL(raw);
-    url.hash = "";
-    for (const key of Array.from(url.searchParams.keys())) {
-      if (/^(utm_|gclid|fbclid|ref|source|campaign|ef_id)/i.test(key)) url.searchParams.delete(key);
-    }
-    url.hostname = url.hostname.toLowerCase().replace(/^www\./, "");
-    url.pathname = url.pathname.replace(/\/+$/, "") || "/";
-    return url.toString();
-  } catch {
-    return raw.trim();
-  }
-}
-
 function hostnameFor(raw: string) {
   try {
     return new URL(raw).hostname.toLowerCase().replace(/^www\./, "");
@@ -113,6 +95,7 @@ function possibleOfficialSource(hit: SearchHit) {
 }
 
 function guessInstitution(hit: SearchHit) {
+  if (hit.institution) return hit.institution;
   const title = hit.title.replace(/\s+[|–—-]\s+.*$/, "").trim();
   if (title && title.length <= 70) return title;
   const domain = hostnameFor(hit.url).split(".")[0] || "";
@@ -156,16 +139,20 @@ function detectBenefitDuration(hit: SearchHit) {
   return { days: Math.round(days), text: duration[0] };
 }
 
-async function checkSource(source: typeof SOURCES[number]) {
-  const page = await fetchOfficialPage(source.url);
-  if (page.fetchStatus !== "ok") return { hits: [] as SearchHit[], error: `${source.institution}: ${page.fetchStatus}` };
-  const signal = /apy|annual percentage yield|bonus|cash back|direct deposit/i.exec(page.normalizedText);
-  if (!signal) return { hits: [] as SearchHit[], error: `${source.institution}: no offer terms found` };
-  return { error: null, hits: [{
+async function checkSource(source: DiscoverySource, cache: Map<string, ReturnType<typeof fetchOfficialPage>>) {
+  // Shared pages for multiple categories are fetched once per sweep.
+  if (!cache.has(source.url)) cache.set(source.url, fetchOfficialPage(source.url));
+  const page = await cache.get(source.url)!;
+  const links = page.fetchStatus === "ok" ? (page.offerLinks || []) : [];
+  if (page.fetchStatus !== "ok") return { hits: [] as SearchHit[], links, source, error: `${source.institution}: ${page.fetchStatus}` };
+  const signal = offerSignal(page.normalizedText, source.category);
+  if (!signal) return { hits: [] as SearchHit[], links, source, error: `${source.institution} (${source.category}): no matching offer terms found` };
+  return { error: null, links, source, hits: [{
     query: `Official page: ${source.institution}`,
+    institution: source.institution,
     category: source.category,
     title: page.pageTitle || source.institution,
-    url: source.url,
+    url: page.finalUrl || source.url,
     description: page.normalizedText.slice(Math.max(0, signal.index - 100), signal.index + 1100),
     rank: 1,
   }] };
@@ -217,7 +204,7 @@ async function runningDiscovery() {
 
 function matchesExistingOpportunity(hit: SearchHit, opportunities: ExistingOpportunity[]) {
   const candidateUrl = canonicalizeUrl(hit.url);
-  return opportunities.find((opportunity) => canonicalizeUrl(opportunity.official_url) === candidateUrl) || null;
+  return opportunities.find((opportunity) => opportunity.category === hit.category && canonicalizeUrl(opportunity.official_url) === candidateUrl) || null;
 }
 
 export async function runDiscoverySweep({ triggerType, force = false }: { triggerType: DiscoveryTrigger; force?: boolean }): Promise<DiscoveryRunResult> {
@@ -243,9 +230,28 @@ export async function runDiscoverySweep({ triggerType, force = false }: { trigge
   const runId = run.id as string;
 
   try {
-    const batches = await mapWithConcurrency(SOURCES, SEARCH_CONCURRENCY, checkSource);
+    const { data: opportunities, error: opportunityError } = await supabase
+      .from("opportunities").select("id,institution,product_name,official_url,category").eq("offer_status", "live");
+    if (opportunityError) throw opportunityError;
+    const knownOpportunities = (opportunities || []) as ExistingOpportunity[];
+    const sources = uniqueSources([
+      ...SEED_SOURCES,
+      ...knownOpportunities.flatMap(row => isDiscoveryCategory(row.category)
+        ? [{ institution: row.institution, url: row.official_url, category: row.category }] : []),
+    ]);
+    const cache = new Map<string, ReturnType<typeof fetchOfficialPage>>();
+    const deadline = Date.now() + 200_000;
+    const check = (source: DiscoverySource) => Date.now() < deadline
+      ? checkSource(source, cache)
+      : Promise.resolve({ hits: [] as SearchHit[], links: [] as string[], source, error: `${source.institution}: scan time budget reached` });
+    const batches = await mapWithConcurrency(sources, SEARCH_CONCURRENCY, check);
+    const knownKeys = new Set(sources.map(source => candidateKey(source.category, source.url)));
+    const linkedSources = uniqueSources(batches.flatMap(batch => batch.links.map(url => ({ ...batch.source, url }))))
+      .filter(source => !knownKeys.has(candidateKey(source.category, source.url))).slice(0, MAX_LINKED_PAGES);
+    batches.push(...await mapWithConcurrency(linkedSources, SEARCH_CONCURRENCY, check));
+    const checkedPages = sources.length + linkedSources.length;
     const failures = batches.flatMap((batch) => batch.error ? [batch.error] : []);
-    if (failures.length === SOURCES.length) throw new Error(failures.join("; "));
+    if (failures.length === checkedPages) throw new Error(failures.join("; "));
     const rawHits = batches.flatMap((batch) => batch.hits);
     const dedupedHits: SearchHit[] = [];
     const seenKeys = new Set<string>();
@@ -257,17 +263,11 @@ export async function runDiscoverySweep({ triggerType, force = false }: { trigge
     }
 
     const keys = dedupedHits.map((hit) => candidateKey(hit.category, hit.url));
-    const [{ data: existingRows, error: existingError }, { data: opportunities, error: opportunityError }] = await Promise.all([
-      keys.length
-        ? supabase.from("discovery_candidates").select("id,candidate_key,candidate_status,official_source_status,official_url,first_discovered_at,created_at").in("candidate_key", keys)
-        : Promise.resolve({ data: [], error: null }),
-      supabase.from("opportunities").select("id,institution,product_name,official_url").eq("offer_status", "live"),
-    ]);
+    const { data: existingRows, error: existingError } = keys.length
+      ? await supabase.from("discovery_candidates").select("id,candidate_key,candidate_status,official_source_status,official_url,first_discovered_at,created_at").in("candidate_key", keys)
+      : { data: [], error: null };
     if (existingError) throw existingError;
-    if (opportunityError) throw opportunityError;
-
     const existingMap = new Map(((existingRows || []) as ExistingCandidate[]).map((row) => [row.candidate_key, row]));
-    const knownOpportunities = (opportunities || []) as ExistingOpportunity[];
     const now = new Date().toISOString();
 
     const candidateRows = dedupedHits.map((hit) => {
@@ -340,9 +340,9 @@ export async function runDiscoverySweep({ triggerType, force = false }: { trigge
 
     const { error: completeError } = await supabase.from("discovery_runs").update({
       status: "completed",
-      error_message: failures.length ? `Partial coverage: ${failures.join("; ")}` : null,
+      error_message: failures.length ? `Partial coverage: ${failures.join("; ")}`.slice(0, 2000) : null,
       completed_at: now,
-      queries_count: SOURCES.length,
+      queries_count: checkedPages,
       results_count: dedupedHits.length,
       new_candidates: newCandidates,
       duplicate_candidates: duplicateCandidates,
@@ -352,11 +352,12 @@ export async function runDiscoverySweep({ triggerType, force = false }: { trigge
     return {
       runId,
       status: "completed",
-      queriesCount: SOURCES.length,
+      queriesCount: checkedPages,
       resultsCount: dedupedHits.length,
       newCandidates,
       duplicateCandidates,
-      nextEligibleAt: new Date(Date.now() + DISCOVERY_INTERVAL_DAYS * 86_400_000).toISOString(),
+      message: failures.length ? `Partial coverage: ${failures.join("; ")}` : undefined,
+      nextEligibleAt: nextEligibleAtFrom({ completed_at: now }),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

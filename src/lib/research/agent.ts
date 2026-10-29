@@ -1,5 +1,6 @@
 import "server-only";
 
+import { extractOfferLinks } from "./discovery-core";
 import { createHash } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
@@ -98,6 +99,7 @@ type PageScan = {
   finalUrl: string | null;
   pageTitle: string | null;
   normalizedText: string;
+  offerLinks?: string[];
   contentHash: string | null;
   contentLength: number;
   excerpt: string | null;
@@ -288,6 +290,7 @@ function buildMismatchFlags(opportunity: LiveOpportunity, text: string) {
 }
 
 function num(value: unknown) {
+  if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
@@ -363,6 +366,7 @@ function isPrivateIp(ip: string) {
 
 async function validatePublicHttpsUrl(rawUrl: string) {
   const parsed = new URL(rawUrl);
+  if (parsed.username || parsed.password || (parsed.port && parsed.port !== "443")) throw new Error("Unsafe URL credentials or port.");
   if (parsed.protocol !== "https:") throw new Error("Only public HTTPS official URLs may be researched.");
   const hostname = parsed.hostname.toLowerCase();
   if (!hostname || hostname === "localhost" || hostname.endsWith(".local") || hostname.endsWith(".internal")) {
@@ -377,6 +381,7 @@ async function validatePublicHttpsUrl(rawUrl: string) {
 }
 
 async function safeFetch(url: string) {
+  const signal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
   let current = (await validatePublicHttpsUrl(url)).toString();
   for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect += 1) {
     const response = await fetch(current, {
@@ -387,7 +392,7 @@ async function safeFetch(url: string) {
         accept: "text/html,application/xhtml+xml",
         "accept-language": "en-US,en;q=0.9",
       },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      signal,
     });
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       const location = response.headers.get("location");
@@ -405,7 +410,21 @@ export async function fetchOfficialPage(url: string): Promise<PageScan> {
     const response = await safeFetch(url);
     const finalUrl = response.url || url;
     const httpStatus = response.status;
-    const html = await response.text();
+    const reader = response.body?.getReader();
+    const chunks: Uint8Array[] = [];
+    let bytes = 0;
+    if (reader) {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          bytes += value.byteLength;
+          if (bytes > 2_000_000) throw new Error("Official page exceeds the 2 MB research limit.");
+          chunks.push(value);
+        }
+      } finally { await reader.cancel(); }
+    }
+    const html = Buffer.concat(chunks).toString("utf8");
     const pageTitle = extractTitle(html);
     const normalizedText = normalizeHtml(html);
     const lower = normalizedText.toLowerCase();
@@ -424,6 +443,7 @@ export async function fetchOfficialPage(url: string): Promise<PageScan> {
       finalUrl,
       pageTitle,
       normalizedText,
+      offerLinks: fetchStatus === "ok" ? extractOfferLinks(html, finalUrl) : [],
       contentHash,
       contentLength: normalizedText.length,
       excerpt: normalizedText ? normalizedText.slice(0, MAX_EXCERPT_LENGTH) : null,
