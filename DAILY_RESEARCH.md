@@ -16,7 +16,7 @@ The initial source set is 28 bank/category entries with the current 21 live offe
 
 Discovery follows only one level of HTTPS links on the same host, excludes application/login/business/loan URLs, and checks the destination's content before saving a candidate. Offer/referral codes are retained because they may affect eligibility. Generic direct-deposit text alone no longer counts as a bonus. The inferred category and extracted snippet still require human review, especially on pages listing multiple products.
 
-New discoveries are private candidates, not published recommendations. Discovery does not write rates or bonuses into live offers. Existing monitoring retains Hold/review behavior and only refreshes a previously approved unchanged page. Partial failures appear in the Research Center's latest-run panel; blocked sources are never bypassed. No whole-web or exhaustive coverage claim is made.
+In addition to bank-owned sources, each sweep also checks Doctor of Credit\u2019s published Bank Accounts RSS feed for **headline-only leads**. Only article titles and links enter the private queue; no full article text is republished and no third-party item is ever called an official bank source. Feed errors are reported separately without making an official page appear verified.\n\nNew discoveries are private candidates, not published recommendations. Discovery does not write rates or bonuses into live offers. Existing monitoring retains Hold/review behavior and only refreshes a previously approved unchanged page. Partial failures appear in the Research Center's latest-run panel; blocked sources are never bypassed. No whole-web or exhaustive coverage claim is made.
 
 ## Runtime limits
 
