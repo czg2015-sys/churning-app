@@ -22,7 +22,7 @@ export default async function HistoryPage() {
   const uid = claims?.claims?.sub;
   if (!uid) redirect("/auth?next=/history");
   const [{ data: missions }, { data: bankHistory }] = await Promise.all([
-    supabase.from("missions").select("id,institution,title,status,expected_bonus,opened_at,updated_at,mission_steps(*)").eq("user_id", uid).in("status", ["complete", "cancelled"]).order("updated_at", { ascending: false }),
+    supabase.from("missions").select("*,mission_steps(*)").eq("user_id", uid).in("status", ["complete", "cancelled"]).order("updated_at", { ascending: false }),
     supabase.from("account_history").select("*").eq("user_id", uid).order("created_at", { ascending: false }),
   ]);
   const pastMissions = (missions || []) as Mission[];
