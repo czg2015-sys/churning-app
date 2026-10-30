@@ -112,11 +112,16 @@ export function AddToPlanButton({
 
     // Recheck current account commitments when the user actually submits,
     // so stale comparison data cannot silently double-allocate a paycheck.
-    const [{ data: latestProfile }, { data: latestMissions }, { data: latestHistory }] = await Promise.all([
+    const [{ data: latestProfile, error: profileReadError }, { data: latestMissions, error: missionReadError }, { data: latestHistory, error: historyReadError }] = await Promise.all([
       supabase.from("financial_profiles").select("*").eq("user_id", userId).maybeSingle(),
       supabase.from("missions").select("*, mission_steps(*), opportunity:opportunities(*)").eq("user_id", userId),
       supabase.from("account_history").select("*").eq("user_id", userId),
     ]);
+    if (profileReadError || missionReadError || historyReadError) {
+      setError("Could not verify your current bank history and commitments. Please refresh and try again.");
+      setSaving(false);
+      return;
+    }
     if (!latestProfile) {
       setError("Update your financial answers before adding another offer.");
       setSaving(false);
