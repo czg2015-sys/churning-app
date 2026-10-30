@@ -702,6 +702,19 @@ export function PlanStrategyHub({
               </div>
             );
           })}
+          <details className="simple-dd-alternatives">
+            <summary>Other DD offers ({ranked.filter(r => r.item.category === "checking_bonus" && numberValue(r.item.direct_deposit_required) > 0 && !ddIds.includes(r.item.id)).length}) · compare alternatives</summary>
+            <p>The roadmap above shows only offers that fit a new paycheck allocation. These are alternatives to compare, not extra offers you can automatically run at the same time.</p>
+            {ranked.filter(r => r.item.category === "checking_bonus" && numberValue(r.item.direct_deposit_required) > 0 && !ddIds.includes(r.item.id)).slice(0, 10).map(r => {
+              const needed = monthlyDdNeed(r.item);
+              const fits = Number.isFinite(needed) && needed <= monthlyDdCapacity + .01;
+              return <div className="simple-dd-alternative" key={r.item.id}>
+                <span><strong>{r.item.institution} · {money.format(numberValue(r.item.bonus_amount))}</strong><small>{r.item.product_name}</small></span>
+                <em>{fits ? "Alternative · check terms" : "Paycheck capacity too low for new DD"}</em>
+              </div>;
+            })}
+            <a className="simple-dd-all-link" href="#benefit-rankings">Compare all bank bonus offers below <ArrowUpRight size={12}/></a>
+          </details>
         </section>
 
         <div id="savings-decision" className="savings-decision-group">
