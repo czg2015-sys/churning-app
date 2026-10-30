@@ -9,7 +9,7 @@ export function isBonusOffer(item: Opportunity) {
 }
 
 function normalizeInstitution(value: string | null | undefined) {
-  return (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return (value || "").toLowerCase().replace(/j\.?p\.?\s*morgan\s+chase/g, "chase").replace(/\b(bank|national association|credit union|incorporated)\b/g, "").replace(/[^a-z0-9]/g, "");
 }
 
 export function hasPriorBonusHistory(item: Opportunity, history: AccountHistory[]) {
