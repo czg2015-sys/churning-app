@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, ShieldCheck, UserRound } from "lucide-react";
+import { BarChart3, History, ShieldCheck, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 
 export async function SiteHeader() {
@@ -18,6 +18,7 @@ export async function SiteHeader() {
           <Link href={signedIn ? "/questionnaire" : "/auth?next=/questionnaire"}>Start Here</Link>
           <Link href="/my-plan"><BarChart3 size={14} /> My Plan</Link>
           <Link href="/opportunities">Opportunities</Link>
+          {signedIn ? <Link href="/history"><History size={14} /> History</Link> : null}
           <Link href="/research-standards"><ShieldCheck size={14} /> Safety</Link>
         </nav>
         <div className="header-actions">

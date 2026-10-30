@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowUpRight, CreditCard, Settings2 } from "lucide-react";
+import { ArrowUpRight, CreditCard, Settings2, History } from "lucide-react";
 import { PlanStrategyHub } from "@/components/plan-strategy-hub";
 import { TopOpportunityTable } from "@/components/top-opportunity-table";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -46,6 +46,7 @@ export default async function MyPlanPage() {
         <div className="plan-topbar">
           <div><span className="workspace-dot" /> My Plan · saved to your account</div>
           <div className="plan-topbar-actions">
+            <Link href="/history" className="plan-history-link"><History size={14} /> History</Link>
             <Link href="/opportunities">Compare all options <ArrowUpRight size={13} /></Link>
             {typedProfile.card_helper_opt_in ? <Link href="/cards"><CreditCard size={14} /> Cards & Spending</Link> : null}
             <Link href="/questionnaire"><Settings2 size={14} /> Update answers</Link>
@@ -62,7 +63,7 @@ export default async function MyPlanPage() {
           stateCode={stateCode}
           addedOpportunityIds={addedOpportunityIds}
         />
-        <TopOpportunityTable opportunities={typedOpportunities} profile={typedProfile} usedBanks={usedBanks} stateCode={stateCode} heading="Browse the best options by category." />
+        <TopOpportunityTable opportunities={typedOpportunities} profile={typedProfile} usedBanks={usedBanks} history={typedHistory} missions={typedMissions} stateCode={stateCode} heading="Browse the best options by category." />
       </div>
     </main>
   );

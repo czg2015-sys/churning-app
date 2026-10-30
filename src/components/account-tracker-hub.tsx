@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CalendarClock, CheckCircle2, ChevronRight, Plus, Save, ShieldAlert, Wallet, X } from "lucide-react";
 import { RewardTracker } from "@/components/reward-tracker";
+import { MissionQuickActions } from "@/components/mission-quick-actions";
 import { money, numberValue } from "@/lib/plan-math";
 import { createClient } from "@/lib/supabase/client";
 import type { FinancialProfile, Mission, Opportunity, TrackedCashAccount } from "@/lib/types";
@@ -514,6 +515,7 @@ export function AccountTrackerHub({
                     <label>Current balance in this account ($)<input type="number" min={0} step="0.01" value={editMissionBalance} onChange={(e) => setEditMissionBalance(e.target.value)} placeholder={String(numberValue(selectedMission.amount_committed))}/></label>
                     <button type="button" disabled={saving || editMissionBalance === ""} onClick={() => void updateMissionBalance(selectedMission, Number(editMissionBalance))}><Save size={14}/> Update balance</button>
                   </> : <small>No manual amount is needed for this tracker.</small>}
+                  <MissionQuickActions mission={selectedMission} onDone={() => setSelectedMissionId(null)} />
                   {error ? <p className="cash-account-error">{error}</p> : null}
                 </div>
                 <RewardTracker missions={[selectedMission]}/>

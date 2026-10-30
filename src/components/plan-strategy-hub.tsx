@@ -264,7 +264,15 @@ export function PlanStrategyHub({
   const effectiveProfile = useMemo(() =>
     accountConfirmedApy == null ? profile : { ...profile, current_hysa_apy: accountConfirmedApy },
     [profile, accountConfirmedApy]);
-  const ranked = useMemo(() => rankMatches(opportunities, effectiveProfile, usedBanks, stateCode), [opportunities, effectiveProfile, usedBanks, stateCode]);
+  // A reward the user deliberately left should not immediately return to
+  // the recommended roadmap. It remains available in the full comparison
+  // table, and can be reconsidered if a newer active tracker is added.
+  const leftIds = useMemo(() => {
+    const active = new Set(missions.filter(m => !["complete", "cancelled"].includes(m.status)).map(m => m.opportunity_id));
+    return new Set(missions.filter(m => m.status === "cancelled" && m.opportunity_id && !active.has(m.opportunity_id)).map(m => m.opportunity_id));
+  }, [missions]);
+  const ranked = useMemo(() => rankMatches(opportunities, effectiveProfile, usedBanks, stateCode)
+    .filter(result => !leftIds.has(result.item.id)), [opportunities, effectiveProfile, usedBanks, stateCode, leftIds]);
   const initialSort = stored.sortMode || (profile.ranking_preference === "profit" ? "profit" : profile.ranking_preference === "ease" ? "ease" : profile.ranking_preference === "liquidity" ? "liquidity" : "overall");
   const [sortMode, setSortMode] = useState<SortMode>(initialSort);
   const [timelineLane, setTimelineLane] = useState<"all" | "dd" | "savings" | "hysa">("all");

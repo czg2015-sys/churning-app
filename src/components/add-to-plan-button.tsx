@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { FormattedNumberInput } from "@/components/formatted-number-input";
 import { benefitDurationLabel, categoryLabel, money, numberValue, timelineFromOpenedDate, trackedInterestEstimate, verificationAgeDays } from "@/lib/plan-math";
-import type { Opportunity, PlanStartDetails } from "@/lib/types";
+import type { AccountHistory, FinancialProfile, Mission, Opportunity, PlanStartDetails } from "@/lib/types";
+import { availabilityWarnings, uncommittedCash } from "@/lib/plan-availability";
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -27,6 +28,7 @@ export function AddToPlanButton({
   guestMode = false,
   onGuestAdd,
   alreadyAdded = false,
+  disabledReason,
   allowGuestSimulationOnHold = false,
   allowPlanningOnHold = false,
 }: {
@@ -35,6 +37,7 @@ export function AddToPlanButton({
   guestMode?: boolean;
   onGuestAdd?: (opportunity: Opportunity, details: PlanStartDetails) => void;
   alreadyAdded?: boolean;
+  disabledReason?: string;
   allowGuestSimulationOnHold?: boolean;
   allowPlanningOnHold?: boolean;
 }) {
@@ -104,6 +107,35 @@ export function AddToPlanButton({
       setSaving(false);
       setOpen(false);
       router.push("/my-plan");
+      return;
+    }
+
+    // Recheck current account commitments when the user actually submits,
+    // so stale comparison data cannot silently double-allocate a paycheck.
+    const [{ data: latestProfile, error: profileReadError }, { data: latestMissions, error: missionReadError }, { data: latestHistory, error: historyReadError }] = await Promise.all([
+      supabase.from("financial_profiles").select("*").eq("user_id", userId).maybeSingle(),
+      supabase.from("missions").select("*, mission_steps(*), opportunity:opportunities(*)").eq("user_id", userId),
+      supabase.from("account_history").select("*").eq("user_id", userId),
+    ]);
+    if (profileReadError || missionReadError || historyReadError) {
+      setError("Could not verify your current bank history and commitments. Please refresh and try again.");
+      setSaving(false);
+      return;
+    }
+    if (!latestProfile) {
+      setError("Update your financial answers before adding another offer.");
+      setSaving(false);
+      return;
+    }
+    const conflicts = availabilityWarnings(opportunity, latestProfile as FinancialProfile, (latestMissions || []) as Mission[], (latestHistory || []) as AccountHistory[]);
+    if (["hysa", "savings_bonus", "cd"].includes(opportunity.category) && details.amountCommitted > uncommittedCash(latestProfile as FinancialProfile, (latestMissions || []) as Mission[]) + 0.01) {
+      setError("This would commit more savings cash than you have available after your other active offers. Reduce the amount or stop tracking an older offer first.");
+      setSaving(false);
+      return;
+    }
+    if (conflicts.length > 0) {
+      setError(conflicts.join(" "));
+      setSaving(false);
       return;
     }
 
@@ -271,7 +303,7 @@ export function AddToPlanButton({
     && verificationAge <= 7;
   const simulationOnly = !safetyCleared && guestMode && allowGuestSimulationOnHold;
   const planningWithPendingResearch = !safetyCleared && allowPlanningOnHold;
-  const canOpen = safetyCleared || simulationOnly || planningWithPendingResearch;
+  const canOpen = (safetyCleared || simulationOnly || planningWithPendingResearch) && !disabledReason;
 
   return (
     <div className={compact ? "add-plan-wrap compact" : "add-plan-wrap"}>
@@ -280,9 +312,9 @@ export function AddToPlanButton({
         type="button"
         onClick={() => !displayedAdded && canOpen && setOpen(true)}
         disabled={displayedAdded || !canOpen}
-        title={!safetyCleared && !simulationOnly && !planningWithPendingResearch ? "This offer has not cleared Churning’s current confidence, safety, and freshness checks." : simulationOnly ? "Guest simulation only — this offer is still on research hold." : planningWithPendingResearch ? "Add this candidate to your plan for tracking and final verification; this is not a recommendation to open it." : undefined}
+        title={disabledReason || (!safetyCleared && !simulationOnly && !planningWithPendingResearch ? "This offer has not cleared Churning’s current confidence, safety, and freshness checks." : simulationOnly ? "Guest simulation only — this offer is still on research hold." : planningWithPendingResearch ? "Add this candidate to your plan for tracking and final verification; this is not a recommendation to open it." : undefined)}
       >
-        {displayedAdded ? <><Check size={16} /> Added ✓</> : simulationOnly ? <><Sparkles size={16} /> Simulate tracker</> : planningWithPendingResearch ? <><Plus size={16} /> Add for review</> : !safetyCleared ? <><ShieldCheck size={16} /> Research hold</> : <><Plus size={16} /> Add to My Plan</>}
+        {displayedAdded ? <><Check size={16} /> Added ✓</> : disabledReason ? <><ShieldCheck size={14} /> Not eligible now</> : simulationOnly ? <><Sparkles size={16} /> Simulate tracker</> : planningWithPendingResearch ? <><Plus size={16} /> Add for review</> : !safetyCleared ? <><ShieldCheck size={16} /> Research hold</> : <><Plus size={16} /> Add to My Plan</>}
       </button>
       {error && <small className="add-plan-error">{error}</small>}
 
