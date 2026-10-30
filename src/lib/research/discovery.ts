@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { fetchOfficialPage } from "@/lib/research/agent";
 import { createResearchAdminClient } from "@/lib/research/server";
 import { parseBankAccountRss } from "./doctor-of-credit";
+import { extractExplicitBonusVariants } from "./offer-variants";
 
 import { canonicalizeUrl, categorizeLinkedSource, isDiscoveryCategory, offerSignal, SEED_SOURCES, uniqueSources, type DiscoveryCategory, type DiscoverySource } from "./discovery-core";
 
@@ -33,6 +34,9 @@ type SearchHit = {
   description: string;
   rank: number;
   institution: string;
+  offerKey?: string;
+  bonusAmount?: number;
+  productHint?: string;
 };
 
 type ExistingCandidate = {
@@ -51,6 +55,7 @@ type ExistingOpportunity = {
   product_name: string;
   official_url: string;
   category: string;
+  bonus_amount: number | string | null;
 };
 
 const NON_OFFICIAL_DOMAINS = [
@@ -107,8 +112,8 @@ function guessProductName(hit: SearchHit) {
   return hit.title.slice(0, 180) || null;
 }
 
-function candidateKey(category: DiscoveryCategory, rawUrl: string) {
-  return createHash("sha256").update(`${category}|${canonicalizeUrl(rawUrl)}`).digest("hex");
+function candidateKey(category: DiscoveryCategory, rawUrl: string, offerKey?: string) {
+  return createHash("sha256").update(`${category}|${canonicalizeUrl(rawUrl)}|${offerKey || "page"}`).digest("hex");
 }
 
 const discoveryDurationWords: Record<string, number> = {
@@ -146,6 +151,26 @@ async function checkSource(source: DiscoverySource, cache: Map<string, ReturnTyp
   const page = await cache.get(source.url)!;
   const links = page.fetchStatus === "ok" ? (page.offerLinks || []) : [];
   if (page.fetchStatus !== "ok") return { hits: [] as SearchHit[], links, source, error: `${source.institution}: ${page.fetchStatus}` };
+  // One official landing page can list several independently qualifying
+  // consumer promotions. Record each *explicitly labeled* bonus as a distinct
+  // private candidate, but never infer eligibility or automatically publish.
+  if (source.category === "checking_bonus" || source.category === "savings_bonus") {
+    const variants = extractExplicitBonusVariants(page.normalizedText, source.category);
+    if (variants.length >= 2) {
+      return { error: null, links, source, hits: variants.map((variant, index) => ({
+        query: "Official page: " + source.institution,
+        institution: source.institution,
+        category: source.category,
+        title: source.institution + " · " + variant.product + " — $" + variant.amount + " bonus (terms pending)",
+        url: page.finalUrl || source.url,
+        description: variant.excerpt,
+        rank: index + 1,
+        offerKey: variant.key,
+        bonusAmount: variant.amount,
+        productHint: variant.product,
+      })) };
+    }
+  }
   const signal = offerSignal(page.normalizedText, source.category);
   if (!signal) return { hits: [] as SearchHit[], links, source, error: `${source.institution} (${source.category}): no matching offer terms found` };
   return { error: null, links, source, hits: [{
@@ -259,7 +284,15 @@ async function runningDiscovery() {
 
 function matchesExistingOpportunity(hit: SearchHit, opportunities: ExistingOpportunity[]) {
   const candidateUrl = canonicalizeUrl(hit.url);
-  return opportunities.find((opportunity) => opportunity.category === hit.category && canonicalizeUrl(opportunity.official_url) === candidateUrl) || null;
+  return opportunities.find((opportunity) => {
+    if (opportunity.category !== hit.category || canonicalizeUrl(opportunity.official_url) !== candidateUrl) return false;
+    if (hit.offerKey) {
+      const amountMatches = Number(opportunity.bonus_amount) === hit.bonusAmount;
+      const productMatches = Boolean(hit.productHint && opportunity.product_name.toLowerCase().includes(hit.productHint.toLowerCase()));
+      return amountMatches && productMatches;
+    }
+    return true;
+  }) || null;
 }
 
 export async function runDiscoverySweep({ triggerType, force = false }: { triggerType: DiscoveryTrigger; force?: boolean }): Promise<DiscoveryRunResult> {
@@ -286,7 +319,7 @@ export async function runDiscoverySweep({ triggerType, force = false }: { trigge
 
   try {
     const { data: opportunities, error: opportunityError } = await supabase
-      .from("opportunities").select("id,institution,product_name,official_url,category").eq("offer_status", "live");
+      .from("opportunities").select("id,institution,product_name,official_url,category,bonus_amount").eq("offer_status", "live");
     if (opportunityError) throw opportunityError;
     const knownOpportunities = (opportunities || []) as ExistingOpportunity[];
     const sources = uniqueSources([
@@ -317,13 +350,13 @@ export async function runDiscoverySweep({ triggerType, force = false }: { trigge
     const dedupedHits: SearchHit[] = [];
     const seenKeys = new Set<string>();
     for (const hit of rawHits) {
-      const key = candidateKey(hit.category, hit.url);
+      const key = candidateKey(hit.category, hit.url, hit.offerKey);
       if (seenKeys.has(key)) continue;
       seenKeys.add(key);
       dedupedHits.push(hit);
     }
 
-    const keys = dedupedHits.map((hit) => candidateKey(hit.category, hit.url));
+    const keys = dedupedHits.map((hit) => candidateKey(hit.category, hit.url, hit.offerKey));
     const { data: existingRows, error: existingError } = keys.length
       ? await supabase.from("discovery_candidates").select("id,candidate_key,candidate_status,official_source_status,official_url,first_discovered_at,created_at").in("candidate_key", keys)
       : { data: [], error: null };
@@ -332,7 +365,7 @@ export async function runDiscoverySweep({ triggerType, force = false }: { trigge
     const now = new Date().toISOString();
 
     const candidateRows = dedupedHits.map((hit) => {
-      const key = candidateKey(hit.category, hit.url);
+      const key = candidateKey(hit.category, hit.url, hit.offerKey);
       const existing = existingMap.get(key);
       const matched = matchesExistingOpportunity(hit, knownOpportunities);
       const possibleOfficial = possibleOfficialSource(hit);
@@ -379,7 +412,7 @@ export async function runDiscoverySweep({ triggerType, force = false }: { trigge
 
     const idMap = new Map(savedCandidates.map((row) => [row.candidate_key, row.id]));
     const sightings = dedupedHits.map((hit) => {
-      const key = candidateKey(hit.category, hit.url);
+      const key = candidateKey(hit.category, hit.url, hit.offerKey);
       return {
         run_id: runId,
         candidate_id: idMap.get(key),
