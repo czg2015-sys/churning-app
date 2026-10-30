@@ -56,6 +56,8 @@ export function availabilityWarnings(item: Opportunity, profile: FinancialProfil
   const warnings: string[] = [];
   if (hasReceivedBankBonus(item, history, missions))
     warnings.push("You already received a bonus from this bank. Repeat eligibility needs to be verified; this offer is not available to add.");
+  if (item.category === "checking_bonus" && activeMissions(missions).some(m => m.opportunity?.category === "checking_bonus" && bankKey(m.institution) === bankKey(item.institution) && m.opportunity_id !== item.id))
+    warnings.push("You already track a consumer checking offer at this bank. Its checking promotions cannot be stacked.");
   if (isTracking(item, missions))
     warnings.push("Already in your active plan — open its tracker above to update progress.");
   const deadline = item.expires_at ? Date.parse(item.expires_at) : NaN;

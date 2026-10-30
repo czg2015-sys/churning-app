@@ -10,7 +10,7 @@ import type { Mission } from "@/lib/types";
 export function MissionQuickActions({ mission, onDone }: { mission: Mission; onDone?: () => void }) {
   const router = useRouter();
   const [action, setAction] = useState<"complete" | "leave" | null>(null);
-  const [receivedAmount, setReceivedAmount] = useState(String(numberValue(mission.expected_bonus)));
+  const [receivedAmount, setReceivedAmount] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -45,6 +45,7 @@ export function MissionQuickActions({ mission, onDone }: { mission: Mission; onD
         const { data: missionRow, error: rowError } = await supabase.from("missions")
           .select("id,status").eq("id", mission.id).eq("user_id", uid).single();
         if (rowError || !missionRow || ["complete","cancelled"].includes(missionRow.status)) throw new Error("This reward is no longer active.");
+        // Never infer a payout from a projected or committed amount.
         const actual = Math.max(0, Number(receivedAmount));
         const { error: stepError } = await supabase.from("mission_steps").update({
           is_complete: true,
