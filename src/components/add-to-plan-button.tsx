@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { FormattedNumberInput } from "@/components/formatted-number-input";
 import { benefitDurationLabel, categoryLabel, money, numberValue, timelineFromOpenedDate, trackedInterestEstimate, verificationAgeDays } from "@/lib/plan-math";
 import type { AccountHistory, FinancialProfile, Mission, Opportunity, PlanStartDetails } from "@/lib/types";
-import { availabilityWarnings } from "@/lib/plan-availability";
+import { availabilityWarnings, uncommittedCash } from "@/lib/plan-availability";
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -128,6 +128,11 @@ export function AddToPlanButton({
       return;
     }
     const conflicts = availabilityWarnings(opportunity, latestProfile as FinancialProfile, (latestMissions || []) as Mission[], (latestHistory || []) as AccountHistory[]);
+    if (["hysa", "savings_bonus", "cd"].includes(opportunity.category) && details.amountCommitted > uncommittedCash(latestProfile as FinancialProfile, (latestMissions || []) as Mission) + 0.01) {
+      setError("This would commit more savings cash than you have available after your other active offers. Reduce the amount or stop tracking an older offer first.");
+      setSaving(false);
+      return;
+    }
     if (conflicts.length > 0) {
       setError(conflicts.join(" "));
       setSaving(false);
