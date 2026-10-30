@@ -1,6 +1,7 @@
 import "server-only";
 
 import { extractOfferLinks } from "./discovery-core";
+import { summarizeSourceCoverage, type SourceChangeStatus } from "./scan-coverage";
 import { createHash } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
@@ -17,7 +18,7 @@ export type ResearchScanScope = "full" | "expiring";
 
 export type ResearchRunResult = {
   runId: string;
-  status: "completed" | "failed" | "already_running";
+  status: "completed" | "partial" | "failed" | "already_running";
   totalOffers: number;
   checkedOffers: number;
   baselineOffers: number;
@@ -470,7 +471,7 @@ export async function fetchOfficialPage(url: string): Promise<PageScan> {
   }
 }
 
-function changeStatusFor(scan: PageScan, previousHash: string | null | undefined) {
+function changeStatusFor(scan: PageScan, previousHash: string | null | undefined): SourceChangeStatus {
   if (scan.fetchStatus !== "ok" || !scan.contentHash) return "unreachable";
   if (!previousHash) return "baseline";
   return scan.contentHash === previousHash ? "unchanged" : "changed";
@@ -631,16 +632,10 @@ export async function runResearchScan({
       if (error) throw error;
     }
 
-    const counts = scans.reduce((acc, row) => {
-      if (row.changeStatus === "baseline") acc.baseline += 1;
-      else if (row.changeStatus === "unchanged") acc.unchanged += 1;
-      else if (row.changeStatus === "changed") acc.changed += 1;
-      else acc.unreachable += 1;
-      return acc;
-    }, { baseline: 0, unchanged: 0, changed: 0, unreachable: 0 });
+    const counts = summarizeSourceCoverage(scans.map((row) => row.changeStatus));
 
     const { error: updateError } = await supabase.from("research_runs").update({
-      status: "completed",
+      status: counts.status,
       completed_at: now,
       total_offers: liveOpportunities.length,
       checked_offers: scans.length,
@@ -648,10 +643,11 @@ export async function runResearchScan({
       unchanged_offers: counts.unchanged,
       changed_offers: counts.changed,
       unreachable_offers: counts.unreachable,
+      error_message: counts.message,
     }).eq("id", runId);
     if (updateError) throw updateError;
 
-    return { runId, status: "completed", totalOffers: liveOpportunities.length, checkedOffers: scans.length, baselineOffers: counts.baseline, unchangedOffers: counts.unchanged, changedOffers: counts.changed, unreachableOffers: counts.unreachable };
+    return { runId, status: counts.status, totalOffers: liveOpportunities.length, checkedOffers: scans.length, baselineOffers: counts.baseline, unchangedOffers: counts.unchanged, changedOffers: counts.changed, unreachableOffers: counts.unreachable, message: counts.message || undefined };
   } catch (error) {
     const details = error && typeof error === "object" ? error as { message?: string; code?: string; details?: string; hint?: string } : null;
     const message = error instanceof Error
