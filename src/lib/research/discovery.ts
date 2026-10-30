@@ -113,7 +113,8 @@ function guessProductName(hit: SearchHit) {
 }
 
 function candidateKey(category: DiscoveryCategory, rawUrl: string, offerKey?: string) {
-  return createHash("sha256").update(`${category}|${canonicalizeUrl(rawUrl)}|${offerKey || "page"}`).digest("hex");
+  const originalKey = `${category}|${canonicalizeUrl(rawUrl)}`;
+  return createHash("sha256").update(offerKey ? `${originalKey}|${offerKey}` : originalKey).digest("hex");
 }
 
 const discoveryDurationWords: Record<string, number> = {
