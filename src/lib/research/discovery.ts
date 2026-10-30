@@ -3,6 +3,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { fetchOfficialPage } from "@/lib/research/agent";
 import { createResearchAdminClient } from "@/lib/research/server";
+import { parseBankAccountRss } from "./doctor-of-credit";
 
 import { canonicalizeUrl, categorizeLinkedSource, isDiscoveryCategory, offerSignal, SEED_SOURCES, uniqueSources, type DiscoveryCategory, type DiscoverySource } from "./discovery-core";
 
@@ -158,6 +159,60 @@ async function checkSource(source: DiscoverySource, cache: Map<string, ReturnTyp
   }] };
 }
 
+// Doctor of Credit is a third-party lead feed, never proof of official terms.
+// Only a headline, category and article URL enter the private review queue.
+const DOC_BANK_RSS = "https://www.doctorofcredit.com/category/bank-account-bonuses/feed/";
+
+async function readDoctorOfCreditLeads(): Promise<{ hits: SearchHit[]; error: string | null }> {
+  try {
+    let url = DOC_BANK_RSS;
+    let response: Response | null = null;
+    for (let redirect = 0; redirect < 3; redirect += 1) {
+      response = await fetch(url, {
+        cache: "no-store",
+        redirect: "manual",
+        headers: { accept: "application/rss+xml,application/xml,text/xml" },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get("location");
+        if (!location) throw new Error("RSS redirected without a destination");
+        const next = new URL(location, url);
+        if (next.protocol !== "https:" ||
+            !["www.doctorofcredit.com", "doctorofcredit.com"].includes(next.hostname.toLowerCase()) ||
+            next.pathname !== "/category/bank-account-bonuses/feed/") {
+          throw new Error("RSS redirect was not to the official Doctor of Credit feed");
+        }
+        url = next.toString();
+        continue;
+      }
+      break;
+    }
+    if (!response?.ok) throw new Error("RSS returned HTTP " + String(response?.status ?? "unknown"));
+    const length = Number(response.headers.get("content-length") || 0);
+    if (length > 3_000_000) throw new Error("RSS too large");
+    const xml = await response.text();
+    if (xml.length > 3_000_000 || !/<rss\b|<feed\b/i.test(xml)) throw new Error("RSS missing or too large");
+    const leads = parseBankAccountRss(xml, 30);
+    return {
+      hits: leads.map((lead, rank) => ({
+        query: "Doctor of Credit bank-account RSS",
+        institution: lead.institution,
+        category: lead.category,
+        title: lead.title,
+        url: lead.articleUrl,
+        // Intentionally do not store or republish article descriptions or text.
+        description: "Third-party discovery lead from Doctor of Credit. Verify exact bank terms and official enrollment URL before publishing.",
+        rank: rank + 1,
+      })),
+      error: null,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { hits: [], error: "Doctor of Credit RSS unavailable: " + message };
+  }
+}
+
 async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>) {
   const output = new Array<R>(items.length);
   let index = 0;
@@ -244,6 +299,7 @@ export async function runDiscoverySweep({ triggerType, force = false }: { trigge
     const check = (source: DiscoverySource) => Date.now() < deadline
       ? checkSource(source, cache)
       : Promise.resolve({ hits: [] as SearchHit[], links: [] as string[], source, error: `${source.institution}: scan time budget reached` });
+    const doctorOfCreditPromise = readDoctorOfCreditLeads();
     const batches = await mapWithConcurrency(sources, SEARCH_CONCURRENCY, check);
     const knownKeys = new Set(sources.map(source => candidateKey(source.category, source.url)));
     const linkedSources = uniqueSources(batches.flatMap(batch => batch.links.flatMap(url => {
@@ -253,9 +309,11 @@ export async function runDiscoverySweep({ triggerType, force = false }: { trigge
       .filter(source => !knownKeys.has(candidateKey(source.category, source.url))).slice(0, MAX_LINKED_PAGES);
     batches.push(...await mapWithConcurrency(linkedSources, SEARCH_CONCURRENCY, check));
     const checkedPages = sources.length + linkedSources.length;
-    const failures = batches.flatMap((batch) => batch.error ? [batch.error] : []);
-    if (failures.length === checkedPages) throw new Error(failures.join("; "));
-    const rawHits = batches.flatMap((batch) => batch.hits);
+    const officialFailures = batches.flatMap((batch) => batch.error ? [batch.error] : []);
+    if (officialFailures.length === checkedPages) throw new Error(officialFailures.join("; "));
+    const doctorOfCredit = await doctorOfCreditPromise;
+    const failures = doctorOfCredit.error ? [...officialFailures, doctorOfCredit.error] : officialFailures;
+    const rawHits = [...batches.flatMap((batch) => batch.hits), ...doctorOfCredit.hits];
     const dedupedHits: SearchHit[] = [];
     const seenKeys = new Set<string>();
     for (const hit of rawHits) {
