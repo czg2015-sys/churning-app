@@ -27,8 +27,8 @@ export default async function HistoryPage() {
   ]);
   const pastMissions = (missions || []) as Mission[];
   const rows = (bankHistory || []) as AccountHistory[];
-  const missionKeys = new Set(pastMissions.filter(m => m.status === "complete").map(m => m.institution.toLowerCase()));
-  const standalone = rows.filter(h => !missionKeys.has(h.institution.toLowerCase()));
+  const completedMissionNotes = new Set(pastMissions.filter(m => m.status === "complete").map(m => "Completed through Churning reward tracker · mission:" + m.id));
+  const standalone = rows.filter(h => !completedMissionNotes.has(h.notes || ""));
   const completed = pastMissions.filter(m => m.status === "complete");
   const left = pastMissions.filter(m => m.status === "cancelled");
   return (
