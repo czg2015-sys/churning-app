@@ -2,6 +2,7 @@ import "server-only";
 
 import { extractOfferLinks } from "./discovery-core";
 import { distinctAdvertisedBonusAmounts } from "./offer-variants";
+import { extractExplicitDeadlines, storedDeadlineDisagrees } from "./deadline-evidence";
 import { summarizeSourceCoverage, type SourceChangeStatus } from "./scan-coverage";
 import { createHash } from "node:crypto";
 import { lookup } from "node:dns/promises";
@@ -553,9 +554,23 @@ export async function runResearchScan({
     const liveOpportunities = (opportunities || []) as LiveOpportunity[];
     const monitorMap = new Map(((monitorRows || []) as MonitorState[]).map((row) => [row.opportunity_id, row]));
 
+    // Fetch each distinct official URL only once per scan. Shared Citi/BMO
+    // landing pages can represent multiple different products. Page content is
+    // cached, but extraction mutations must stay isolated per opportunity.
+    const pageCache = new Map<string, Promise<PageScan>>();
     const scans = await mapWithConcurrency(liveOpportunities, CONCURRENCY, async (opportunity) => {
       const previous = monitorMap.get(opportunity.id);
-      const scan = await fetchOfficialPage(opportunity.official_url);
+      let pending = pageCache.get(opportunity.official_url);
+      if (!pending) {
+        pending = fetchOfficialPage(opportunity.official_url);
+        pageCache.set(opportunity.official_url, pending);
+      }
+      const shared = await pending;
+      const scan: PageScan = {
+        ...shared,
+        extractedTerms: { ...shared.extractedTerms },
+        detectedSignals: { ...shared.detectedSignals },
+      };
       const changeStatus = changeStatusFor(scan, previous?.last_content_hash);
       const bonusAmounts = ["checking_bonus", "savings_bonus"].includes(opportunity.category)
         ? distinctAdvertisedBonusAmounts(scan.normalizedText) : [];
@@ -570,6 +585,14 @@ export async function runResearchScan({
       }
       const mismatchFlags = scan.normalizedText ? buildMismatchFlags(opportunity, scan.normalizedText) : [];
       if (multiOfferPage) mismatchFlags.push("multiple_promotions_require_offer_specific_review");
+      if (scan.fetchStatus === "ok" && ["checking_bonus", "savings_bonus"].includes(opportunity.category)) {
+        const deadlines = extractExplicitDeadlines(scan.normalizedText);
+        if (deadlines.length) {
+          scan.detectedSignals = { ...scan.detectedSignals, explicitDeadlineEvidence: deadlines };
+        }
+        if (deadlines.length > 1) mismatchFlags.push("multiple_promotion_deadlines_require_offer_specific_review");
+        else if (storedDeadlineDisagrees(opportunity.expires_at, deadlines)) mismatchFlags.push("stored_offer_expiration_disagrees_with_official_date");
+      }
       const termDiffs = buildTermDiffs(opportunity, previous?.last_extracted_terms, scan.extractedTerms);
       const materialChange = termDiffs.length > 0;
       const failures = changeStatus === "unreachable" ? (previous?.consecutive_failures || 0) + 1 : 0;
