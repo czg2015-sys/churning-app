@@ -273,3 +273,83 @@
   .simple-timeline-item { border-left:0; border-top:1px solid var(--line); }
   .simple-timeline-item:first-child { border-top:0; }
 }
+
+
+/* Small enhancements to the existing Opportunities layout; no theme/nav redesign. */
+.library-eligibility-copy {
+  margin:0;
+  font-size:11px;
+  color:var(--muted);
+  line-height:1.55;
+}
+.library-combine-notice {
+  border:1px solid rgba(88,207,140,.35);
+  border-radius:13px;
+  background:rgba(59,178,115,.075);
+  padding:13px 16px;
+}
+.library-combine-summary {
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+}
+.library-combine-summary > svg { flex:0 0 auto; color:var(--green); margin-top:2px; }
+.library-combine-summary strong { color:var(--ink); font-size:13px; }
+.library-combine-summary p {
+  margin:5px 0 0;
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.55;
+}
+.library-combine-summary b { color:var(--muted-strong); }
+.library-combine-notice details { margin:7px 0 0 28px; }
+.library-combine-notice summary {
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  cursor:pointer;
+  color:var(--green);
+  font-weight:750;
+  font-size:11px;
+  list-style:none;
+}
+.library-combine-notice summary::-webkit-details-marker,
+.library-completed-offers summary::-webkit-details-marker { display:none; }
+.library-combine-notice details[open] summary svg,
+.library-completed-offers[open] summary svg { transform:rotate(180deg); }
+.library-combine-details { margin-top:12px; border-top:1px solid var(--line); padding-top:9px; }
+.library-combine-details p { font-size:11px; color:var(--muted); line-height:1.55; margin:5px 0; }
+.library-combine-details > div { display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; }
+.library-combine-details a { display:inline-flex; align-items:center; gap:3px; color:var(--green); font-size:11px; }
+.library-completed-offers {
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:rgba(39,54,45,.94);
+  padding:12px 14px;
+}
+.library-completed-offers > summary {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  cursor:pointer;
+  font-size:12px;
+  font-weight:800;
+  color:var(--muted-strong);
+  list-style:none;
+}
+.library-completed-offers > summary span {
+  display:flex;
+  gap:6px;
+  align-items:center;
+  color:var(--green);
+  font-size:10px;
+  font-weight:650;
+}
+.library-completed-offers ul { margin:12px 0 0; padding:0; list-style:none; }
+.library-completed-offers li { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-top:1px solid var(--line); font-size:11px; }
+.library-completed-offers li small { color:var(--muted); }
+.library-completed-offers > p { margin:10px 0 0; color:var(--muted); font-size:10px; }
+@media (max-width:720px) {
+  .library-combine-notice { padding:12px; }
+  .library-completed-offers li { flex-direction:column; gap:2px; }
+}

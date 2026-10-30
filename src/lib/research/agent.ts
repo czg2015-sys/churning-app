@@ -653,7 +653,13 @@ export async function runResearchScan({
 
     return { runId, status: "completed", totalOffers: liveOpportunities.length, checkedOffers: scans.length, baselineOffers: counts.baseline, unchangedOffers: counts.unchanged, changedOffers: counts.changed, unreachableOffers: counts.unreachable };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const details = error && typeof error === "object" ? error as { message?: string; code?: string; details?: string; hint?: string } : null;
+    const message = error instanceof Error
+      ? error.message
+      : details
+        ? [details.message, details.code, details.details, details.hint].filter(Boolean).join(" | ") || JSON.stringify(error)
+        : String(error);
+    console.error("[research] Official source scan failed:", message);
     await supabase.from("research_runs").update({ status: "failed", completed_at: new Date().toISOString(), error_message: message.slice(0, 2_000) }).eq("id", runId);
     return { runId, status: "failed", totalOffers: 0, checkedOffers: 0, baselineOffers: 0, unchangedOffers: 0, changedOffers: 0, unreachableOffers: 0, message };
   }
