@@ -5,6 +5,7 @@ import { ArrowLeft, CheckCircle2, CircleSlash, History } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { money, numberValue } from "@/lib/plan-math";
 import type { AccountHistory, Mission } from "@/lib/types";
+import { visibleRewardHistory } from "@/lib/reward-history-rules";
 
 export const metadata: Metadata = { title: "Reward History" };
 export const dynamic = "force-dynamic";
@@ -27,10 +28,7 @@ export default async function HistoryPage() {
   ]);
   const pastMissions = (missions || []) as Mission[];
   const rows = (bankHistory || []) as AccountHistory[];
-  const completedMissionNotes = new Set(pastMissions.filter(m => m.status === "complete").map(m => "Completed through Churning reward tracker · mission:" + m.id));
-  const standalone = rows.filter(h => !completedMissionNotes.has(h.notes || ""));
-  const completed = pastMissions.filter(m => m.status === "complete");
-  const left = pastMissions.filter(m => m.status === "cancelled");
+  const { completed, stopped: left, standalone } = visibleRewardHistory(pastMissions, rows);
   return (
     <main className="page-shell my-plan-page">
       <div className="shell reward-history-page">
@@ -40,7 +38,7 @@ export default async function HistoryPage() {
         <div className="reward-history-entries">
           {completed.map(m => {
             const paid = numberValue(m.mission_steps?.find(s => s.step_type === "bonus_received")?.current_amount);
-            return <article className="history-entry" key={m.id}><div><small>COMPLETED</small><strong>{m.institution}</strong><span>{m.title}</span></div><div><b>{money.format(paid)}</b><small>{dateLabel((m as Mission & {updated_at?: string}).updated_at || m.opened_at)}</small></div></article>;
+            return <article className="history-entry" key={m.id}><div><small>COMPLETED</small><strong>{m.institution}</strong><span>{m.title}</span></div><div><b>{money.format(paid)}</b><small>Marked complete {dateLabel((m as Mission & {updated_at?: string}).updated_at || m.opened_at)}</small></div></article>;
           })}
           {standalone.map(h =>
             <article className="history-entry" key={h.id}><div><small>{h.bonus_received ? "BONUS RECEIVED" : "BANK HISTORY"}</small><strong>{h.institution}</strong><span>{h.product_name || "Past account"}</span></div><div><b>{h.bonus_received ? money.format(numberValue(h.bonus_amount)) : "Recorded"}</b><small>{dateLabel(h.bonus_received_at || h.closed_at || h.opened_at)}</small></div></article>
@@ -48,7 +46,7 @@ export default async function HistoryPage() {
           {left.map(m =>
             <article className="history-entry stopped" key={m.id}><div><small>STOPPED TRACKING</small><strong>{m.institution}</strong><span>{m.title}</span></div><div><b>No reward counted</b><small>{dateLabel((m as Mission & {updated_at?: string}).updated_at || m.opened_at)}</small></div></article>
           )}
-          {!pastMissions.length && !rows.length ? <div className="history-empty">No completed or stopped rewards recorded yet. Your history will appear here when you confirm a reward or leave a tracked offer.</div> : null}
+          {!completed.length && !left.length && !standalone.length ? <div className="history-empty">No completed or stopped rewards recorded yet. Your history will appear here when you confirm a reward or leave a tracked offer.</div> : null}
         </div>
         <p className="history-disclaimer">Stopping tracking here does not close a real bank account. Prior bonuses may restrict future signup eligibility; exact rules vary by bank.</p>
       </div>
