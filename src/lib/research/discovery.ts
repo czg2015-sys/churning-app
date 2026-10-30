@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { fetchOfficialPage } from "@/lib/research/agent";
 import { createResearchAdminClient } from "@/lib/research/server";
 
-import { canonicalizeUrl, isDiscoveryCategory, offerSignal, SEED_SOURCES, uniqueSources, type DiscoveryCategory, type DiscoverySource } from "./discovery-core";
+import { canonicalizeUrl, categorizeLinkedSource, isDiscoveryCategory, offerSignal, SEED_SOURCES, uniqueSources, type DiscoveryCategory, type DiscoverySource } from "./discovery-core";
 
 const DISCOVERY_INTERVAL_DAYS = 1;
 const SEARCH_CONCURRENCY = 3;
@@ -246,7 +246,10 @@ export async function runDiscoverySweep({ triggerType, force = false }: { trigge
       : Promise.resolve({ hits: [] as SearchHit[], links: [] as string[], source, error: `${source.institution}: scan time budget reached` });
     const batches = await mapWithConcurrency(sources, SEARCH_CONCURRENCY, check);
     const knownKeys = new Set(sources.map(source => candidateKey(source.category, source.url)));
-    const linkedSources = uniqueSources(batches.flatMap(batch => batch.links.map(url => ({ ...batch.source, url }))))
+    const linkedSources = uniqueSources(batches.flatMap(batch => batch.links.flatMap(url => {
+      const category = categorizeLinkedSource(batch.source, url);
+      return category ? [{ ...batch.source, url, category }] : [];
+    })))
       .filter(source => !knownKeys.has(candidateKey(source.category, source.url))).slice(0, MAX_LINKED_PAGES);
     batches.push(...await mapWithConcurrency(linkedSources, SEARCH_CONCURRENCY, check));
     const checkedPages = sources.length + linkedSources.length;

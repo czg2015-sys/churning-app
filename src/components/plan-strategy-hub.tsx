@@ -121,7 +121,7 @@ function rankPrefix(mode: SortMode) {
 function optionLabel(result: RankedMatch, ranks: RankMaps, profile: FinancialProfile, mode: SortMode, amount?: number) {
   const rank = mode === "profit" ? ranks.profit.get(result.item.id) : mode === "ease" ? ranks.ease.get(result.item.id) : mode === "liquidity" ? ranks.liquidity.get(result.item.id) : ranks.overall.get(result.item.id);
   const extra = estimatedExtra(result, profile, amount);
-  return `#${rank} ${rankPrefix(mode)} · ${result.item.institution} · ${extra >= 0 ? "+" : ""}${money.format(extra)}`;
+  return `#${rank} ${rankPrefix(mode)} · ${result.item.institution} · ${extra >= 0 ? "+" : ""}${money.format(extra)}${result.item.category === "hysa" ? (numberValue(result.item.benefit_duration_days) > 0 ? "/promo" : "/yr") : ""}`;
 }
 
 function shortRequirement(item: Opportunity) {
@@ -172,7 +172,7 @@ function SimplePick({
         <span className={statusClass(result)}>{result.safetyPassed ? <ShieldCheck size={11} /> : <ShieldAlert size={11} />}{statusText(result)}</span>
       </div>
       <div className="simple-pick-foot">
-        <span><b>{extra >= 0 ? "+" : ""}{money.format(extra)}</b> est. extra · {shortRequirement(result.item)}</span>
+        <span><b>{extra >= 0 ? "+" : ""}{money.format(extra)}{result.item.category === "hysa" ? (numberValue(result.item.benefit_duration_days) > 0 ? "/promo" : "/yr") : ""}</b> est. extra · {shortRequirement(result.item)}</span>
         <div>
           <AddToPlanButton opportunity={result.item} alreadyAdded={addedOpportunityIds.includes(result.item.id)} allowPlanningOnHold compact />
           <a href={result.item.official_url} target="_blank" rel="noreferrer">Terms <ArrowUpRight size={12} /></a>
@@ -705,7 +705,7 @@ export function PlanStrategyHub({
             <section className="simple-roadmap-card">
               <div className="simple-roadmap-card-head"><span><Landmark size={18} /></span><div><small>SAVINGS / HYSA</small><h3>{money.format(savingsCash)}</h3><p>{baselineNeedsConfirmation ? "Update your current APY" : "liquid savings"}</p></div></div>
               <label className="simple-roadmap-select"><span>Recommended home</span><select value={hysaId} onChange={(event) => updateHysa(event.target.value)} disabled={saving}><option value="current">Current savings · {baselineNeedsConfirmation ? "APY needs update" : currentApy.toFixed(2) + "% APY"}</option>{hysaSorted.map((result) => <option key={result.item.id} value={result.item.id}>{optionLabel(result, hysaRanks, effectiveProfile, sortMode, savingsCash)} · {numberValue(result.item.apy).toFixed(2)}%</option>)}</select></label>
-              {selectedHysa ? <><SimplePick result={selectedHysa} profile={effectiveProfile} amount={savingsCash} amountLabel={money.format(savingsCash)} ranks={hysaRanks} addedOpportunityIds={addedOpportunityIds} /><div className="savings-return-note">{numberValue(selectedHysa.item.apy).toFixed(2)}% APY ≈ {money.format(savingsCash * numberValue(selectedHysa.item.apy) / 100)} interest/year at this balance if the rate stayed unchanged.</div></> : <div className="simple-current"><WalletCards size={16} /><span><strong>Keep current savings</strong><small>{money.format(savingsCash)} · {baselineNeedsConfirmation ? "Confirm your new APY after the promo" : "current " + currentApy.toFixed(2) + "% APY"}.</small></span></div>}
+              {selectedHysa ? <><SimplePick result={selectedHysa} profile={effectiveProfile} amount={savingsCash} amountLabel={money.format(savingsCash)} ranks={hysaRanks} addedOpportunityIds={addedOpportunityIds} /><div className="savings-return-note">{numberValue(selectedHysa.item.apy).toFixed(2)}% APY ≈ {money.format(savingsCash * numberValue(selectedHysa.item.apy) / 100)} interest/year at this balance if the rate stayed unchanged. {numberValue(selectedHysa.item.benefit_duration_days) > 0 ? `Promotional rate: ${Math.round(numberValue(selectedHysa.item.benefit_duration_days) / 30.44)} months; not a full-year guarantee.` : "Variable APY: not locked; bank may change it."}</div></> : <div className="simple-current"><WalletCards size={16} /><span><strong>Keep current savings</strong><small>{money.format(savingsCash)} · {baselineNeedsConfirmation ? "Confirm your new APY after the promo" : "current " + currentApy.toFixed(2) + "% APY"}.</small></span></div>}
             </section>
 
             <section className="simple-roadmap-card">

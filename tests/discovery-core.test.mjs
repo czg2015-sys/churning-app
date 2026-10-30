@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canonicalizeUrl, extractOfferLinks, offerSignal, uniqueSources } from '../src/lib/research/discovery-core.ts';
+import { canonicalizeUrl, categorizeLinkedSource, extractOfferLinks, offerSignal, uniqueSources } from '../src/lib/research/discovery-core.ts';
 
 test('deduplicates tracking URLs while retaining offer eligibility codes', () => {
   assert.equal(canonicalizeUrl('https://www.example.com/bonus/?utm_source=a#terms'), 'https://example.com/bonus');
@@ -27,4 +27,12 @@ test('does not mistake generic direct deposit copy for a bonus', () => {
 test('retains different categories on a shared page and rejects unsafe seeds', () => {
   const a = { institution: 'Bank', url: 'https://bank.example/offer', category: 'checking_bonus' };
   assert.equal(uniqueSources([a, a, {...a, category: 'savings_bonus'}, {...a, url: 'http://bank.example'}, {...a,url:'https://user:password@bank.example'}]).length, 2);
+});
+
+test('classifies savings vs checking links rather than blindly copying parent category', () => {
+  const parent = { institution: 'Banner Bank', url: 'https://bannerbank.com/new-account-offers', category: 'savings_bonus' };
+  assert.equal(categorizeLinkedSource(parent, 'https://bannerbank.com/new-account-offers/personal-checking-account-bonus'), 'checking_bonus');
+  assert.equal(categorizeLinkedSource(parent, 'https://bannerbank.com/new-account-offers/personal-savings-bonus'), 'savings_bonus');
+  assert.equal(categorizeLinkedSource(parent, 'https://bannerbank.com/business/savings-bonus'), null);
+  assert.equal(categorizeLinkedSource(parent, 'not-a-url'), null);
 });

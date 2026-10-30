@@ -61,12 +61,31 @@ export function offerSignal(text: string, category: DiscoveryCategory) {
   return /(?:bonus|welcome offer|earn|receive|get)[\s\S]{0,100}\$\s*[\d,]+|\$\s*[\d,]+[\s\S]{0,100}(?:bonus|welcome offer)/i.exec(text);
 }
 
+// Linked pages occasionally advertise multiple product types. Keep the
+// category tied to the linked product URL, not blindly copied from a generic
+// parent page. Unclear links remain private candidates for manual review.
+export function categorizeLinkedSource(parent: DiscoverySource, rawUrl: string): DiscoveryCategory | null {
+  let path: string;
+  try { path = new URL(rawUrl).pathname.toLowerCase(); } catch { return null; }
+  if (new RegExp("(?:^|/)(?:business|commercial|mortgage|loan|credit-card)(?:/|$)").test(path)) return null;
+  if (/checking/.test(path) && !/savings/.test(path)) return "checking_bonus";
+  if (/savings|money-market|moneymarket/.test(path)) {
+    if (/bonus|offer|promo/.test(path)) return "savings_bonus";
+    if (/yield|rate|savings-account/.test(path)) return "hysa";
+  }
+  return parent.category;
+}
+
 export const SEED_SOURCES: DiscoverySource[] = [
   { institution: "American Express", url: "https://www.americanexpress.com/en-us/banking/online-savings/high-yield-savings-account/", category: "hysa" },
   { institution: "Synchrony Bank", url: "https://www.synchrony.com/banking/products/high-yield-savings", category: "hysa" },
   { institution: "Capital One", url: "https://www.capitalone.com/bank/savings-accounts/online-performance-savings-account/", category: "hysa" },
   { institution: "Banner Bank", url: "https://www.bannerbank.com/new-account-offers/personal-account-offers", category: "checking_bonus" },
-  { institution: "Banner Bank", url: "https://www.bannerbank.com/new-account-offers/personal-account-offers", category: "savings_bonus" },
+  { institution: "Banner Bank", url: "https://www.bannerbank.com/new-account-offers/personal-account-offers/personal-savings-bonus", category: "savings_bonus" },
   { institution: "Frontwave Credit Union", url: "https://www.frontwavecu.com/new-member", category: "checking_bonus" },
   { institution: "Frontwave Credit Union", url: "https://www.frontwavecu.com/deposit-offers", category: "savings_bonus" },
+  { institution: "E*TRADE", url: "https://us.etrade.com/promo/savings", category: "savings_bonus" },
+  { institution: "Citizens Bank", url: "https://www.citizensbank.com/promo/checking/ag-move-money-chk-2026.aspx", category: "savings_bonus" },
+  { institution: "Chase", url: "https://account.chase.com/consumer/banking/savingsoffer", category: "savings_bonus" },
+  { institution: "SoFi", url: "https://www.sofi.com/banking/", category: "checking_bonus" },
 ];
