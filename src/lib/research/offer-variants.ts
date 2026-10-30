@@ -13,7 +13,7 @@ export type BonusCategory = "checking_bonus" | "savings_bonus";
 function productNear(text: string, at: number, end: number) {
   // The product label must be present on the page; do not invent it.
   // The capitalization check helps avoid generic phrases like "checking account".
-  const pattern = /\b((?:[A-Z][A-Za-z0-9&'-]*\s+){1,3}(?:Checking|Savings|Banking)(?:\s+Account)?)\b/g;
+  const pattern = /\b((?:(?:[A-Z][A-Za-z0-9&'-]*\s+){1,3}(?:Checking|Savings|Banking)(?:\s+Account)?|Savings\s+(?:Builder|Account|Plus)))\b/g;
   const before = text.slice(Math.max(0, at - 180), at);
   const labels = [...before.matchAll(pattern)];
   const near = labels.at(-1);
