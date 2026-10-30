@@ -128,7 +128,7 @@ export function AddToPlanButton({
       return;
     }
     const conflicts = availabilityWarnings(opportunity, latestProfile as FinancialProfile, (latestMissions || []) as Mission[], (latestHistory || []) as AccountHistory[]);
-    if (["hysa", "savings_bonus", "cd"].includes(opportunity.category) && details.amountCommitted > uncommittedCash(latestProfile as FinancialProfile, (latestMissions || []) as Mission) + 0.01) {
+    if (["hysa", "savings_bonus", "cd"].includes(opportunity.category) && details.amountCommitted > uncommittedCash(latestProfile as FinancialProfile, (latestMissions || []) as Mission[]) + 0.01) {
       setError("This would commit more savings cash than you have available after your other active offers. Reduce the amount or stop tracking an older offer first.");
       setSaving(false);
       return;
