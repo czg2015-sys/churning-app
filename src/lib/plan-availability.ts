@@ -32,6 +32,9 @@ export function committedCash(missions: Mission[]) {
     return sum + cash;
   }, 0);
 }
+export function uncommittedCash(profile: FinancialProfile, missions: Mission[]) {
+  return Math.max(0, numberValue(profile.total_cash) - numberValue(profile.emergency_reserve) - committedCash(missions));
+}
 export function requiredDdPerPaycheck(item: Opportunity) {
   const threshold = numberValue(item.reward_monthly_dd_threshold) / 2;
   const window = Math.max(14, numberValue(item.direct_deposit_window_days || item.qualification_days || 30));
@@ -60,10 +63,11 @@ export function availabilityWarnings(item: Opportunity, profile: FinancialProfil
     warnings.push("The stored offer deadline has passed.");
 
   const balance = Math.max(numberValue(item.required_balance), numberValue(item.min_opening_deposit));
-  const liquid = Math.max(0, numberValue(profile.total_cash) - numberValue(profile.emergency_reserve));
-  const remainingCash = Math.max(0, liquid - committedCash(missions));
+  const remainingCash = uncommittedCash(profile, missions);
   if (balance > remainingCash)
     warnings.push("Needs " + money.format(balance) + " cash, but only " + money.format(remainingCash) + " remains after your existing savings commitments.");
+  else if (item.category === "hysa" && remainingCash <= 0)
+    warnings.push("No uncommitted savings cash remains; your other tracked savings already use the available balance.");
 
   const perCheck = requiredDdPerPaycheck(item);
   if (perCheck > 0) {
