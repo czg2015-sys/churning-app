@@ -333,7 +333,7 @@ export function beforeOpenFacts(opportunity: Opportunity) {
 // personalized recommendations (while leaving ordinary HYSA comparisons).
 function uncertainRepeatBonus(item: Opportunity, usedBanks: string[]) {
   if (numberValue(item.bonus_amount) <= 0 || !["checking_bonus", "savings_bonus", "debit_spend"].includes(item.category)) return false;
-  const clean = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const clean = (name: string) => name.toLowerCase().replace(/j\.?p\.?\s*morgan\s+chase/g, "chase").replace(/\b(bank|national association|credit union|incorporated)\b/g, "").replace(/[^a-z0-9]/g, "");
   return usedBanks.some((bank) => clean(bank) === clean(item.institution));
 }
 
