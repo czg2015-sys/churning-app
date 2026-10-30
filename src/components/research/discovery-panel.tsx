@@ -70,6 +70,7 @@ export async function DiscoveryPanel() {
                 <div className={styles.metaRow}>
                   <span>{candidate.categoryGuess.replaceAll("_", " ")}</span>
                   <span>Source: <b>{candidate.officialSourceStatus.replaceAll("_", " ")}</b></span>
+                  {candidate.sourceDomain?.endsWith("doctorofcredit.com") ? <span>Lead: <b>Doctor of Credit · third-party only</b></span> : null}
                   <span>Seen: {formatDate(candidate.lastSeenAt)}</span>
                   {candidate.detectedBenefitDurationDays ? <span>Limited benefit signal: <b>{durationLabel(candidate.detectedBenefitDurationDays)}</b></span> : null}
                 </div>
