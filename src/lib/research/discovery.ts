@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { fetchOfficialPage } from "@/lib/research/agent";
 import { createResearchAdminClient } from "@/lib/research/server";
 import { parseBankAccountRss } from "./doctor-of-credit";
-import { extractExplicitBonusVariants } from "./offer-variants";
+import { distinctAdvertisedBonusAmounts, extractExplicitBonusVariants } from "./offer-variants";
 
 import { canonicalizeUrl, categorizeLinkedSource, isDiscoveryCategory, offerSignal, SEED_SOURCES, uniqueSources, type DiscoveryCategory, type DiscoverySource } from "./discovery-core";
 
@@ -157,7 +157,10 @@ async function checkSource(source: DiscoverySource, cache: Map<string, ReturnTyp
   // private candidate, but never infer eligibility or automatically publish.
   if (source.category === "checking_bonus" || source.category === "savings_bonus") {
     const variants = extractExplicitBonusVariants(page.normalizedText, source.category);
-    if (variants.length >= 2) {
+    // A mixed bank landing page might mention one checking bonus and one
+    // savings bonus. Still create the product-specific private candidate.
+    const mentions = distinctAdvertisedBonusAmounts(page.normalizedText);
+    if (variants.length >= 2 || (variants.length >= 1 && mentions.length >= 2)) {
       return { error: null, links, source, hits: variants.map((variant, index) => ({
         query: "Official page: " + source.institution,
         institution: source.institution,
