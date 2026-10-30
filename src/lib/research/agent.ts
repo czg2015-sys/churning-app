@@ -1,6 +1,7 @@
 import "server-only";
 
 import { extractOfferLinks } from "./discovery-core";
+import { distinctAdvertisedBonusAmounts } from "./offer-variants";
 import { summarizeSourceCoverage, type SourceChangeStatus } from "./scan-coverage";
 import { createHash } from "node:crypto";
 import { lookup } from "node:dns/promises";
@@ -556,7 +557,19 @@ export async function runResearchScan({
       const previous = monitorMap.get(opportunity.id);
       const scan = await fetchOfficialPage(opportunity.official_url);
       const changeStatus = changeStatusFor(scan, previous?.last_content_hash);
+      const bonusAmounts = ["checking_bonus", "savings_bonus"].includes(opportunity.category)
+        ? distinctAdvertisedBonusAmounts(scan.normalizedText) : [];
+      const multiOfferPage = bonusAmounts.length >= 2;
+      if (multiOfferPage) {
+        // A shared page might contain $125, $325 and $400 bonuses. Its first
+        // nearby dollar and DD number must never be stored as the terms for
+        // every promotion on that URL.
+        delete scan.extractedTerms.bonusAmount;
+        delete scan.extractedTerms.directDepositRequired;
+        scan.detectedSignals = { ...scan.detectedSignals, distinctAdvertisedBonusAmounts: bonusAmounts };
+      }
       const mismatchFlags = scan.normalizedText ? buildMismatchFlags(opportunity, scan.normalizedText) : [];
+      if (multiOfferPage) mismatchFlags.push("multiple_promotions_require_offer_specific_review");
       const termDiffs = buildTermDiffs(opportunity, previous?.last_extracted_terms, scan.extractedTerms);
       const materialChange = termDiffs.length > 0;
       const failures = changeStatus === "unreachable" ? (previous?.consecutive_failures || 0) + 1 : 0;
