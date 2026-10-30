@@ -328,9 +328,25 @@ export function beforeOpenFacts(opportunity: Opportunity) {
   };
 }
 
+// A prior bank relationship can disqualify a welcome bonus. Until an offer's
+// specific repeat-eligibility period has been verified, exclude it from the
+// personalized recommendations (while leaving ordinary HYSA comparisons).
+function uncertainRepeatBonus(item: Opportunity, usedBanks: string[]) {
+  if (numberValue(item.bonus_amount) <= 0 || !["checking_bonus", "savings_bonus", "debit_spend"].includes(item.category)) return false;
+  const clean = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return usedBanks.some((bank) => clean(bank) === clean(item.institution));
+}
+
+function currentOffer(item: Opportunity, usedBanks: string[]) {
+  const expires = item.expires_at ? Date.parse(item.expires_at) : NaN;
+  return item.offer_status === "live"
+    && !(Number.isFinite(expires) && expires < Date.now())
+    && !uncertainRepeatBonus(item, usedBanks);
+}
+
 export function rankOpportunities(opportunities: Opportunity[], profile: FinancialProfile, usedBanks: string[], stateCode?: string | null) {
   return opportunities
-    .filter((item) => item.offer_status === "live" && stateEligible(item, stateCode) && !["credit_card_bonus", "brokerage_bonus"].includes(item.category))
+    .filter((item) => currentOffer(item, usedBanks) && stateEligible(item, stateCode) && !["credit_card_bonus", "brokerage_bonus"].includes(item.category))
     .map((item) => ({ item, ...opportunityFit(item, profile, usedBanks) }))
     .filter((result) => result.safetyPassed && result.cashFit >= 100 && result.ddFit >= 100 && result.spendFit >= 100)
     .sort((a, b) => b.score - a.score);
@@ -338,7 +354,7 @@ export function rankOpportunities(opportunities: Opportunity[], profile: Financi
 
 export function rankResearchQueue(opportunities: Opportunity[], profile: FinancialProfile, usedBanks: string[], stateCode?: string | null) {
   return opportunities
-    .filter((item) => item.offer_status === "live" && stateEligible(item, stateCode) && !["credit_card_bonus", "brokerage_bonus"].includes(item.category))
+    .filter((item) => currentOffer(item, usedBanks) && stateEligible(item, stateCode) && !["credit_card_bonus", "brokerage_bonus"].includes(item.category))
     .map((item) => ({ item, ...opportunityFit(item, profile, usedBanks) }))
     .filter((result) => !result.safetyPassed)
     .sort((a, b) => Number(b.researchReady) - Number(a.researchReady) || b.baseScore - a.baseScore || b.confidence - a.confidence);
@@ -346,7 +362,7 @@ export function rankResearchQueue(opportunities: Opportunity[], profile: Financi
 
 export function rankMatches(opportunities: Opportunity[], profile: FinancialProfile, usedBanks: string[], stateCode?: string | null) {
   return opportunities
-    .filter((item) => item.offer_status === "live" && stateEligible(item, stateCode) && !["credit_card_bonus", "brokerage_bonus"].includes(item.category))
+    .filter((item) => currentOffer(item, usedBanks) && stateEligible(item, stateCode) && !["credit_card_bonus", "brokerage_bonus"].includes(item.category))
     .map((item) => ({ item, ...opportunityFit(item, profile, usedBanks) }))
     .sort((a, b) => {
       const bFit = Number(b.cashFit >= 100 && b.ddFit >= 100 && b.spendFit >= 100);
