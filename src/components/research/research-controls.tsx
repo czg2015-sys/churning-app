@@ -19,7 +19,9 @@ export function RunResearchScanButton() {
       setMessage(
         payload.status === "already_running"
           ? "A scan is already running."
-          : `Checked ${payload.checkedOffers} offers · ${payload.changedOffers} changed · ${payload.unreachableOffers} unreachable`,
+          : payload.status === "partial"
+            ? `Partial coverage: ${payload.checkedOffers - payload.unreachableOffers} official pages readable · ${payload.unreachableOffers} unreachable/blocked. See findings below.`
+            : `Read ${payload.checkedOffers} official pages · ${payload.changedOffers} changed · ${payload.unreachableOffers} unreachable`,
       );
       router.refresh();
     } catch (error) {
