@@ -146,7 +146,7 @@ function detectBenefitDuration(hit: SearchHit) {
   return { days: Math.round(days), text: duration[0] };
 }
 
-async function checkSource(source: DiscoverySource, cache: Map<string, ReturnType<typeof fetchOfficialPage>>) {
+async function checkSource(source: DiscoverySource, cache: Map<string, ReturnType<typeof fetchOfficialPage>>): Promise<{ hits: SearchHit[]; links: string[]; source: DiscoverySource; error: string | null }> {
   // Shared pages for multiple categories are fetched once per sweep.
   if (!cache.has(source.url)) cache.set(source.url, fetchOfficialPage(source.url));
   const page = await cache.get(source.url)!;
