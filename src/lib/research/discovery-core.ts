@@ -67,7 +67,7 @@ export function offerSignal(text: string, category: DiscoveryCategory) {
 export function categorizeLinkedSource(parent: DiscoverySource, rawUrl: string): DiscoveryCategory | null {
   let path: string;
   try { path = new URL(rawUrl).pathname.toLowerCase(); } catch { return null; }
-  if (/\\b(?:business|commercial|mortgage|loan|credit-card)\\b/.test(path)) return null;
+  if (new RegExp("(?:^|/)(?:business|commercial|mortgage|loan|credit-card)(?:/|$)").test(path)) return null;
   if (/checking/.test(path) && !/savings/.test(path)) return "checking_bonus";
   if (/savings|money-market|moneymarket/.test(path)) {
     if (/bonus|offer|promo/.test(path)) return "savings_bonus";
