@@ -18,24 +18,24 @@ function decodeXml(value: string) {
 function readTag(xml: string, tag: string) {
   const match = new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${tag}>`, "i").exec(xml);
   if (!match) return "";
-  return decodeXml(match[1].replace(/^<!\\[CDATA\\[/, "").replace(/\\]\\]>$/, "").replace(/<[^>]*>/g, "").trim()).trim();
+  return decodeXml(match[1].replace(/^<!\[CDATA\[/, "").replace(/\]\]>$/, "").replace(/<[^>]*>/g, "").trim()).trim();
 }
 
 export function categorizeBankHeadline(title: string): BankLeadCategory | null {
   // Keep news, stocks, referrals, credit cards, business and unrelated
   // cashback deals out of the bank-account review queue.
-  if (/\\b(credit card|airline|miles|points|business|merchant|coupon|giftcard|gift card|loan|mortgage|ira|brokerage|stock|cryptocurrency)\\b/i.test(title)) return null;
-  const cashBonus = /\\bbonus\\b|\\$\\s*[0-9][\\d,]*/i.test(title);
-  if (/\\b(checking|bank account)\\b/i.test(title) && cashBonus) return "checking_bonus";
-  if (/\\b(savings|money market|money-market)\\b/i.test(title) && cashBonus) return "savings_bonus";
-  if (/\\b(savings|money market|high.yield)\\b/i.test(title) && /\\d+(?:\\.\\d+)?\\s*%\\s*(?:apy|yield)|\\bapy\\b/i.test(title)) return "hysa";
-  if (/\\b(bank|credit union|\\bfcu\\b)\\b/i.test(title) && /\\bbonus\\b/i.test(title)) return "checking_bonus";
+  if (/\b(credit card|airline|miles|points|business|merchant|coupon|giftcard|gift card|loan|mortgage|ira|brokerage|stock|cryptocurrency)\b/i.test(title)) return null;
+  const cashBonus = /\bbonus\b|\$\s*[0-9][\d,]*/i.test(title);
+  if (/\b(checking|bank account)\b/i.test(title) && cashBonus) return "checking_bonus";
+  if (/\b(savings|money market|money-market)\b/i.test(title) && cashBonus) return "savings_bonus";
+  if (/\b(savings|money market|high.yield)\b/i.test(title) && /\d+(?:\.\d+)?\s*%\s*(?:apy|yield)|\bapy\b/i.test(title)) return "hysa";
+  if (/\b(bank|credit union|\bfcu\b)\b/i.test(title) && /\bbonus\b/i.test(title)) return "checking_bonus";
   return null;
 }
 
 function bankNameFromHeadline(title: string) {
-  const clean = title.replace(/^(?:\\[[^\\]]{1,80}\\]\\s*)+/g, "").replace(/^(?:Update|Updated)\\s*[:–-]\\s*/i, "");
-  const split = /^(.*?)\\s+(?:\\$\\s*[0-9]|(?:up to )?\\d+(?:\\.\\d+)?%|checking|savings|bank account)/i.exec(clean);
+  const clean = title.replace(/^(?:\[[^\]]{1,80}\]\s*)+/g, "").replace(/^(?:Update|Updated)\s*[:–-]\s*/i, "");
+  const split = /^(.*?)\s+(?:\$\s*[0-9]|(?:up to )?\d+(?:\.\d+)?%|checking|savings|bank account)/i.exec(clean);
   const candidate = (split?.[1] || clean.split(/[:–—]/)[0]).trim();
   return candidate && candidate.length <= 75 ? candidate : "Bank name needs verification";
 }
@@ -43,7 +43,7 @@ function bankNameFromHeadline(title: string) {
 export function parseBankAccountRss(xml: string, maxItems = 30): BankRssLead[] {
   const out: BankRssLead[] = [];
   const seen = new Set<string>();
-  for (const match of xml.matchAll(/<item(?:\\s[^>]*)?>([\\s\\S]*?)<\\/item>/gi)) {
+  for (const match of xml.matchAll(/<item(?:\s[^>]*)?>([\s\S]*?)<\/item>/gi)) {
     const title = readTag(match[1], "title").slice(0, 180);
     const raw = readTag(match[1], "link");
     const category = categorizeBankHeadline(title);
