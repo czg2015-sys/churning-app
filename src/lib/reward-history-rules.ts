@@ -1,4 +1,4 @@
-import { numberValue } from "@/lib/plan-math";
+function numberValue(value: unknown) { const n = Number(value ?? 0); return Number.isFinite(n) ? n : 0; }
 import type { AccountHistory, Mission, MissionStep } from "@/lib/types";
 
 type DatedMission = Mission & { created_at?: string | null; updated_at?: string | null };
