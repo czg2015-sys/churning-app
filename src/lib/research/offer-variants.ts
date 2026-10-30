@@ -64,3 +64,23 @@ export function extractExplicitBonusVariants(text: string, category: BonusCatego
   }
   return results;
 }
+
+
+// Even when the webpage lacks reliable product labels, multiple distinct
+// advertised bonus amounts make page-wide "closest dollar" extraction unsafe.
+export function distinctAdvertisedBonusAmounts(text: string): number[] {
+  if (!text || text.length > 700_000) return [];
+  const money = String.raw`\$\s*([0-9]{2,3}(?:,[0-9]{3})?|[0-9]{4,5})(?:\.[0-9]{2})?`;
+  const expressions = [
+    new RegExp(money + String.raw`\s*(?:cash\s+)?(?:bonus|reward)\b`, "gi"),
+    new RegExp(String.raw`\b(?:bonus|reward)\s*(?:of|up to|:)\s*` + money, "gi"),
+  ];
+  const amounts = new Set<number>();
+  for (const expression of expressions) {
+    for (const match of text.matchAll(expression)) {
+      const amount = Number((match[1] || "").replace(/,/g, ""));
+      if (amount >= 50 && amount <= 20_000 && Number.isFinite(amount)) amounts.add(amount);
+    }
+  }
+  return [...amounts].sort((a, b) => b - a);
+}
