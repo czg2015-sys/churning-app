@@ -35,6 +35,7 @@ function formatDate(value: string | null) {
 function friendlyStatus(status: string) {
   const labels: Record<string, string> = {
     verified: "Verified",
+    partial: "Partial coverage",
     changed: "Changed",
     needs_review: "Needs review",
     hold: "On hold",
@@ -107,9 +108,10 @@ export default async function ResearchCenterPage() {
             <>
               <strong>{friendlyStatus(latestRun.status)}</strong>
               <span>{formatDate(latestRun.started_at)}</span>
-              <span>{latestRun.checked_offers}/{latestRun.total_offers} checked</span>
+              <span>{Math.max(0, latestRun.checked_offers - latestRun.unreachable_offers)}/{latestRun.total_offers} readable</span>
               <span>{latestRun.changed_offers} changed</span>
               <span>{latestRun.unreachable_offers} unreachable</span>
+              {latestRun.error_message ? <span title={latestRun.error_message}>{latestRun.status === "failed" ? "Scan failed — check error details" : latestRun.error_message}</span> : null}
             </>
           ) : <span>No scan has run yet. Run the first baseline scan above.</span>}
         </section>
