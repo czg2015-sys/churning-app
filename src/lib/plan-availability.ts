@@ -44,7 +44,7 @@ export function remainingDdPerPaycheck(profile: FinancialProfile, missions: Miss
     if (!m.opportunity) return sum;
     const steps = m.mission_steps || [];
     const deposit = steps.find(s => s.step_type === "direct_deposit");
-    if (deposit?.is_complete || (numberValue(deposit?.target_amount) > 0 && numberValue(deposit?.current_amount) >= numberValue(deposit?.target_amount))) return sum;
+    if (numberValue(m.opportunity.reward_monthly_dd_threshold) <= 0 && (deposit?.is_complete || (numberValue(deposit?.target_amount) > 0 && numberValue(deposit?.current_amount) >= numberValue(deposit?.target_amount)))) return sum;
     return sum + requiredDdPerPaycheck(m.opportunity);
   }, 0);
   return Math.max(0, numberValue(profile.biweekly_pay) - reserved);
@@ -69,7 +69,7 @@ export function availabilityWarnings(item: Opportunity, profile: FinancialProfil
   if (perCheck > 0) {
     const remaining = remainingDdPerPaycheck(profile, missions);
     const currentDdOffers = activeMissions(missions).filter(m => m.opportunity && requiredDdPerPaycheck(m.opportunity) > 0
-      && !(m.mission_steps || []).find(s => s.step_type === "direct_deposit")?.is_complete);
+      && (numberValue(m.opportunity.reward_monthly_dd_threshold) > 0 || !(m.mission_steps || []).find(s => s.step_type === "direct_deposit")?.is_complete));
     if (currentDdOffers.length && profile.employer_multiple_dd !== true)
       warnings.push("Your existing DD offer uses your paycheck. Confirm your employer can split payroll before trying a second DD bonus.");
     if (perCheck > remaining)
