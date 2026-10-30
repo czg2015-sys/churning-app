@@ -537,7 +537,7 @@ export function RewardTracker({
   const source = guestMode ? guestMissions : missions;
   const active = useMemo(() => source.filter((mission) => !["complete", "cancelled"].includes(mission.status)), [source]);
   const completed = useMemo(() => source.filter((mission) => ["complete", "cancelled"].includes(mission.status)), [source]);
-  const lifetime = completed.reduce((sum, mission) => sum + earnedValue(mission), 0);
+  const lifetime = completed.filter((mission) => mission.status === "complete").reduce((sum, mission) => sum + earnedValue(mission), 0);
   const expected = active.reduce((sum, mission) => sum + numberValue(mission.expected_bonus) + numberValue(mission.expected_interest), 0);
   const committed = active.reduce((sum, mission) => sum + numberValue(mission.amount_committed), 0);
   const shown = tab === "active" ? active : completed;
