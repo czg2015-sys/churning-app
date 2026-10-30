@@ -97,7 +97,7 @@ function doNotDoWarning(mission: Mission, steps: MissionStep[]) {
 function earnedValue(mission: Mission) {
   const rewardStep = (mission.mission_steps || []).find((step) => step.step_type === "bonus_received");
   const actual = numberValue(rewardStep?.current_amount);
-  return mission.status === "complete" ? actual : numberValue(mission.expected_bonus) + numberValue(mission.expected_interest);
+  return mission.status === "cancelled" ? 0 : mission.status === "complete" ? actual : numberValue(mission.expected_bonus) + numberValue(mission.expected_interest);
 }
 
 function inferredTrackingDays(mission: Mission) {
@@ -437,7 +437,7 @@ function MissionCard({
     <article className={`reward-card ${mission.status === "planned" ? "planned" : ""}`}>
       <div className="reward-card-top">
         <div className="reward-title-group"><span className="reward-bank">{mission.institution}</span><h3>{mission.title}</h3><div className="reward-title-tags"><span className={`reward-safety ${safety.tone}`}><ShieldCheck size={13} /> {safety.label}</span>{lifecycle ? <span className={`reward-lifecycle-tag ${lifecycle.tone}`}>{lifecycle.label}</span> : null}</div></div>
-        <div className="reward-value"><small>{mission.status === "complete" ? "Reward earned" : "Expected reward"}</small><strong>{money.format(reward)}</strong>{numberValue(mission.amount_committed) > 0 && <span>{money.format(numberValue(mission.amount_committed))} committed</span>}</div>
+        <div className="reward-value"><small>{mission.status === "cancelled" ? "Stopped tracking" : mission.status === "complete" ? "Reward earned" : "Expected reward"}</small><strong>{money.format(reward)}</strong>{numberValue(mission.amount_committed) > 0 && <span>{money.format(numberValue(mission.amount_committed))} committed</span>}</div>
       </div>
 
       {mission.status === "planned" && !mission.opened_at ? (
