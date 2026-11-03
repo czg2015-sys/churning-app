@@ -1,4 +1,5 @@
 import "server-only";
+import { standardRateMismatch } from "./standard-rate-evidence";
 
 import { extractOfferLinks } from "./discovery-core";
 import { distinctAdvertisedBonusAmounts } from "./offer-variants";
@@ -39,6 +40,7 @@ type LiveOpportunity = {
   safety_gate: string;
   bonus_amount: number | string | null;
   apy: number | string | null;
+  standard_apy_after_benefit?: number | string | null;
   direct_deposit_required: number | string | null;
   monthly_fee: number | string | null;
   annual_fee?: number | string | null;
@@ -284,6 +286,7 @@ function expectedValueAppears(text: string, variants: string[]) {
 
 function buildMismatchFlags(opportunity: LiveOpportunity, text: string) {
   const flags: string[] = [];
+  if (standardRateMismatch(text, opportunity.standard_apy_after_benefit)) flags.push("stored_post_promo_apy_mismatch");
   if (!expectedValueAppears(text, numberVariants(opportunity.bonus_amount, "money"))) flags.push("stored_bonus_not_found_on_page");
   if (!expectedValueAppears(text, numberVariants(opportunity.apy, "percent"))) flags.push("stored_apy_not_found_on_page");
   if (!expectedValueAppears(text, numberVariants(opportunity.direct_deposit_required, "money"))) flags.push("stored_dd_requirement_not_found_on_page");
@@ -535,7 +538,7 @@ export async function runResearchScan({
 
   try {
     let opportunityQuery = supabase.from("opportunities").select(
-      "id,institution,product_name,category,official_url,safety_gate,bonus_amount,apy,direct_deposit_required,monthly_fee,annual_fee,purchase_required_spend,qualification_days,payout_days,min_account_age_days,required_balance,purchase_count,purchase_min_amount,reward_rate,benefit_duration_days,expires_at,last_verified_at",
+      "id,institution,product_name,category,official_url,safety_gate,bonus_amount,apy,standard_apy_after_benefit,direct_deposit_required,monthly_fee,annual_fee,purchase_required_spend,qualification_days,payout_days,min_account_age_days,required_balance,purchase_count,purchase_min_amount,reward_rate,benefit_duration_days,expires_at,last_verified_at",
     ).eq("offer_status", "live").order("institution");
 
     if (scope === "expiring") {

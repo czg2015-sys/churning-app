@@ -187,3 +187,5 @@
   .dd-plan-summary { grid-template-columns:1fr; }
   .savings-decision-head { align-items:flex-start; flex-direction:column; }
 }
+
+.cash-progress-date { display: block; font-size: 11px; line-height: 1.4; margin-bottom: 6px; color: var(--muted, #c6d6cc); }

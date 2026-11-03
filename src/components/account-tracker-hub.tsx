@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, CalendarClock, CheckCircle2, ChevronRight, Plus, Save, ShieldAlert, Wallet, X } from "lucide-react";
 import { RewardTracker } from "@/components/reward-tracker";
 import { MissionQuickActions } from "@/components/mission-quick-actions";
-import { money, numberValue } from "@/lib/plan-math";
+import { money, numberValue, addDaysIso } from "@/lib/plan-math";
 import { createClient } from "@/lib/supabase/client";
 import type { FinancialProfile, Mission, Opportunity, TrackedCashAccount } from "@/lib/types";
 
@@ -67,7 +67,11 @@ function isEnded(account: TrackedCashAccount) {
 function accountRate(account: TrackedCashAccount) {
   if (isEnded(account)) {
     const confirmed = account.confirmed_post_promo_apy;
-    return confirmed != null ? Number(confirmed).toFixed(2) + "% confirmed" : "New APY needs confirmation";
+    const published = account.published_standard_apy;
+    if (published != null && account.published_rate_asof && (!account.apy_last_confirmed_at || account.published_rate_asof > account.apy_last_confirmed_at.slice(0, 10))) {
+      return Number(published).toFixed(2) + "% published · checked " + formatDate(account.published_rate_asof) + " · confirm in bank";
+    }
+    return confirmed != null ? Number(confirmed).toFixed(2) + "% last entered " + formatDate(account.apy_last_confirmed_at) : "New APY needs confirmation";
   }
   const known = account.promotional_apy ?? account.current_apy;
   return known != null ? Number(known).toFixed(2) + "% APY" : "APY not entered";
@@ -117,6 +121,7 @@ export function AccountTrackerHub({
   const [editApy, setEditApy] = useState("");
   const [editDD, setEditDD] = useState("");
   const [editMissionBalance, setEditMissionBalance] = useState("");
+  const [editFundedAt, setEditFundedAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -140,6 +145,7 @@ export function AccountTrackerHub({
         typeLabel: account.account_kind === "hysa" ? "HYSA" : account.account_kind === "savings_bonus" ? "Savings bonus" : account.account_kind === "direct_deposit" ? "Direct deposit" : account.account_kind === "checking" ? "Checking" : "Cash account",
         name: account.product_name,
         date: account.promotional_end_date || null,
+        progressLabel: null,
         urgent,
         value: account.balance ? money.format(numberValue(account.balance)) : "Balance N/A",
         subtitle: isEnded(account) ? "Benefit ended " + formatDate(account.promotional_end_date) + " · " + accountRate(account) : accountRate(account) + (account.promotional_end_date ? " · ends " + formatDate(account.promotional_end_date) : " · no end date"),
@@ -158,6 +164,7 @@ export function AccountTrackerHub({
       typeLabel: "Savings / HYSA",
       name: "Savings / HYSA",
       date: null,
+      progressLabel: null,
       urgent: false,
       value: money.format(numberValue(profile.savings_cash)),
       subtitle: numberValue(profile.current_hysa_apy).toFixed(2) + "% APY · expiration N/A",
@@ -183,6 +190,9 @@ export function AccountTrackerHub({
         typeLabel: isDd ? "DD / checking bonus" : isSavingsBonus ? "Savings bonus" : "Bonus account",
         name: mission.title,
         date: nextMissionDate(mission),
+        progressLabel: isSavingsBonus
+          ? (mission.qualification_deadline ? `Hold balance through ${formatDate(mission.qualification_deadline)}` : "Add the date qualifying funds arrived to start the hold clock")
+          : (nextMissionDate(mission) ? `Next date · ${formatDate(nextMissionDate(mission))}` : "Add account dates"),
         urgent: false,
         value: isDd
           ? `${money.format(ddCurrent)} / ${money.format(ddTarget)} DD`
@@ -190,9 +200,9 @@ export function AccountTrackerHub({
             ? money.format(numberValue(mission.amount_committed))
             : money.format(numberValue(mission.expected_bonus) + numberValue(mission.expected_interest)),
         subtitle: isDd
-          ? `${money.format(numberValue(mission.expected_bonus))} reward · ${formatDate(nextMissionDate(mission))} next check`
+          ? `${money.format(numberValue(mission.expected_bonus))} reward · ${nextMissionDate(mission) ? formatDate(nextMissionDate(mission)) + " next check" : "dates needed"}`
           : isSavingsBonus
-            ? `${money.format(numberValue(mission.expected_bonus))} reward · ${formatDate(nextMissionDate(mission))} next check`
+            ? `${money.format(numberValue(mission.expected_bonus))} reward · ${nextMissionDate(mission) ? formatDate(nextMissionDate(mission)) + " next check" : "dates needed"}`
             : formatDate(nextMissionDate(mission)) + " next check",
         progress: missionProgress(mission),
         badgeText: badge.text,
@@ -223,7 +233,7 @@ export function AccountTrackerHub({
     setKind(selected.category === "hysa" ? "hysa" : selected.category === "savings_bonus" ? "savings_bonus" : "checking");
     setRate(selected.apy && numberValue(selected.apy) > 0 ? String(selected.apy) : "");
     setPublishedRate(selected.standard_apy_after_benefit != null ? String(selected.standard_apy_after_benefit) : "");
-    setPublishedRateAsOf(selected.institution === "CIT Bank" ? "2026-07-01" : "");
+    setPublishedRateAsOf(selected.last_verified_at?.slice(0, 10) || "");
     if (promoStart && selected.benefit_duration_days) {
       const d = new Date(promoStart + "T12:00:00");
       d.setDate(d.getDate() + Number(selected.benefit_duration_days));
@@ -397,15 +407,26 @@ export function AccountTrackerHub({
     const required = numberValue(mission.opportunity?.required_balance);
     const holdStep = (mission.mission_steps || []).find((item) => item.step_type === "hold");
     const supabase = createClient();
-    const missionResult = await supabase.from("missions").update({ amount_committed: amount }).eq("id", mission.id).eq("user_id", uid);
+    const fundedAt = editFundedAt ?? mission.funded_at ?? "";
+    if (fundedAt && (fundedAt > localDate() || (mission.opened_at && fundedAt < mission.opened_at))) {
+      setError("Funding date must be after opening and no later than today."); setSaving(false); return;
+    }
+    const eventBased = mission.opportunity?.qualification_start_trigger === "funded_at";
+    const deadline = eventBased && fundedAt ? addDaysIso(fundedAt, numberValue(mission.opportunity?.qualification_days)) : null;
+    const payout = deadline ? addDaysIso(deadline, numberValue(mission.opportunity?.payout_days)) : null;
+    const missionResult = await supabase.from("missions").update({ amount_committed: amount, funded_at: fundedAt || null,
+      ...(eventBased ? { qualification_start_date: fundedAt || null, qualification_deadline: deadline, payout_due_date: payout,
+        safe_close_review_date: [payout, mission.minimum_account_age_date].filter(Boolean).sort().at(-1) || null } : {}) }).eq("id", mission.id).eq("user_id", uid);
     let stepError = null;
     if (!missionResult.error && holdStep) {
-      const completed = required > 0 && amount >= required;
+      // A balance entry cannot attest that the balance was maintained for the entire hold.
+      const holdEnd = deadline || mission.qualification_deadline;
+      const completed = Boolean(holdStep.is_complete && holdEnd && holdEnd <= localDate() && required > 0 && amount >= required && fundedAt === (mission.funded_at || ""));
       const result = await supabase.from("mission_steps").update({
         current_amount: amount,
         target_amount: numberValue(holdStep.target_amount) || required || null,
         is_complete: completed,
-        completed_at: completed ? new Date().toISOString() : null,
+        completed_at: completed ? holdStep.completed_at : null,
         updated_at: new Date().toISOString(),
       }).eq("id", holdStep.id).eq("user_id", uid);
       stepError = result.error;
@@ -436,12 +457,13 @@ export function AccountTrackerHub({
             <div className="cash-owned-top"><span><small>{card.institution}</small><strong>{card.typeLabel}</strong><em>{card.name}</em></span><b>{card.value}</b></div>
             <div className="cash-owned-badge-row">
               <button type="button" className={`cash-lifecycle-badge ${card.badgeTone}`} title={card.badgeReason}
-                onClick={() => card.badgeText === "Rotate" ? rotateToSavings() : card.kind === "account" ? openAccount(card.id) : card.kind === "baseline" ? openBaselineSavings() : setSelectedMissionId(card.id)}>
+                onClick={() => card.badgeText === "Rotate" ? rotateToSavings() : card.kind === "account" ? openAccount(card.id) : card.kind === "baseline" ? openBaselineSavings() : (setEditFundedAt(null), setEditMissionBalance(""), setSelectedMissionId(card.id))}>
                 {card.badgeText}
               </button>
             </div>
+            {card.progressLabel ? <small className="cash-progress-date">{card.progressLabel}</small> : null}
             {card.progress != null ? <div className="cash-owned-progress"><span style={{ width: card.progress + "%" }} /></div> : null}
-            <button type="button" className="cash-owned-update" onClick={() => card.kind === "account" ? openAccount(card.id) : card.kind === "baseline" ? openBaselineSavings() : setSelectedMissionId(card.id)}>
+            <button type="button" className="cash-owned-update" onClick={() => card.kind === "account" ? openAccount(card.id) : card.kind === "baseline" ? openBaselineSavings() : (setEditFundedAt(null), setEditMissionBalance(""), setSelectedMissionId(card.id))}>
               <span>{card.urgent ? <ShieldAlert size={13} /> : <CheckCircle2 size={13} />}{card.subtitle}</span><em>{card.kind === "baseline" ? "Track details" : "Update"} <ChevronRight size={14} /></em>
             </button>
           </div>
@@ -491,7 +513,7 @@ export function AccountTrackerHub({
                 </div>
                 <button disabled={saving || (editBalance === "" && editApy === "")} onClick={() => void updateAccount({
                   ...(editBalance !== "" ? { balance: Number(editBalance) } : {}),
-                  ...(editApy !== "" ? (isEnded(selectedAccount)
+                  ...(editApy !== "" && Number(editApy) !== Number(selectedAccount.confirmed_post_promo_apy ?? selectedAccount.current_apy) ? (isEnded(selectedAccount)
                     ? { confirmed_post_promo_apy: Number(editApy), current_apy: Number(editApy), apy_last_confirmed_at: new Date().toISOString() }
                     : { current_apy: Number(editApy), apy_last_confirmed_at: new Date().toISOString() }) : {}),
                 })}><Save size={14}/> Save update</button>
@@ -512,8 +534,9 @@ export function AccountTrackerHub({
                     <button type="button" disabled={saving || editDD === ""} onClick={() => void updateMissionDD(selectedMission, Number(editDD))}><Save size={14}/> Update DD total</button>
                   </> : selectedMission.opportunity?.category === "savings_bonus" ? <>
                     <div className="cash-quick-current"><small>Tracked savings balance</small><b>{money.format(numberValue(selectedMission.amount_committed))}</b></div>
+                    <label>Date the full qualifying balance arrived<input type="date" max={localDate()} value={editFundedAt ?? selectedMission.funded_at ?? ""} onChange={(e) => setEditFundedAt(e.target.value)}/><small>Use the posted deposit date, not the date you updated this website.</small></label>
                     <label>Current balance in this account ($)<input type="number" min={0} step="0.01" value={editMissionBalance} onChange={(e) => setEditMissionBalance(e.target.value)} placeholder={String(numberValue(selectedMission.amount_committed))}/></label>
-                    <button type="button" disabled={saving || editMissionBalance === ""} onClick={() => void updateMissionBalance(selectedMission, Number(editMissionBalance))}><Save size={14}/> Update balance</button>
+                    <button type="button" disabled={saving || (editMissionBalance === "" && editFundedAt === null)} onClick={() => void updateMissionBalance(selectedMission, editMissionBalance === "" ? numberValue(selectedMission.amount_committed) : Number(editMissionBalance))}><Save size={14}/> Update balance</button>
                   </> : <small>No manual amount is needed for this tracker.</small>}
                   <MissionQuickActions mission={selectedMission} onDone={() => setSelectedMissionId(null)} />
                   {error ? <p className="cash-account-error">{error}</p> : null}
