@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CalendarClock, CheckCircle2, ChevronRight, Plus, Save, ShieldAlert, Wallet, X } from "lucide-react";
+import { accountDeadline } from "@/lib/account-deadline";
 import { RewardTracker } from "@/components/reward-tracker";
 import { MissionQuickActions } from "@/components/mission-quick-actions";
 import { money, numberValue, addDaysIso } from "@/lib/plan-math";
@@ -146,6 +147,7 @@ export function AccountTrackerHub({
         name: account.product_name,
         date: account.promotional_end_date || null,
         progressLabel: null,
+        progressDetail: null,
         urgent,
         value: account.balance ? money.format(numberValue(account.balance)) : "Balance N/A",
         subtitle: isEnded(account) ? "Benefit ended " + formatDate(account.promotional_end_date) + " · " + accountRate(account) : accountRate(account) + (account.promotional_end_date ? " · ends " + formatDate(account.promotional_end_date) : " · no end date"),
@@ -165,6 +167,7 @@ export function AccountTrackerHub({
       name: "Savings / HYSA",
       date: null,
       progressLabel: null,
+        progressDetail: null,
       urgent: false,
       value: money.format(numberValue(profile.savings_cash)),
       subtitle: numberValue(profile.current_hysa_apy).toFixed(2) + "% APY · expiration N/A",
@@ -182,6 +185,7 @@ export function AccountTrackerHub({
       const ddCurrent = numberValue(ddStep?.current_amount);
       const isDd = numberValue(mission.opportunity?.direct_deposit_required) > 0;
       const isSavingsBonus = mission.opportunity?.category === "savings_bonus";
+      const deadline = accountDeadline(mission, localDate());
       return {
         key: "mission:" + mission.id,
         kind: "mission" as const,
@@ -190,9 +194,8 @@ export function AccountTrackerHub({
         typeLabel: isDd ? "DD / checking bonus" : isSavingsBonus ? "Savings bonus" : "Bonus account",
         name: mission.title,
         date: nextMissionDate(mission),
-        progressLabel: isSavingsBonus
-          ? (mission.qualification_deadline ? `Hold balance through ${formatDate(mission.qualification_deadline)}` : "Add the date qualifying funds arrived to start the hold clock")
-          : (nextMissionDate(mission) ? `Next date · ${formatDate(nextMissionDate(mission))}` : "Add account dates"),
+        progressLabel: deadline.label,
+        progressDetail: deadline.detail,
         urgent: false,
         value: isDd
           ? `${money.format(ddCurrent)} / ${money.format(ddTarget)} DD`
@@ -461,7 +464,7 @@ export function AccountTrackerHub({
                 {card.badgeText}
               </button>
             </div>
-            {card.progressLabel ? <small className="cash-progress-date">{card.progressLabel}</small> : null}
+            {card.progressLabel ? <div className="cash-progress-date"><strong>{card.progressLabel}</strong><small>{card.progressDetail}</small></div> : null}
             {card.progress != null ? <div className="cash-owned-progress"><span style={{ width: card.progress + "%" }} /></div> : null}
             <button type="button" className="cash-owned-update" onClick={() => card.kind === "account" ? openAccount(card.id) : card.kind === "baseline" ? openBaselineSavings() : (setEditFundedAt(null), setEditMissionBalance(""), setSelectedMissionId(card.id))}>
               <span>{card.urgent ? <ShieldAlert size={13} /> : <CheckCircle2 size={13} />}{card.subtitle}</span><em>{card.kind === "baseline" ? "Track details" : "Update"} <ChevronRight size={14} /></em>

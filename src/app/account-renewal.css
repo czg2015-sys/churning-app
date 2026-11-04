@@ -189,3 +189,6 @@
 }
 
 .cash-progress-date { display: block; font-size: 11px; line-height: 1.4; margin-bottom: 6px; color: var(--muted, #c6d6cc); }
+.cash-progress-date strong, .cash-progress-date small { display: block; }
+.cash-progress-date strong { font-size: 12px; font-weight: 600; }
+.cash-progress-date small { margin-top: 3px; font-size: 10px; }

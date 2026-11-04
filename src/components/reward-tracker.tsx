@@ -446,7 +446,7 @@ function MissionCard({
           {starting ? <div className="reward-start-form">
             <label><small>Opened</small><input type="date" value={startDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setStartDate(event.target.value)} /></label>
             {(opportunity?.benefit_start_trigger === "funded_at" || opportunity?.qualification_start_trigger === "funded_at") ? <label><small>Funded <em>optional</em></small><input type="date" value={fundedDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setFundedDate(event.target.value)} /></label> : null}
-            {opportunity?.qualification_start_trigger === "first_dd_at" || opportunity?.benefit_start_trigger === "first_dd_at" ? <label><small>First DD <em>optional</em></small><input type="date" value={firstDdDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setFirstDdDate(event.target.value)} /></label> : null}
+            {numberValue(opportunity?.direct_deposit_required) > 0 || opportunity?.qualification_start_trigger === "first_dd_at" || opportunity?.benefit_start_trigger === "first_dd_at" ? <label><small>First DD <em>optional</em></small><input type="date" value={firstDdDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setFirstDdDate(event.target.value)} /></label> : null}
             <button type="button" className="button primary compact" onClick={startTracker}>Start tracker</button><button type="button" className="button ghost compact" onClick={() => setStarting(false)}>Cancel</button>
           </div> : <button type="button" className="button primary compact" onClick={() => setStarting(true)}>I opened this account</button>}
         </div>
@@ -476,7 +476,7 @@ function MissionCard({
             <div className="reward-start-form reward-edit-form">
               <label><small>Opened</small><input type="date" value={editOpenedDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setEditOpenedDate(event.target.value)} /></label>
               {(opportunity?.benefit_start_trigger === "funded_at" || opportunity?.qualification_start_trigger === "funded_at" || mission.funded_at) ? <label><small>Funded <em>optional</em></small><input type="date" value={editFundedDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setEditFundedDate(event.target.value)} /></label> : null}
-              {(opportunity?.qualification_start_trigger === "first_dd_at" || opportunity?.benefit_start_trigger === "first_dd_at" || mission.first_dd_at) ? <label><small>First DD <em>optional</em></small><input type="date" value={editFirstDdDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setEditFirstDdDate(event.target.value)} /></label> : null}
+              {(numberValue(opportunity?.direct_deposit_required) > 0 || opportunity?.qualification_start_trigger === "first_dd_at" || opportunity?.benefit_start_trigger === "first_dd_at" || mission.first_dd_at) ? <label><small>First DD <em>optional</em></small><input type="date" value={editFirstDdDate} max={todayIso()} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setEditFirstDdDate(event.target.value)} /></label> : null}
               <button type="button" className="button primary compact" onClick={saveTrackerDates}>Save real dates</button>
               <button type="button" className="button ghost compact" onClick={() => setEditingDates(false)}>Cancel</button>
             </div>
