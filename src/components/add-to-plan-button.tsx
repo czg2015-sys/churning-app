@@ -128,12 +128,12 @@ export function AddToPlanButton({
       return;
     }
     const conflicts = availabilityWarnings(opportunity, latestProfile as FinancialProfile, (latestMissions || []) as Mission[], (latestHistory || []) as AccountHistory[]);
-    if (["hysa", "savings_bonus", "cd"].includes(opportunity.category) && details.amountCommitted > uncommittedCash(latestProfile as FinancialProfile, (latestMissions || []) as Mission[]) + 0.01) {
+    if (!details.openedAlready && ["hysa", "savings_bonus", "cd"].includes(opportunity.category) && details.amountCommitted > uncommittedCash(latestProfile as FinancialProfile, (latestMissions || []) as Mission[]) + 0.01) {
       setError("This would commit more savings cash than you have available after your other active offers. Reduce the amount or stop tracking an older offer first.");
       setSaving(false);
       return;
     }
-    if (conflicts.length > 0) {
+    if (!details.openedAlready && conflicts.length > 0) {
       setError(conflicts.join(" "));
       setSaving(false);
       return;
@@ -324,7 +324,7 @@ export function AddToPlanButton({
             <button className="plan-modal-close" type="button" onClick={() => setOpen(false)} aria-label="Close"><X size={18} /></button>
             <div className="plan-modal-eyebrow"><ShieldCheck size={14} /> ACCURATE TRACKING SETUP</div>
             <h2 id={`add-${opportunity.id}`}>Add {opportunity.institution} to your plan</h2>
-            <p className="plan-modal-lede">Give Churning the real starting details so the countdown, cash commitment, and requirement progress are based on your situation—not a generic example.</p>
+            <p className="plan-modal-lede">Enter the account dates you know. Come back after each payday or deposit to update progress in My Plan. Churning does not automatically read your bank activity.</p>
             {simulationOnly && <div className="simulation-warning"><Sparkles size={15} /><span><strong>Guest simulation only.</strong> This candidate is still on research hold. Use this to test the tracker experience—not as a recommendation to open the account.</span></div>}
             {planningWithPendingResearch && !simulationOnly && <div className="simulation-warning"><ShieldCheck size={15} /><span><strong>Final verification is still pending.</strong> Adding this candidate creates a planning/tracking item only. Recheck the official terms and unresolved research before opening an account.</span></div>}
 

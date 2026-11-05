@@ -1,209 +1,89 @@
 "use client";
 
-import { useMemo } from "react";
-import { ArrowUpRight, ChevronDown, GitMerge, ShieldAlert, ShieldCheck } from "lucide-react";
-import { findConcurrentDepositPair, preliminarilyFits } from "@/lib/offer-matching";
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import { ArrowUpRight, Search } from "lucide-react";
+import { offerResearchStatus } from "@/lib/offer-research";
+import { preliminarilyFits } from "@/lib/offer-matching";
 import { AddToPlanButton } from "@/components/add-to-plan-button";
 import { money, numberValue, rankMatches } from "@/lib/plan-math";
 import type { AccountHistory, FinancialProfile, Mission, Opportunity } from "@/lib/types";
 
-type RankedMatch = ReturnType<typeof rankMatches>[number];
-type SortMode = "overall" | "profit" | "ease" | "liquidity";
-
-type Lane = {
-  id: string;
-  eyebrow: string;
-  title: string;
-  subtitle: string;
-  items: Opportunity[];
-};
-
-function profitValue(result: RankedMatch, profile: FinancialProfile) {
-  return profile.tax_rate_known ? result.estimatedAfterTaxAdvantage : result.grossAdvantage;
+function dateLabel(value?: string | null) {
+  if (!value) return "Not confirmed";
+  const date = new Date(value.slice(0, 10) + "T12:00:00Z");
+  return Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat("en-US", {month:"short",day:"numeric",year:"numeric",timeZone:"UTC"}).format(date) : "Not confirmed";
 }
-
-function easeValue(result: RankedMatch) {
-  return (6 - Math.min(5, Math.max(1, result.effort))) * 18
-    + result.liquidity * 0.35
-    + result.cashFit * 0.12
-    + result.ddFit * 0.12
-    + result.spendFit * 0.08
-    + (result.safetyPassed ? 12 : 0);
-}
-
-function sortRanked(items: RankedMatch[], mode: SortMode, profile: FinancialProfile) {
-  return [...items].sort((a, b) => {
-    if (mode === "profit") return profitValue(b, profile) - profitValue(a, profile) || b.score - a.score;
-    if (mode === "ease") return easeValue(b) - easeValue(a) || b.score - a.score;
-    if (mode === "liquidity") return b.liquidity - a.liquidity || easeValue(b) - easeValue(a);
-    return b.score - a.score;
-  });
-}
-
-function requirementText(item: Opportunity) {
+function requirement(item: Opportunity) {
+  const monthly = numberValue(item.reward_monthly_dd_threshold);
+  if (monthly > 0) return `${money.format(monthly)} in qualifying deposits each month`;
   const dd = numberValue(item.direct_deposit_required);
+  if (dd > 0) return `${money.format(dd)} in qualifying direct deposits${item.dd_deposit_count ? ` across at least ${item.dd_deposit_count} deposits` : ""}${item.dd_min_each ? `, at least ${money.format(numberValue(item.dd_min_each))} each` : ""}`;
   const cash = Math.max(numberValue(item.required_balance), numberValue(item.min_opening_deposit));
-  const spend = Math.max(numberValue(item.purchase_required_spend), Number(item.purchase_count || 0) * numberValue(item.purchase_min_amount));
-  if (dd > 0) return `${money.format(dd)} qualifying direct deposit${item.dd_deposit_count ? ` · ${item.dd_deposit_count} deposit${item.dd_deposit_count === 1 ? "" : "s"}` : ""}${item.direct_deposit_window_days ? ` · ${item.direct_deposit_window_days} days` : ""}`;
-  if (cash > 0) return `${money.format(cash)} cash requirement${item.qualification_days ? ` · ${item.qualification_days} days` : ""}`;
-  if (spend > 0) return `${money.format(spend)} normal spend${item.spend_window_days || item.qualification_days ? ` · ${item.spend_window_days || item.qualification_days} days` : ""}`;
-  if (Number(item.purchase_count || 0) > 0) return `${item.purchase_count} qualifying purchases`;
-  return "No large cash requirement stored";
+  if (cash > 0) return `${money.format(cash)} deposit / balance requirement`;
+  if (item.purchase_count) return `${item.purchase_count} qualifying purchases${item.purchase_min_amount ? ` of at least ${money.format(numberValue(item.purchase_min_amount))} each` : ""}`;
+  if (item.purchase_required_spend) return `${money.format(numberValue(item.purchase_required_spend))} qualifying spending`;
+  return "Check the bank’s minimum deposit and requirements";
 }
-
-function opportunityValue(item: Opportunity) {
-  const bonus = numberValue(item.bonus_amount);
-  return bonus > 0 ? money.format(bonus) : `${numberValue(item.apy).toFixed(2)}% APY`;
-}
-
-function genericCleared(item: Opportunity) {
-  return ["green", "pass"].includes(String(item.safety_gate || "").toLowerCase()) && numberValue(item.evidence_confidence) >= 80;
-}
-
-function rankMap(items: RankedMatch[], mode: SortMode, profile: FinancialProfile) {
-  return new Map(sortRanked(items, mode, profile).map((result, index) => [result.item.id, index + 1]));
-}
-
-export function OpportunityLibraryV2({
-  opportunities,
-  profile,
-  usedBanks = [],
-  stateCode,
-  accountHistory = [],
-  missions = [],
-}: {
-  opportunities: Opportunity[];
-  profile?: FinancialProfile | null;
-  usedBanks?: string[];
-  stateCode?: string | null;
-  accountHistory?: AccountHistory[];
-  missions?: Mission[];
+const categories = [
+  ["all", "All offers"], ["checking_bonus", "Paycheck & checking"], ["savings_bonus", "Savings bonuses"],
+  ["hysa", "High-yield savings"], ["debit_spend", "Debit rewards"], ["other", "Other offers"],
+] as const;
+const mainCategories = new Set(["checking_bonus", "savings_bonus", "hysa", "debit_spend"]);
+export function OpportunityLibraryV2({ opportunities, profile, usedBanks = [], stateCode, accountHistory = [], missions = [] }: {
+  opportunities: Opportunity[]; profile?: FinancialProfile | null; usedBanks?: string[]; stateCode?: string | null;
+  accountHistory?: AccountHistory[]; missions?: Mission[];
 }) {
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("all");
+  const [fitOnly, setFitOnly] = useState(false);
+  const [sort, setSort] = useState("bank");
   const ranked = useMemo(() => profile ? rankMatches(opportunities, profile, usedBanks, stateCode) : [], [opportunities, profile, usedBanks, stateCode]);
-  const rankedById = useMemo(() => new Map(ranked.map((result) => [result.item.id, result])), [ranked]);
-  const activeMissions = useMemo(() => missions.filter((mission) => !["complete", "cancelled"].includes(mission.status)), [missions]);
-  const activeIds = useMemo(() => new Set(activeMissions.map((mission) => mission.opportunity_id).filter((id): id is string => Boolean(id))), [activeMissions]);
-  const visibleOpportunities = useMemo(() => profile
-    ? opportunities.filter((item) => preliminarilyFits(rankedById.get(item.id), accountHistory, activeIds))
-    : opportunities, [opportunities, profile, rankedById, accountHistory, activeIds]);
-  const visibleIds = useMemo(() => new Set(visibleOpportunities.map((item) => item.id)), [visibleOpportunities]);
-  const combination = useMemo(() => profile
-    ? findConcurrentDepositPair(ranked.filter((result) => visibleIds.has(result.item.id)), profile, accountHistory, missions)
-    : null, [ranked, profile, accountHistory, missions, visibleIds]);
-  const completed = useMemo(() => {
-    const entries: { key: string; label: string; date: string | null }[] = [];
-    const seen = new Set<string>();
-    for (const entry of accountHistory) {
-      if (!(entry.bonus_received || entry.bonus_received_at)) continue;
-      const key = entry.opportunity_id || `${entry.institution.toLowerCase()}:${(entry.product_name || "").toLowerCase()}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      entries.push({ key, label: [entry.institution, entry.product_name].filter(Boolean).join(" · "), date: entry.bonus_received_at || null });
-    }
-    for (const mission of missions.filter((item) => item.status === "complete")) {
-      const key = mission.opportunity_id || `${mission.institution.toLowerCase()}:${mission.title.toLowerCase()}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      entries.push({ key, label: [mission.institution, mission.title].filter(Boolean).join(" · "), date: null });
-    }
-    return entries;
-  }, [accountHistory, missions]);
-
-  const lanes: Lane[] = [
-    { id: "dd", eyebrow: "DIRECT DEPOSIT", title: "Paycheck bonuses", subtitle: "Offers that ask you to route legitimate payroll or another qualifying deposit.", items: visibleOpportunities.filter((item) => item.category === "checking_bonus" && numberValue(item.direct_deposit_required) > 0) },
-    { id: "hysa", eyebrow: "SAVINGS / HYSA", title: "High-yield savings", subtitle: "Rate options compared against the APY you already earn—not against zero.", items: opportunities.filter((item) => item.category === "hysa") },
-    { id: "bonus", eyebrow: "CASH BONUS", title: "Cash-funded bonuses", subtitle: "Offers where money is parked to earn a bonus; opportunity cost matters here.", items: opportunities.filter((item) => item.category === "savings_bonus") },
-    { id: "spending", eyebrow: "OPTIONAL SPENDING", title: "Debit & spending rewards", subtitle: "Only for normal purchases you already planned. No manufactured spending.", items: opportunities.filter((item) => item.category === "debit_spend") },
-  ].filter((lane) => lane.items.length > 0);
-
-  return (
-    <div className="opportunity-library-v2">
-      {profile ? (
-        <p className="library-eligibility-copy">
-          Showing offers that fit your saved cash, paycheck, spending, geography and bank history. These are preliminary matches, not eligibility guarantees. Offers you already track or may be restricted from repeating are omitted.
-        </p>
-      ) : null}
-      {combination ? (
-        <div className="library-combine-notice">
-          <div className="library-combine-summary">
-            <GitMerge size={18} aria-hidden="true" />
-            <div>
-              <strong>Two offers may work together</strong>
-              <p>{combination.first.item.institution} + {combination.second.item.institution} could run at the same time with <b>separate qualifying payroll deposits</b>.</p>
-            </div>
-          </div>
-          <details>
-            <summary>See how to combine <ChevronDown size={14} aria-hidden="true" /></summary>
-            <div className="library-combine-details">
-              <p><b>{combination.first.item.institution}:</b> {requirementText(combination.first.item)}.</p>
-              <p><b>{combination.second.item.institution}:</b> {requirementText(combination.second.item)}.</p>
-              <p>Your saved pay information suggests roughly {money.format(combination.availableMonthlyDeposits)} per ordinary two-paycheck month is available after your existing tracked deposit commitments. The two requirements average at least {money.format(combination.totalMonthlyDeposits)} per month across their qualification windows.</p>
-              <p><b>Important:</b> Your employer must be able to split payroll. Each bank needs its own qualifying deposit; the same money transfer does not count twice. Check official eligible-deposit definitions, dates, repeat-customer restrictions, fees and closing rules before opening anything.</p>
-              <div><a href={combination.first.item.official_url} target="_blank" rel="noreferrer">First bank terms <ArrowUpRight size={12} /></a><a href={combination.second.item.official_url} target="_blank" rel="noreferrer">Second bank terms <ArrowUpRight size={12} /></a></div>
-            </div>
-          </details>
-        </div>
-      ) : null}
-      {completed.length ? (
-        <details className="library-completed-offers">
-          <summary>Completed offers ({completed.length}) <span>View history <ChevronDown size={13} aria-hidden="true" /></span></summary>
-          <ul>{completed.map((entry) => <li key={entry.key}><span>{entry.label}</span><small>{entry.date ? `Reward recorded ${entry.date.slice(0, 10)}` : "Marked complete"}</small></li>)}</ul>
-          <p>Completed bonuses stay in your history and affect which new bonuses appear here. Check each bank's repeat-offer waiting period before trying again.</p>
-        </details>
-      ) : null}
-      {profile && visibleOpportunities.length === 0 ? (
-        <div className="disclaimer">There are no preliminary eligible matches in the current research feed. Review your answers in Start Here, and check back after the next official-source verification. We won't invent a replacement.</div>
-      ) : null}
-      {lanes.map((lane) => {
-        const laneRanked = lane.items.map((item) => rankedById.get(item.id)).filter((item): item is RankedMatch => Boolean(item));
-        const overallRanks = profile ? rankMap(laneRanked, "overall", profile) : new Map<string, number>();
-        const profitRanks = profile ? rankMap(laneRanked, "profit", profile) : new Map<string, number>();
-        const easeRanks = profile ? rankMap(laneRanked, "ease", profile) : new Map<string, number>();
-        const ordered = profile
-          ? sortRanked(laneRanked, profile.ranking_preference === "profit" ? "profit" : profile.ranking_preference === "ease" ? "ease" : profile.ranking_preference === "liquidity" ? "liquidity" : "overall", profile).map((result) => result.item)
-          : [...lane.items].sort((a, b) => Number(genericCleared(b)) - Number(genericCleared(a)) || numberValue(b.evidence_confidence) - numberValue(a.evidence_confidence) || numberValue(b.bonus_amount) - numberValue(a.bonus_amount));
-
-        return (
-          <section className="library-lane" key={lane.id}>
-            <div className="library-lane-head">
-              <div><small>{lane.eyebrow}</small><h2>{lane.title}</h2><p>{lane.subtitle}</p></div>
-              <span>{ordered.length} live option{ordered.length === 1 ? "" : "s"}</span>
-            </div>
-            <div className="library-card-grid">
-              {ordered.map((item) => {
-                const result = rankedById.get(item.id);
-                const cleared = result ? result.safetyPassed : genericCleared(item);
-                const profit = result && profile ? profitValue(result, profile) : null;
-                return (
-                  <article className="library-offer-card" key={item.id}>
-                    <div className="library-offer-top">
-                      <div><small>{item.institution}</small><strong>{item.product_name}</strong></div>
-                      <span className={`library-safety ${cleared ? "clear" : "hold"}`}>{cleared ? <ShieldCheck size={12} /> : <ShieldAlert size={12} />}{cleared ? "Cleared" : "Hold"}</span>
-                    </div>
-                    {result && profile ? (
-                      <div className="library-rank-tags">
-                        <span>#{overallRanks.get(item.id)} overall</span>
-                        <span>#{profitRanks.get(item.id)} profit</span>
-                        <span>#{easeRanks.get(item.id)} easiest</span>
-                      </div>
-                    ) : null}
-                    <div className="library-offer-value">
-                      <div><small>Headline value</small><b>{opportunityValue(item)}</b></div>
-                      <div><small>{profile?.tax_rate_known ? "Est. after-tax extra" : "Est. extra vs baseline"}</small><b className={profit !== null && profit >= 0 ? "positive" : profit !== null ? "negative" : ""}>{profit === null ? "Build plan" : `${profit >= 0 ? "+" : ""}${money.format(profit)}`}</b></div>
-                    </div>
-                    <p className="library-offer-requirement"><b>Requirement:</b> {requirementText(item)}. <b>Evidence:</b> {Math.round(numberValue(item.evidence_confidence))}%.</p>
-                    {result && !result.safetyPassed ? <p className="library-offer-requirement"><b>Why it is not green:</b> stored research is incomplete, stale, or the safety gate has not passed yet.</p> : null}
-                    <div className="library-offer-footer">
-                      <div>{profile ? <AddToPlanButton opportunity={item} compact /> : null}</div>
-                      <a href={item.official_url} target="_blank" rel="noreferrer">Official terms <ArrowUpRight size={12} /></a>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })}
+  const rankedById = useMemo(() => new Map(ranked.map(row => [row.item.id, row])), [ranked]);
+  const activeIds = useMemo(() => new Set(missions.filter(m => !["complete", "cancelled"].includes(m.status)).map(m => m.opportunity_id).filter((id): id is string => Boolean(id))), [missions]);
+  const visible = opportunities.filter(item => {
+    const term = search.trim().toLowerCase();
+    return (!term || `${item.institution} ${item.product_name}`.toLowerCase().includes(term))
+      && (category === "all" || (category === "other" ? !mainCategories.has(item.category) : item.category === category))
+      && (!fitOnly || preliminarilyFits(rankedById.get(item.id), accountHistory, activeIds));
+  }).sort((a,b) => sort === "bonus" ? numberValue(b.bonus_amount)-numberValue(a.bonus_amount)
+    : sort === "apy" ? numberValue(b.apy)-numberValue(a.apy)
+    : sort === "verified" ? (b.last_verified_at || "").localeCompare(a.last_verified_at || "")
+    : a.institution.localeCompare(b.institution));
+  return <div className="opportunity-library-v2">
+    <div className="offer-toolbar">
+      <label className="offer-search"><Search size={18}/><span className="sr-only">Search banks and offers</span><input type="search" placeholder="Search banks or offers" value={search} onChange={e => setSearch(e.target.value)}/></label>
+      <label>Sort by<select value={sort} onChange={e => setSort(e.target.value)}><option value="bank">Bank name</option><option value="bonus">Bonus amount</option><option value="apy">Savings APY</option><option value="verified">Recently verified</option></select></label>
+      {profile ? <label className="fit-toggle"><input type="checkbox" checked={fitOnly} onChange={e => setFitOnly(e.target.checked)}/> Fits my profile</label> : null}
     </div>
-  );
+    <div className="offer-category-tabs" aria-label="Offer categories">{categories.map(([id,label]) => <button type="button" key={id} aria-pressed={category===id} onClick={() => setCategory(id)}>{label}</button>)}</div>
+    <p className="offer-results" role="status">{visible.length} offer{visible.length === 1 ? "" : "s"} · {fitOnly ? "Preliminary matches, not guaranteed eligibility. Already tracked offers stay in My Plan." : "All offers shown, including banks you already track. Open details to check eligibility."}</p>
+    {!visible.length ? <div className="disclaimer">No offers match these filters. <button type="button" onClick={() => {setSearch("");setCategory("all");setFitOnly(false);}}>Clear filters</button></div> : null}
+    <div className="library-card-grid">{visible.map(item => {
+      const result = rankedById.get(item.id);
+      const {cleared, expired, label} = offerResearchStatus(item);
+      const tracked = activeIds.has(item.id);
+      return <article className="library-offer-card" key={item.id}>
+        <div className="library-offer-top"><div><small>{item.institution}</small><strong>{item.product_name}</strong></div><span className={`library-safety ${cleared ? "clear" : "hold"}`}>{label}</span></div>
+        <div className="offer-headline">{numberValue(item.bonus_amount)>0 ? money.format(numberValue(item.bonus_amount)) + " bonus" : `${numberValue(item.apy).toFixed(2)}% APY`}</div>
+        <dl className="offer-facts">
+          <div><dt>What you need</dt><dd>{requirement(item)}</dd></div>
+          <div><dt>Time to qualify</dt><dd>{item.direct_deposit_window_days || item.qualification_days ? `${item.direct_deposit_window_days || item.qualification_days} days · check when the clock starts` : "Check official terms"}</dd></div>
+          <div><dt>Monthly fee</dt><dd>{item.monthly_fee == null ? "Not confirmed" : `${money.format(numberValue(item.monthly_fee))}${item.fee_waiver_summary ? " · waiver available" : ""}`}</dd></div>
+          <div><dt>Apply by</dt><dd>{dateLabel(item.expires_at)}</dd></div>
+          <div><dt>Last verified</dt><dd>{dateLabel(item.last_verified_at)}</dd></div>
+        </dl>
+        <details className="offer-details"><summary>Requirements, eligibility & details</summary>
+          <p>{item.terms_summary || "Full requirements have not been recorded. Read the official bank terms."}</p>
+          <p><strong>Who can qualify:</strong> {item.eligibility_notes || "Eligibility is not fully confirmed."} {item.state_scope ? `Availability: ${item.state_scope}.` : ""}</p>
+          <p><strong>Fee waiver:</strong> {item.fee_waiver_summary || "Not confirmed."}</p>
+          <p><strong>Payout:</strong> {item.payout_days ? `Stored payout window: ${item.payout_days} days after the bank’s qualifying event. Confirm the trigger in the terms.` : "Payout timing not confirmed."}</p>
+          <p><strong>Before closing:</strong> {item.keep_guidance || "Check minimum account age and bonus repayment rules."}</p>
+          {result ? <p><strong>Your estimated extra value:</strong> {money.format(profile?.tax_rate_known ? result.estimatedAfterTaxAdvantage : result.grossAdvantage)} {profile?.tax_rate_known ? "after estimated tax" : "before tax"}. An estimate, not a promised reward.</p> : null}
+          {!cleared ? <p>Some terms need review or a fresh check. Saving an offer does not confirm that you qualify.</p> : null}
+        </details>
+        <div className="library-offer-footer"><div>{tracked ? <Link href="/my-plan#my-accounts">In My Plan · update progress</Link> : profile ? <AddToPlanButton opportunity={item} compact allowPlanningOnHold disabledReason={expired ? "Application deadline passed. Check for a renewed offer." : undefined}/> : <Link href="/auth?next=/my-plan">Sign in to save</Link>}</div><a href={item.official_url} target="_blank" rel="noreferrer">Bank terms <ArrowUpRight size={12}/></a></div>
+      </article>;
+    })}</div>
+  </div>;
 }

@@ -18,6 +18,7 @@ import { AddToPlanButton } from "@/components/add-to-plan-button";
 import { AccountTrackerHub } from "@/components/account-tracker-hub";
 import { createClient } from "@/lib/supabase/client";
 import { money, numberValue, rankMatches } from "@/lib/plan-math";
+import { accountDeadline } from "@/lib/account-deadline";
 import { planningDates } from "@/lib/roadmap";
 import type { FinancialProfile, Mission, Opportunity, TrackedCashAccount } from "@/lib/types";
 
@@ -184,7 +185,7 @@ function SimplePick({
 
 function readableDate(value: string) {
   const date = new Date(`${value.slice(0, 10)}T12:00:00`);
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(date);
 }
 
 function addDaysIso(value: string, days: number) {
@@ -547,7 +548,8 @@ export function PlanStrategyHub({
       const label = isSavingsBonus ? mission.institution + " savings bonus" : isDd ? mission.institution + " DD / checking" : mission.institution;
       const subject = "mission:" + mission.id;
       add(mission.benefit_end_date, label + " · rate ends", "active", "Review the benefit before it expires.", lane, subject);
-      add(mission.qualification_deadline, label + " · qualify", "active", "Confirm the requirement against your bank activity.", lane, subject);
+      const deadline = accountDeadline(mission, todayLocal);
+      add(deadline.deadline, label + " · qualification deadline", "active", deadline.detail, lane, subject);
       add(mission.payout_due_date, label + " · payout check", "active", "Check whether the reward actually posted.", lane, subject);
       add(mission.safe_close_review_date, label + " · keep/close review", "active", "Review fees and terms before deciding to keep or close.", lane, subject);
     }
@@ -646,8 +648,10 @@ export function PlanStrategyHub({
 
       <AccountTrackerHub missions={missions} accounts={accounts} opportunities={opportunities} profile={profile} />
 
+      <details className="next-move-details" id="next-move">
+      <summary>Explore a new bonus or savings account</summary>
       <div className="simple-roadmap-head">
-        <div><span className="kicker">RECOMMENDED ROADMAP</span><h2>Pick one. The next recommendation updates.</h2><p>Start with Churning’s recommendation, or use any dropdown to choose another option.</p></div>
+        <div><span className="kicker">EXPLORE YOUR NEXT MOVE</span><h2>Considering another bonus?</h2><p>These choices are for new offers. Your saved accounts above stay tracked when you change these choices.</p></div>
         <div className="simple-roadmap-actions">
           <select value={sortMode} onChange={(event) => updateSort(event.target.value as SortMode)} disabled={saving}>
             <option value="overall">Best overall</option>
@@ -661,7 +665,7 @@ export function PlanStrategyHub({
 
       <div className="simple-roadmap-grid">
         <section className="simple-roadmap-card dd">
-          <div className="simple-roadmap-card-head"><span><Banknote size={18} /></span><div><small>DIRECT DEPOSIT</small><h3>{selectedDd.length ? money.format(plannedDd) + "/mo" : "Skip"}</h3><p>{ddSourceCount} paycheck source{ddSourceCount === 1 ? "" : "s"} · {canSplitPayroll ? "splitting enabled" : "no splitting assumed"}</p></div></div>
+          <div className="simple-roadmap-card-head"><span><Banknote size={18} /></span><div><small>DIRECT DEPOSIT</small><h3>{selectedDd.length ? money.format(plannedDd) + "/mo" : "None selected"}</h3><p>{ddSourceCount} paycheck source{ddSourceCount === 1 ? "" : "s"} · {canSplitPayroll ? "splitting enabled" : "no splitting assumed"}</p></div></div>
           {Array.from({ length: ddLaneLimit }).map((_, index) => {
             const selected = selectedDd[index] || null;
             const availableForThisLine = ddRoomAt(index, ddIds.slice(0, index));
@@ -674,7 +678,7 @@ export function PlanStrategyHub({
             });
             return (
               <div className="simple-dd-line" key={index}>
-                <label><span>DD line {index + 1} · {money.format(availableForThisLine)}/mo available · real payroll only</span><select value={selected?.item.id || "none"} onChange={(event) => updateDd(index, event.target.value)} disabled={saving}><option value="none">No DD offer</option>{options.map((result) => <option key={result.item.id} value={result.item.id}>{optionLabel(result, ddRanks, effectiveProfile, sortMode)}</option>)}</select></label>
+                <label><span>Paycheck option {index + 1} · {money.format(availableForThisLine)}/mo available · qualifying pay deposits</span><select value={selected?.item.id || "none"} onChange={(event) => updateDd(index, event.target.value)} disabled={saving}><option value="none">No additional paycheck bonus</option>{options.map((result) => <option key={result.item.id} value={result.item.id}>{optionLabel(result, ddRanks, effectiveProfile, sortMode)}</option>)}</select></label>
                 {selected ? (() => {
                   const sourceIndex = sourceIndexForLane(index);
                   const nextPayday = sourceNextDates[sourceIndex] || null;
@@ -695,7 +699,7 @@ export function PlanStrategyHub({
                       <div><small>BONUS RATIO</small><strong>{ratio.toFixed(1)}%</strong><span>{recurring ? `${money.format(completion.monthlyReward)} ÷ ${money.format(completion.monthlyThreshold)} monthly DD` : `${money.format(reward)} ÷ ${money.format(requiredDd)} DD`} · not APY</span></div>
                     </div>
                     {recurring ? <div className="dd-completion-note"><CalendarDays size={13}/><span>This is a monthly threshold, not one six-month lump sum. In a normal two-paycheck month, route at least {money.format(completion.perPaycheck)} from each paycheck to reach {money.format(completion.monthlyThreshold)}.</span></div>
-                    : !completion.qualificationDate ? <div className="dd-completion-note"><CalendarDays size={13}/><span>Add your next payday in Start Here to turn this into exact qualification and payout dates.</span></div>
+                    : !completion.qualificationDate ? <div className="dd-completion-note"><CalendarDays size={13}/><span>Add your next payday in My Profile to turn this into estimated qualification and payout dates.</span></div>
                     : completion.payoutDate ? <div className="dd-completion-note"><CalendarDays size={13}/><span>Estimated payout review: {readableDate(completion.payoutDate)}.</span></div> : null}
                   </div>;
                 })() : null}
@@ -703,17 +707,17 @@ export function PlanStrategyHub({
             );
           })}
           <details className="simple-dd-alternatives">
-            <summary>Other DD offers ({ranked.filter(r => r.item.category === "checking_bonus" && numberValue(r.item.direct_deposit_required) > 0 && !ddIds.includes(r.item.id)).length}) · compare alternatives</summary>
+            <summary>Other paycheck bonuses ({ranked.filter(r => r.item.category === "checking_bonus" && numberValue(r.item.direct_deposit_required) > 0 && !ddIds.includes(r.item.id)).length}) · compare alternatives</summary>
             <p>The roadmap above shows only offers that fit a new paycheck allocation. These are alternatives to compare, not extra offers you can automatically run at the same time.</p>
             {ranked.filter(r => r.item.category === "checking_bonus" && numberValue(r.item.direct_deposit_required) > 0 && !ddIds.includes(r.item.id)).slice(0, 10).map(r => {
               const needed = monthlyDdNeed(r.item);
               const fits = Number.isFinite(needed) && needed <= monthlyDdCapacity + .01;
               return <div className="simple-dd-alternative" key={r.item.id}>
                 <span><strong>{r.item.institution} · {money.format(numberValue(r.item.bonus_amount))}</strong><small>{r.item.product_name}</small></span>
-                <em>{fits ? "Alternative · check terms" : "Paycheck capacity too low for new DD"}</em>
+                <em>{fits ? "Alternative · check terms" : "Not enough unassigned paycheck money"}</em>
               </div>;
             })}
-            <a className="simple-dd-all-link" href="#benefit-rankings">Compare all bank bonus offers below <ArrowUpRight size={12}/></a>
+            <a className="simple-dd-all-link" href="/opportunities">Browse all bank bonuses <ArrowUpRight size={12}/></a>
           </details>
         </section>
 
@@ -731,7 +735,7 @@ export function PlanStrategyHub({
 
             <section className="simple-roadmap-card">
               <div className="simple-roadmap-card-head"><span><BadgeDollarSign size={18} /></span><div><small>SAVINGS BONUS</small><h3>{selectedBonus ? money.format(bonusCash) : "$0"}</h3><p>{selectedBonus ? "cash assigned to bonus" : "keep it in HYSA"}</p></div></div>
-              <label className="simple-roadmap-select"><span>Recommended bonus</span><select value={bonusId} onChange={(event) => updateBonus(event.target.value)} disabled={saving}><option value="none">Skip savings bonus</option>{bonusSorted.filter((result) => requiredCash(result.item) <= baseAvailableCash + .01).map((result) => <option key={result.item.id} value={result.item.id}>{optionLabel(result, bonusRanks, effectiveProfile, sortMode)} · needs {money.format(requiredCash(result.item))}</option>)}</select></label>
+              <label className="simple-roadmap-select"><span>Recommended bonus</span><select value={bonusId} onChange={(event) => updateBonus(event.target.value)} disabled={saving}><option value="none">Keep this money in savings</option>{bonusSorted.filter((result) => requiredCash(result.item) <= baseAvailableCash + .01).map((result) => <option key={result.item.id} value={result.item.id}>{optionLabel(result, bonusRanks, effectiveProfile, sortMode)} · needs {money.format(requiredCash(result.item))}</option>)}</select></label>
               {selectedBonus ? (() => {
                 const required = requiredCash(selectedBonus.item);
                 const bonus = numberValue(selectedBonus.item.bonus_amount);
@@ -739,7 +743,7 @@ export function PlanStrategyHub({
                 const periodReturn = required > 0 ? bonus / required * 100 : 0;
                 const annualizedSimple = periodReturn * 365 / days;
                 return <><SimplePick result={selectedBonus} profile={effectiveProfile} amount={bonusCash} amountLabel={money.format(bonusCash)} ranks={bonusRanks} addedOpportunityIds={addedOpportunityIds} /><div className="savings-return-note"><strong>{periodReturn.toFixed(1)}% bonus on required cash</strong> over about {days} days · ≈ {annualizedSimple.toFixed(1)}% simple annualized before lost interest/tax · not APY.</div></>;
-              })() : <div className="simple-current"><WalletCards size={16}/><span><strong>No bonus selected</strong><small>All available cash stays in the savings/HYSA side.</small></span></div>}
+              })() : <div className="simple-current"><WalletCards size={16}/><span><strong>No bonus selected</strong><small>Your unassigned money stays in savings. Existing bonus trackers are unchanged.</small></span></div>}
             </section>
           </div>
         </div>
@@ -758,10 +762,12 @@ export function PlanStrategyHub({
         <span><strong>Why the numbers move:</strong><small>If you pick a cash bonus, that cash comes out of the HYSA lane. If you pick a DD offer, the next DD recommendation is rebuilt from the paycheck capacity left over.</small></span>
       </div>
 
+      </details>
       <section className="simple-timeline">
+        {missions.filter(m => !["complete", "cancelled"].includes(m.status) && !accountDeadline(m, todayLocal).deadline).map(m => <p className="progress-checkin" key={m.id}><strong>{m.institution}: date needed</strong>{accountDeadline(m, todayLocal).label}. Your account is still tracked above. Use Update progress to add the missing date.</p>)}
         <div className="simple-timeline-head timeline-with-tabs">
           <CalendarDays size={16} />
-          <span><strong>Your money timeline</strong><small>All shows only the next important event per account. Pick a lane for the full schedule.</small></span>
+          <span><strong>Your money timeline</strong><small>All shows only the next important event per account. Choose a category for more dates. Your saved accounts are shown above.</small></span>
           <div className="timeline-tabs" role="tablist" aria-label="Timeline category">
             {[
               ["all", "All"],
@@ -783,7 +789,7 @@ export function PlanStrategyHub({
 
       <div className={`plan-safety-footer ${holdCount ? "hold" : "clear"}`}>
         {holdCount ? <ShieldAlert size={17} /> : <ShieldCheck size={17} />}
-        <span><strong>{holdCount ? "Some picks still need review." : "Selected picks pass the stored research gate."}</strong><small>{holdCount ? "You can compare them, but do not treat HOLD as permission to open yet." : "Re-check the official terms before moving money."}</small></span>
+        <span><strong>{holdCount ? "Some picks still need review." : "Selected picks pass the stored research gate."}</strong><small>{holdCount ? "You can compare them, but check the missing terms before opening an account." : "Re-check the official terms before moving money."}</small></span>
       </div>
       {message ? <div className="plan-save-message">{message}</div> : null}
     </section>

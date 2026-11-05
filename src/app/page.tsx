@@ -99,6 +99,15 @@ export default async function Home() {
         <HomeDashboardExample />
       </section>
 
+      <section className="shell bonus-basics" aria-label="Bank bonuses explained">
+        <div><span className="kicker">NEW TO BANK BONUSES?</span><h2>Three simple ways to earn.</h2></div>
+        <div className="bonus-basics-grid">
+          <article><h3>Paycheck bonuses</h3><p>A bank may pay you a bonus when you open an account and send enough of your paycheck there. This is called direct deposit, or DD.</p></article>
+          <article><h3>Savings bonuses</h3><p>A bank may pay you a bonus when you deposit a certain amount and leave it there for a set time.</p></article>
+          <article><h3>High-yield savings</h3><p>A savings account that pays interest on your money. APY is the yearly rate if it stays the same. Rates can change.</p></article>
+        </div>
+        <p>Each bank has its own rules. Compare the requirements, open an account with the bank, then come back here to track deposits and deadlines.</p>
+      </section>
       <section className="process shell new-how-it-works" id="how-it-works">
         <div className="section-heading split-heading">
           <div><span>HOW IT WORKS</span><h2>From idle cash to a trackable plan.</h2></div>
@@ -112,7 +121,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <div className="shell"><TopOpportunityTable opportunities={opportunities} heading="Explore the latest researched cash opportunities." /></div>
+      <div className="shell"><TopOpportunityTable opportunities={opportunities} heading="Explore bank offers and their research status." /></div>
 
       <section className="home-research shell compact-research-section">
         <div className="research-home-copy"><span className="kicker">RESEARCH YOU CAN SEE</span><h2>A bonus number is only the beginning.</h2><p>Each opportunity can publish the evidence that matters before you act. If research is stale or incomplete, Churning shows that instead of hiding it.</p></div>

@@ -124,6 +124,7 @@ export function AccountTrackerHub({
   const [editMissionBalance, setEditMissionBalance] = useState("");
   const [editFundedAt, setEditFundedAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [savedNotice, setSavedNotice] = useState("");
   const [error, setError] = useState("");
 
   const selectedAccount = localAccounts.find((account) => account.id === selectedAccountId) || null;
@@ -282,6 +283,7 @@ export function AccountTrackerHub({
       setError(dbError?.message || "Account could not be saved.");
     } else {
       setLocalAccounts((current) => [...current, data as TrackedCashAccount]);
+      setSavedNotice("Account saved. Come back after a payday or deposit to update progress.");
       setAdding(false);
       setOfferId("");
       setInstitution("");
@@ -317,6 +319,7 @@ export function AccountTrackerHub({
     const a = localAccounts.find((item) => item.id === id);
     if (!a) return;
     setError("");
+    setSavedNotice("");
     setEditBalance(String(a.balance || ""));
     setEditApy(a.confirmed_post_promo_apy != null ? String(a.confirmed_post_promo_apy) : a.current_apy != null ? String(a.current_apy) : "");
     setEditDD("");
@@ -349,6 +352,7 @@ export function AccountTrackerHub({
           if (profileError) setError("Account balance saved, but My Plan totals could not update: " + profileError.message);
         }
       }
+      setSavedNotice("Account update saved.");
       router.refresh();
     }
     setSaving(false);
@@ -397,7 +401,7 @@ export function AccountTrackerHub({
     setError(dbError?.message || "");
     setEditDD("");
     setSaving(false);
-    if (!dbError) router.refresh();
+    if (!dbError) {setSavedNotice("Deposit progress saved."); router.refresh();}
   }
 
   async function updateMissionBalance(mission: Mission, amount: number) {
@@ -437,25 +441,29 @@ export function AccountTrackerHub({
     setError(missionResult.error?.message || stepError?.message || "");
     setEditMissionBalance("");
     setSaving(false);
-    if (!missionResult.error && !stepError) router.refresh();
+    if (!missionResult.error && !stepError) {setSavedNotice("Savings progress saved."); router.refresh();}
   }
 
   function rotateToSavings() {
     setSelectedAccountId(null);
     setSelectedMissionId(null);
     setAdding(false);
+    const nextMove = document.getElementById("next-move");
+    if (nextMove instanceof HTMLDetailsElement) nextMove.open = true;
     window.setTimeout(() => document.getElementById("savings-decision")?.scrollIntoView({ behavior: "smooth", block: "start" }), 40);
   }
 
   const drawerOpen = selectedAccount || selectedMission || adding;
   return (
     <>
-      <section className="cash-accounts-hub">
+      <section className="cash-accounts-hub" id="my-accounts">
+        {savedNotice ? <p role="status" className="form-success">{savedNotice}</p> : null}
+        <p className="progress-checkin"><strong>Paid today or moved money?</strong> Come back after each payday or deposit and choose Update progress. These balances are entered by you; Churning does not automatically read your bank activity.</p>
         <div className="cash-accounts-header">
           <div><small>YOUR ACCOUNTS</small><strong>{cards.length ? cards.length + " tracked" : "No accounts yet"}</strong></div>
           <button type="button" onClick={() => { setAdding(true); setError(""); }}><Plus size={14} /> Add account</button>
         </div>
-        {cards.length ? <div className="cash-accounts-cards">{cards.slice(0, 8).map((card) => (
+        {cards.length ? <div className="cash-accounts-cards">{cards.map((card) => (
           <div className={"cash-owned-card" + (card.urgent ? " urgent" : "")} key={card.key}>
             <div className="cash-owned-top"><span><small>{card.institution}</small><strong>{card.typeLabel}</strong><em>{card.name}</em></span><b>{card.value}</b></div>
             <div className="cash-owned-badge-row">
@@ -467,7 +475,7 @@ export function AccountTrackerHub({
             {card.progressLabel ? <div className="cash-progress-date"><strong>{card.progressLabel}</strong><small>{card.progressDetail}</small></div> : null}
             {card.progress != null ? <div className="cash-owned-progress"><span style={{ width: card.progress + "%" }} /></div> : null}
             <button type="button" className="cash-owned-update" onClick={() => card.kind === "account" ? openAccount(card.id) : card.kind === "baseline" ? openBaselineSavings() : (setEditFundedAt(null), setEditMissionBalance(""), setSelectedMissionId(card.id))}>
-              <span>{card.urgent ? <ShieldAlert size={13} /> : <CheckCircle2 size={13} />}{card.subtitle}</span><em>{card.kind === "baseline" ? "Track details" : "Update"} <ChevronRight size={14} /></em>
+              <span>{card.urgent ? <ShieldAlert size={13} /> : <CheckCircle2 size={13} />}{card.subtitle}</span><em>{card.kind === "baseline" ? "Track details" : "Update progress"} <ChevronRight size={14} /></em>
             </button>
           </div>
         ))}</div> : <div className="cash-owned-empty">N/A · Add a savings or checking account, or choose a roadmap recommendation below.</div>}
@@ -503,6 +511,7 @@ export function AccountTrackerHub({
                 {error ? <p className="cash-account-error">{error}</p> : null}
                 <button type="submit" className="button primary" disabled={saving}><Save size={14}/>{saving ? "Saving…" : "Save account"}</button>
               </form> : null}
+              {savedNotice ? <p role="status" className="form-success">{savedNotice}</p> : null}
               {selectedAccount ? <div className="cash-account-edit">
                 {isEnded(selectedAccount) ? <div className="cash-account-ended"><ShieldAlert size={17}/><span><strong>Benefit ended {formatDate(selectedAccount.promotional_end_date)}</strong><small>Your saved promo date stays on this account. Update only the balance or APY when they change.</small></span></div> : null}
                 <div className="cash-account-details compact">
@@ -553,3 +562,4 @@ export function AccountTrackerHub({
     </>
   );
 }
+

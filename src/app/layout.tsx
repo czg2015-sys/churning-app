@@ -10,6 +10,7 @@ import "./my-plan-dashboard.css";
 import "./roadmap.css";
 import "./plan-lanes.css";
 import "./account-renewal.css";
+import "./public-beta.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
