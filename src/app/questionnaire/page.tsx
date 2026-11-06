@@ -23,8 +23,13 @@ export default async function QuestionnairePage() {
     <main className="page-shell">
       <div className="shell questionnaire-wrap">
         <div className="page-heading">
-          <div><span className="kicker">MY PROFILE</span><h1>Your money. Your preferences.</h1><p>Update your savings, paycheck and preferences here. Your answers stay saved. To record a bank deposit or bonus payment, use Update progress in My Plan.</p></div>
+          {profile ? (
+            <div><span className="kicker">MY PROFILE</span><h1>Your money, all in one place.</h1><p>These are your saved answers. Change them anytime. To record a real deposit or bonus payment, choose Update progress in My Plan.</p></div>
+          ) : (
+            <div><span className="kicker">GET STARTED</span><h1>Let's find bank offers that could work for you.</h1><p>Start with your checking, savings, and money you need for bills. Add paycheck details if you have them. Estimates are fine, and you can edit everything later.</p></div>
+          )}
         </div>
+        <div className="profile-intro-guide"><span aria-hidden="true">✓</span><div><strong>{profile ? "Want to change one answer?" : "No bank logins or account numbers needed"}</strong><p>{profile ? "Open the section you want, make your changes, and save. Your tracked bank accounts remain in My Plan." : "The first section is about your money. The other sections help us match offers but can be filled out later."}</p></div></div>
         <QuestionnaireForm initial={(profile as FinancialProfile | null) || null} initialBanks={((bankHistory || []) as Array<{ institution: string }>).map((row) => row.institution)} initialState={userProfile?.state_code || "CA"} />
       </div>
     </main>
