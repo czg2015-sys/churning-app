@@ -199,7 +199,7 @@ export function QuestionnaireForm({
   return (
     <form className="form-card planner-form" onSubmit={submit} onInvalidCapture={(event) => { const section = (event.target as HTMLElement).closest("details"); if (section) section.open = true; }}>
       <div className="questionnaire-guidance">
-        <div><BadgeCheck size={18} /><span><strong>More accurate answers = better matches.</strong><small>Estimates are okay. Skip optional questions when you truly do not know.</small></span></div>
+        <div><BadgeCheck size={18} /><span><strong>You can start with estimates.</strong><small>Only share what you're comfortable with. You can update your answers later.</small></span></div>
         <div><Info size={16} /><span>Churning provides educational comparisons and tracking tools, not financial, tax, or legal advice.</span></div>
       </div>
 
@@ -207,41 +207,41 @@ export function QuestionnaireForm({
 
       <div className="form-stack">
         <details className="planner-section profile-section" open>
-          <summary className="form-section-heading"><span>01</span><div><h3>Where is your cash today?</h3><p>Enter money in your bank accounts, leaving out investments. Tell us how much must stay untouched for bills and emergencies.</p></div></summary>
+          <summary className="form-section-heading"><span>01</span><div><h3>How much money do you have available?</h3><p>Enter a rough amount in checking and savings. Tell us how much you need to leave alone for bills or emergencies.</p></div></summary>
           <div className="form-grid">
-            <div className="field"><label htmlFor="savings_cash">Cash currently in savings</label><FormattedNumberInput id="savings_cash" name="savings_cash" value={savingsCash} onValueChange={setSavingsCash} required /><small>Include savings and money-market cash you could move.</small></div>
-            <div className="field"><label htmlFor="checking_cash">Cash currently in checking</label><FormattedNumberInput id="checking_cash" name="checking_cash" value={checkingCash} onValueChange={setCheckingCash} /><small>Include your checking balance. Put money needed for bills in the untouched amount below.</small></div>
-            <div className="field"><label htmlFor="emergency_reserve">Cash you want left completely untouched</label><FormattedNumberInput id="emergency_reserve" name="emergency_reserve" value={emergencyReserve} onValueChange={setEmergencyReserve} required /><small>Your reserve stays outside the opportunity budget.</small></div>
+            <div className="field"><label htmlFor="savings_cash">About how much do you have in savings?</label><FormattedNumberInput id="savings_cash" name="savings_cash" value={savingsCash} onValueChange={setSavingsCash} required /><small>Include savings and money-market cash you could move.</small></div>
+            <div className="field"><label htmlFor="checking_cash">About how much do you have in checking?</label><FormattedNumberInput id="checking_cash" name="checking_cash" value={checkingCash} onValueChange={setCheckingCash} /><small>Include your checking balance. Put money needed for bills in the untouched amount below.</small></div>
+            <div className="field"><label htmlFor="emergency_reserve">How much should stay untouched for bills or emergencies?</label><FormattedNumberInput id="emergency_reserve" name="emergency_reserve" value={emergencyReserve} onValueChange={setEmergencyReserve} required /><small>We won't suggest using this amount for bank bonuses.</small></div>
             <div className="field"><label htmlFor="state_code">Home state</label><select id="state_code" name="state_code" defaultValue={initialState}>{usStates.map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select><small>Used only to filter state-limited offers and terms.</small></div>
           </div>
 
           <div className={`cash-auto-summary ${reserveWarning ? "warning" : ""}`}>
-            <div><small>Total liquid cash</small><strong>{dollars(totalCash)}</strong></div>
-            <div><small>Protected reserve</small><strong>{dollars(Math.min(emergencyReserve, totalCash))}</strong></div>
-            <div><small>Cash available after reserve</small><strong>{dollars(availableAfterReserve)}</strong></div>
+            <div><small>Total money you entered</small><strong>{dollars(totalCash)}</strong></div>
+            <div><small>Money kept untouched</small><strong>{dollars(Math.min(emergencyReserve, totalCash))}</strong></div>
+            <div><small>Money left after bills and savings</small><strong>{dollars(availableAfterReserve)}</strong></div>
           </div>
 
           <div className="optional-toggle-block">
-            <div><strong>Are you currently earning interest on your savings?</strong><small>This gives us your real baseline so we can compare whether an offer is actually better.</small></div>
+            <div><strong>Does your savings account already pay you interest?</strong><small>If you know the rate, we can compare new offers with what your bank already pays.</small></div>
             <div className="choice-pills"><button type="button" className={hasCurrentSavingsYield ? "active" : ""} onClick={() => setHasCurrentSavingsYield(true)}>Yes</button><button type="button" className={!hasCurrentSavingsYield ? "active" : ""} onClick={() => setHasCurrentSavingsYield(false)}>No / not sure</button></div>
           </div>
-          {hasCurrentSavingsYield && <div className="field inline-compact-field"><label htmlFor="current_hysa_apy">Current savings APY</label><FormattedPercentInput id="current_hysa_apy" name="current_hysa_apy" max={20} defaultValue={Number(profile.current_hysa_apy || 0)} placeholder="4.10" /><small>Use the APY shown by your bank, not the monthly interest amount.</small></div>}
+          {hasCurrentSavingsYield && <div className="field inline-compact-field"><label htmlFor="current_hysa_apy">Your bank's yearly savings rate (APY)</label><FormattedPercentInput id="current_hysa_apy" name="current_hysa_apy" max={20} defaultValue={Number(profile.current_hysa_apy || 0)} placeholder="4.10" /><small>Look for “APY” in your bank app. It's okay if you don't know it.</small></div>}
         </details>
 
         <details className="planner-section profile-section">
-          <summary className="form-section-heading"><span>02</span><div><h3>Your paycheck and normal spending</h3><p>Direct deposit means your employer sends your pay straight to your bank. These answers help us check which bonuses your pay could cover.</p></div></summary>
+          <summary className="form-section-heading"><span>02</span><div><h3>Do you get paid by direct deposit?</h3><p>Direct deposit just means your employer sends your paycheck to a bank. Tell us about it so we can find paycheck bonuses you might qualify for.</p></div></summary>
           <div className="form-grid">
-            <div className="field"><label htmlFor="dd_source_count">How many separate paychecks / direct deposit sources do you receive?</label><select id="dd_source_count" name="dd_source_count" value={ddSourceCount} onChange={(event) => setDdSourceCount(Number(event.target.value))}><option value={1}>1 paycheck source</option><option value={2}>2 paycheck sources</option><option value={3}>3 paycheck sources</option></select><small>Count jobs or income streams, not bank accounts. Don't double count the same paycheck.</small></div>
-            <div className="field"><label htmlFor="employer_multiple_dd">Can your employer split a paycheck between bank accounts?</label><select id="employer_multiple_dd" name="employer_multiple_dd" defaultValue={profile.employer_multiple_dd === true ? "yes" : profile.employer_multiple_dd === false ? "no" : "unknown"}><option value="unknown">I don't know</option><option value="yes">Yes, they allow a split</option><option value="no">No, one bank per paycheck</option></select><small>If you don't know, Churning will not assume you can split.</small></div>
+            <div className="field"><label htmlFor="dd_source_count">How many jobs or income sources pay you?</label><select id="dd_source_count" name="dd_source_count" value={ddSourceCount} onChange={(event) => setDdSourceCount(Number(event.target.value))}><option value={1}>1 paycheck source</option><option value={2}>2 paycheck sources</option><option value={3}>3 paycheck sources</option></select><small>Count jobs or income streams, not bank accounts. Don't double count the same paycheck.</small></div>
+            <div className="field"><label htmlFor="employer_multiple_dd">Can your paycheck go to more than one bank?</label><select id="employer_multiple_dd" name="employer_multiple_dd" defaultValue={profile.employer_multiple_dd === true ? "yes" : profile.employer_multiple_dd === false ? "no" : "unknown"}><option value="unknown">I don't know</option><option value="yes">Yes, they allow a split</option><option value="no">No, one bank per paycheck</option></select><small>If you don't know, Churning will not assume you can split.</small></div>
             {ddSourceCount === 1 ? <>
-                <div className="field"><label htmlFor="biweekly_pay">Average take-home amount per two weeks</label><FormattedNumberInput id="biweekly_pay" name="biweekly_pay" defaultValue={Number(profile.biweekly_pay)} placeholder="650" /><small>This is the most you can route before keeping money for bills.</small></div>
+                <div className="field"><label htmlFor="biweekly_pay">About how much do you get paid every 2 weeks?</label><FormattedNumberInput id="biweekly_pay" name="biweekly_pay" defaultValue={Number(profile.biweekly_pay)} placeholder="650" /><small>This is the most you can route before keeping money for bills.</small></div>
                 <div className="field"><label htmlFor="dd_next_0">Next expected payday <span className="optional-label">optional</span></label><input id="dd_next_0" type="date" value={ddSourceNextDates[0] || ""} onChange={(event) => setDdSourceNextDates((prev) => { const nextValues = [...prev]; nextValues[0] = event.target.value; return nextValues; })}/><small>Used for estimates. Your actual bank deposit dates determine progress.</small></div>
               </>
               : Array.from({ length: ddSourceCount }, (_, index) => <div className="dd-source-pair" key={index}>
                   <div className="field"><label htmlFor={`dd_source_${index}`}>Income source ${index + 1} — average take-home per two weeks</label><FormattedNumberInput id={`dd_source_${index}`} name={`dd_source_${index}`} value={ddSourceAmounts[index] || 0} onValueChange={(value) => setDdSourceAmounts((prev) => { const nextValues = [...prev]; nextValues[index] = Math.max(0, value); return nextValues; })} placeholder="650"/><small>Use an equivalent two-week amount so we can test each source independently.</small></div>
                   <div className="field"><label htmlFor={`dd_next_${index}`}>Source ${index + 1} next payday <span className="optional-label">optional</span></label><input id={`dd_next_${index}`} type="date" value={ddSourceNextDates[index] || ""} onChange={(event) => setDdSourceNextDates((prev) => { const nextValues = [...prev]; nextValues[index] = event.target.value; return nextValues; })}/><small>Used only to estimate when a DD requirement could finish.</small></div>
                 </div>)}
-            <div className="field"><label htmlFor="biweekly_essential_spend">About how much every 2 weeks goes to essentials?</label><FormattedNumberInput id="biweekly_essential_spend" name="biweekly_essential_spend" defaultValue={Number(profile.biweekly_essential_spend)} placeholder="500" /><small>Rent, food, gas, bills. Keep access to this money.</small></div>
+            <div className="field"><label htmlFor="biweekly_essential_spend">About how much do you need every 2 weeks for bills?</label><FormattedNumberInput id="biweekly_essential_spend" name="biweekly_essential_spend" defaultValue={Number(profile.biweekly_essential_spend)} placeholder="500" /><small>Rent, food, gas, bills. Keep access to this money.</small></div>
           </div>
 
           <div className="optional-toggle-block">
@@ -255,7 +255,7 @@ export function QuestionnaireForm({
         </details>
 
         <details className="planner-section profile-section">
-          <summary className="form-section-heading"><span>03</span><div><h3>How hands-on do you want to be?</h3><p>Your pace controls how many opportunities we surface at once. You can change it anytime.</p></div></summary>
+          <summary className="form-section-heading"><span>03</span><div><h3>How much work do you want to do? (Optional)</h3><p>Some bonuses take more effort than others. Choose the approach you prefer. You can change it later.</p></div></summary>
           <div className="strategy-options detailed">
             {[
               { id: 1, name: "Simple", badge: "LOW UPKEEP", copy: "Usually one active move at a time. Prioritizes liquidity, easy requirements, and fewer accounts to manage." },
@@ -274,14 +274,14 @@ export function QuestionnaireForm({
         </details>
 
         <details className="planner-section profile-section">
-          <summary className="form-section-heading"><span>04</span><div><h3>Optional tax estimate</h3><p>We use this only to estimate what a bonus or interest may be worth after taxes. If you do not know it, skip it and we will show pre-tax comparisons.</p></div></summary>
+          <summary className="form-section-heading"><span>04</span><div><h3>Tax estimate (optional)</h3><p>We use this only to estimate what a bonus or interest may be worth after taxes. If you do not know it, skip it and we will show pre-tax comparisons.</p></div></summary>
           <div className="switch-row"><input id="tax-known" type="checkbox" checked={taxKnown} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setTaxKnown(event.target.checked)} /><label htmlFor="tax-known">I know my approximate combined tax rate</label></div>
           {taxKnown && <div className="field" style={{ marginTop: 14, maxWidth: 300 }}><label htmlFor="estimated_tax_rate">Approximate combined tax rate</label><FormattedPercentInput id="estimated_tax_rate" name="estimated_tax_rate" max={60} defaultValue={Number(profile.estimated_tax_rate || 0)} placeholder="22" /></div>}
           <div className="explain-inline"><CircleHelp size={16} /><span>Example: a 22% estimate means we would show a $400 taxable bonus as roughly $312 after estimated taxes. Your actual tax treatment can differ.</span></div>
         </details>
 
         <details className="planner-section profile-section">
-          <summary className="form-section-heading"><span>05</span><div><h3>Your banking history</h3><p>Which banks have you used? This helps check new-customer rules. Adding a bank here does not start a bonus tracker.</p></div></summary>
+          <summary className="form-section-heading"><span>05</span><div><h3>Banks you've used before (optional)</h3><p>Some banks only pay bonuses to new customers. Tell us which ones you've used so we can flag restrictions. This won't start a tracker.</p></div></summary>
           <div className="form-grid banking-history-grid">
             <div className="field"><label htmlFor="recent_bank_openings">Checking or savings accounts opened in the last 12 months</label><FormattedNumberInput id="recent_bank_openings" name="recent_bank_openings" defaultValue={Number(profile.recent_bank_openings || 0)} /><small>Include accounts opened outside Churning too.</small></div>
             <div className="banking-signal-note"><strong>Why we ask</strong><p>Banks use different screening and eligibility rules. Churning treats this as a planning signal and publishes known ChexSystems/EWS/inquiry research when available.</p></div>
@@ -300,7 +300,7 @@ export function QuestionnaireForm({
       </div>
 
       {error && <div className="form-error" style={{ marginTop: 18 }}>{error}</div>}
-      <div className="form-actions">{guestMode && <Link className="text-link back-link" href="/"><ArrowLeft size={16} /> Back home</Link>}<button className="button primary" type="submit" disabled={saving}>{saving ? "Saving your profile…" : <><Sparkles size={17} /> {initial ? "Save profile" : "Create my plan"} <ArrowRight size={18} /></>}</button></div>
+      <div className="form-actions">{guestMode && <Link className="text-link back-link" href="/"><ArrowLeft size={16} /> Back home</Link>}<button className="button primary" type="submit" disabled={saving}>{saving ? "Saving your profile…" : <><Sparkles size={17} /> {initial ? "Save profile" : "See my plan"} <ArrowRight size={18} /></>}</button></div>
     </form>
   );
 }
