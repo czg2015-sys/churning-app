@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { TopOpportunityTable } from "@/components/top-opportunity-table";
+import { getLiveOpportunities } from "@/lib/opportunities";
 import { ArrowRight, CalendarClock, CheckCircle2, CircleCheck, Landmark, LockKeyhole, ShieldCheck, Sparkles, WalletCards } from "lucide-react";
 
 function HomeDashboardExample() {
