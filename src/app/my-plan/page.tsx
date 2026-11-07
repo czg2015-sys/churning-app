@@ -3,7 +3,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowUpRight, CreditCard, Settings2, History } from "lucide-react";
 import { PlanStrategyHub } from "@/components/plan-strategy-hub";
-import { TopOpportunityTable } from "@/components/top-opportunity-table";
 import { SignOutButton } from "@/components/sign-out-button";
 import { createClient } from "@/lib/supabase/server";
 import type { AccountHistory, FinancialProfile, Mission, Opportunity, TrackedCashAccount } from "@/lib/types";
@@ -17,7 +16,7 @@ export default async function MyPlanPage() {
   const userId = claimsData?.claims?.sub;
   if (!userId) redirect("/auth");
 
-  const [{ data: profile }, { data: opportunities }, { data: missions }, { data: bankHistory }, { data: userProfile }, { data: trackedAccounts }] = await Promise.all([
+  const [{ data: profile, error: profileError }, { data: opportunities, error: offersError }, { data: missions, error: missionsError }, { data: bankHistory, error: historyError }, { data: userProfile, error: userError }, { data: trackedAccounts, error: accountsError }] = await Promise.all([
     supabase.from("financial_profiles").select("*").eq("user_id", userId).maybeSingle(),
     supabase.from("opportunities").select("*, opportunity_reviews(*)").eq("offer_status", "live"),
     supabase.from("missions").select("*, mission_steps(*), opportunity:opportunities(*, opportunity_reviews(*))").eq("user_id", userId).order("created_at", { ascending: false }),
@@ -25,6 +24,8 @@ export default async function MyPlanPage() {
     supabase.from("profiles").select("state_code").eq("user_id", userId).maybeSingle(),
     supabase.from("tracked_cash_accounts").select("*").eq("user_id", userId).eq("status", "active"),
   ]);
+
+  if (profileError || offersError || missionsError || historyError || userError || accountsError) throw new Error("Your saved plan could not be loaded. Please retry; your saved accounts have not been removed.");
 
   if (!profile) redirect("/questionnaire");
 
@@ -63,7 +64,7 @@ export default async function MyPlanPage() {
           stateCode={stateCode}
           addedOpportunityIds={addedOpportunityIds}
         />
-        <TopOpportunityTable opportunities={typedOpportunities} profile={typedProfile} usedBanks={usedBanks} history={typedHistory} missions={typedMissions} stateCode={stateCode} heading="Browse the best options by category." />
+        <p className="progress-checkin">Looking for another bank? <Link href="/opportunities">Browse all Opportunities →</Link></p>
       </div>
     </main>
   );

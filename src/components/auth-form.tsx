@@ -47,6 +47,16 @@ export function AuthForm() {
     return () => { active = false; };
   }, []);
 
+  async function resetPassword() {
+    if (!email) { setMessage({type: "error", text: "Enter your email first."}); return; }
+    setLoading(true);
+    try {
+      const {error} = await withTimeout(createClient().auth.resetPasswordForEmail(email, {redirectTo: window.location.origin + "/auth/confirm?next=/auth/reset-password"}));
+      setMessage(error ? {type:"error",text:error.message} : {type:"success",text:"If an account matches that email, a password reset link will arrive shortly. Open it in this browser."});
+    } catch { setMessage({type:"error",text:"Could not request a reset link. Please try again."}); }
+    finally {setLoading(false);}
+  }
+
   async function resendConfirmation() {
     if (!email) {
       setMessage({ type: "error", text: "Enter your email first." });
@@ -126,7 +136,7 @@ export function AuthForm() {
         {mode === "signin" ? (
           <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid var(--line)", borderRadius: 10, background: "rgba(255,255,255,.025)", cursor: "default" }}>
             <input type="checkbox" checked readOnly aria-label="Keep me signed in" />
-            <span style={{ display: "grid", gap: 1 }}><strong style={{ fontSize: 14 }}>Keep me signed in</strong><small style={{ color: "var(--muted)" }}>Stays signed in on this device until you choose Sign out.</small></span>
+            <span style={{ display: "grid", gap: 1 }}><strong style={{ fontSize: 14 }}>Keep me signed in</strong><small style={{ color: "var(--muted)" }}>Keeps your session on this device. You may occasionally need to sign in again.</small></span>
           </label>
         ) : null}
 
@@ -134,6 +144,7 @@ export function AuthForm() {
         <button className="button primary full" type="submit" disabled={loading}>{loading ? "Signing in…" : mode === "signin" ? "Sign in" : "Create account"}</button>
         {mode === "signup" && awaitingConfirmation && <button className="button full" type="button" onClick={resendConfirmation} disabled={resending}>{resending ? "Resending…" : "Resend confirmation email"}</button>}
       </form>
+      {mode === "signin" ? <button type="button" className="button ghost full" disabled={loading} onClick={resetPassword}>Forgot password?</button> : null}
       <div className="auth-toggle">{mode === "signin" ? "New to Churning? " : "Already have an account? "}<button type="button" onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setMessage(null); setAwaitingConfirmation(false); }}>{mode === "signin" ? "Create an account" : "Sign in"}</button></div>
       <div className="auth-divider"><span>or</span></div>
       <Link className="button guest-auth-button full" href="/guest"><Sparkles size={17} /> Continue as guest</Link>
