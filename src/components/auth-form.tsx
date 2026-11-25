@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
+const REMEMBERED_EMAIL = "churning.remembered-email";
 const AUTH_TIMEOUT_MS = 12_000;
 
 function withTimeout<T>(promise: Promise<T>, ms = AUTH_TIMEOUT_MS): Promise<T> {
@@ -24,14 +26,29 @@ function friendlySignInError(message: string) {
   return message;
 }
 
+function subscribeToStorage(notify: () => void) {
+  window.addEventListener("storage", notify);
+  return () => window.removeEventListener("storage", notify);
+}
+
+function readSavedEmail() {
+  try { return localStorage.getItem(REMEMBERED_EMAIL) || ""; }
+  catch { return ""; }
+}
+
 export function AuthForm() {
+  const confirmationFailed = useSearchParams().get("error") === "confirmation";
+  const savedEmail = useSyncExternalStore(subscribeToStorage, readSavedEmail, () => "");
+  const [rememberChoice, setRememberEmail] = useState<boolean>();
+  const rememberEmail = rememberChoice ?? Boolean(savedEmail);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState("");
+  const [editedEmail, setEmail] = useState<string>();
+  const email = editedEmail ?? savedEmail;
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
-  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
-  const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(confirmationFailed);
+  const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(confirmationFailed ? { type: "error", text: "That email link could not be verified. Request a new confirmation below, or choose Forgot password for a reset link." } : null);
 
   useEffect(() => {
     let active = true;
@@ -47,18 +64,25 @@ export function AuthForm() {
     return () => { active = false; };
   }, []);
 
+  function saveEmail(value: string | null) {
+    try {
+      if (value) localStorage.setItem(REMEMBERED_EMAIL, value);
+      else localStorage.removeItem(REMEMBERED_EMAIL);
+    } catch { /* Sign-in also works without browser storage. */ }
+  }
+
   async function resetPassword() {
-    if (!email) { setMessage({type: "error", text: "Enter your email first."}); return; }
+    if (!email.trim()) { setMessage({type: "error", text: "Enter your email first."}); return; }
     setLoading(true);
     try {
-      const {error} = await withTimeout(createClient().auth.resetPasswordForEmail(email, {redirectTo: window.location.origin + "/auth/confirm?next=/auth/reset-password"}));
+      const {error} = await withTimeout(createClient().auth.resetPasswordForEmail(email.trim(), {redirectTo: window.location.origin + "/auth/confirm?next=/auth/reset-password"}));
       setMessage(error ? {type:"error",text:error.message} : {type:"success",text:"If an account matches that email, a password reset link will arrive shortly. Open it in this browser."});
     } catch { setMessage({type:"error",text:"Could not request a reset link. Please try again."}); }
     finally {setLoading(false);}
   }
 
   async function resendConfirmation() {
-    if (!email) {
+    if (!email.trim()) {
       setMessage({ type: "error", text: "Enter your email first." });
       return;
     }
@@ -67,7 +91,7 @@ export function AuthForm() {
     try {
       const supabase = createClient();
       const emailRedirectTo = window.location.origin + "/auth/confirm?next=/my-plan";
-      const { error } = await withTimeout(supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo } }));
+      const { error } = await withTimeout(supabase.auth.resend({ type: "signup", email: email.trim(), options: { emailRedirectTo } }));
       if (error) {
         setMessage({ type: "error", text: error.message.toLowerCase().includes("already confirmed") ? "This email is already confirmed. Switch to Sign in instead." : error.message });
         return;
@@ -91,8 +115,9 @@ export function AuthForm() {
     try {
       const supabase = createClient();
       if (mode === "signin") {
-        const { data, error } = await withTimeout(supabase.auth.signInWithPassword({ email, password }));
+        const { data, error } = await withTimeout(supabase.auth.signInWithPassword({ email: email.trim(), password }));
         if (error) {
+          setAwaitingConfirmation(error.code === "email_not_confirmed" || error.message.toLowerCase().includes("email not confirmed"));
           setMessage({ type: "error", text: friendlySignInError(error.message) });
           return;
         }
@@ -102,19 +127,22 @@ export function AuthForm() {
         }
 
         // A full navigation makes sure the new auth cookies are read by the server header immediately.
-        window.location.assign("/my-plan");
+        saveEmail(rememberEmail ? email.trim() : null);
+        window.location.replace("/my-plan");
         return;
       }
 
       const emailRedirectTo = window.location.origin + "/auth/confirm?next=/my-plan";
-      const { data, error } = await withTimeout(supabase.auth.signUp({ email, password, options: { emailRedirectTo } }));
+      const { data, error } = await withTimeout(supabase.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo } }));
       if (error) {
         setMessage({ type: "error", text: error.message });
       } else if (data.session) {
-        window.location.assign("/my-plan");
+        saveEmail(rememberEmail ? email.trim() : null);
+        window.location.replace("/my-plan");
       } else {
+        saveEmail(rememberEmail ? email.trim() : null);
         setAwaitingConfirmation(true);
-        setMessage({ type: "success", text: "Check your email for a confirmation link. If it doesn’t arrive, check spam or use Resend confirmation below. If you’ve used this email before, switch to Sign in instead." });
+        setMessage({ type: "success", text: "Check your inbox and spam folder for a confirmation link. Already registered? Choose Sign in." });
       }
     } catch (error) {
       console.error("[auth] Sign-in unavailable", error);
@@ -127,25 +155,29 @@ export function AuthForm() {
 
   return (
     <div className="auth-card">
-      <h2>{mode === "signin" ? "Welcome back" : "Create your account"}</h2>
-      <p>{mode === "signin" ? "Your plan is right where you left it." : "It takes about two minutes to build your first plan."}</p>
+      <h1>{mode === "signin" ? "Sign in to Churning" : "Create your account"}</h1>
+
       <form className="form-stack" onSubmit={submit}>
-        <div className="field"><label htmlFor="email">Email</label><input id="email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></div>
-        <div className="field"><label htmlFor="password">Password</label><input id="password" type="password" minLength={8} autoComplete={mode === "signin" ? "current-password" : "new-password"} value={password} onChange={(event) => setPassword(event.target.value)} required />{mode === "signup" && <small>Use at least 8 characters.</small>}</div>
+        <div className="field"><label htmlFor="email">Email</label><input id="email" name="email" type="email" autoCapitalize="none" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} required /></div>
+        <div className="field"><label htmlFor="password">Password</label><input id="password" name="password" type="password" minLength={mode === "signup" ? 8 : undefined} autoComplete={mode === "signin" ? "current-password" : "new-password"} value={password} onChange={(event) => setPassword(event.target.value)} required />{mode === "signup" && <small>Use at least 8 characters.</small>}</div>
 
-        {mode === "signin" ? (
-          <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid var(--line)", borderRadius: 10, background: "rgba(255,255,255,.025)", cursor: "default" }}>
-            <input type="checkbox" checked readOnly aria-label="Keep me signed in" />
-            <span style={{ display: "grid", gap: 1 }}><strong style={{ fontSize: 14 }}>Keep me signed in</strong><small style={{ color: "var(--muted)" }}>Keeps your session on this device. You may occasionally need to sign in again.</small></span>
-          </label>
-        ) : null}
+        <label className="remember-email">
+          <input type="checkbox" checked={rememberEmail} onChange={(event) => {
+            setRememberEmail(event.target.checked);
+            if (!event.target.checked) {
+              setEmail(email);
+              saveEmail(null);
+            }
+          }} />
+          Remember my email on this device
+        </label>
 
-        {message && <div className={message.type === "error" ? "form-error" : "form-success"}>{message.text}</div>}
-        <button className="button primary full" type="submit" disabled={loading}>{loading ? "Signing in…" : mode === "signin" ? "Sign in" : "Create account"}</button>
-        {mode === "signup" && awaitingConfirmation && <button className="button full" type="button" onClick={resendConfirmation} disabled={resending}>{resending ? "Resending…" : "Resend confirmation email"}</button>}
+        {message && <div role="status" className={message.type === "error" ? "form-error" : "form-success"}>{message.text}</div>}
+        <button className="button primary full" type="submit" disabled={loading || resending}>{loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}</button>
+        {awaitingConfirmation && <button className="button full" type="button" onClick={resendConfirmation} disabled={loading || resending}>{resending ? "Resending…" : "Resend confirmation email"}</button>}
       </form>
-      {mode === "signin" ? <button type="button" className="button ghost full" disabled={loading} onClick={resetPassword}>Forgot password?</button> : null}
-      <div className="auth-toggle">{mode === "signin" ? "New to Churning? " : "Already have an account? "}<button type="button" onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setMessage(null); setAwaitingConfirmation(false); }}>{mode === "signin" ? "Create an account" : "Sign in"}</button></div>
+      {mode === "signin" ? <button type="button" className="button ghost full" disabled={loading || resending} onClick={resetPassword}>Forgot password?</button> : null}
+      <div className="auth-toggle">{mode === "signin" ? "New to Churning? " : "Already have an account? "}<button disabled={loading || resending} type="button" onClick={() => { setPassword(""); setMode(mode === "signin" ? "signup" : "signin"); setMessage(null); setAwaitingConfirmation(false); }}>{mode === "signin" ? "Create an account" : "Sign in"}</button></div>
       <div className="auth-divider"><span>or</span></div>
       <Link className="button guest-auth-button full" href="/guest"><Sparkles size={17} /> Continue as guest</Link>
       <p className="auth-guest-note">No account needed. Guest plans disappear when you leave.</p>

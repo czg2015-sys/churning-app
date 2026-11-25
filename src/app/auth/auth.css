@@ -1,0 +1,16 @@
+.auth-entry {
+  min-height: calc(100svh - 72px);
+}
+
+.auth-card h1 {
+  font-size: 31px;
+  letter-spacing: -0.04em;
+  margin: 0 0 24px;
+}
+
+.remember-email {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
